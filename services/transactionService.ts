@@ -162,7 +162,6 @@ export async function recordExpense(
   amount: number,
   description: string,
   category: string,
-  userId?: string
 ): Promise<{ success: boolean; ledger?: any; error?: string }> {
   try {
     const ledger = await prisma.ledger.create({
@@ -173,7 +172,6 @@ export async function recordExpense(
         description,
         category,
         referenceType: 'EXPENSE',
-        userId,
       },
     });
     return { success: true, ledger };
@@ -186,8 +184,7 @@ export async function recordPettyCash(
   storeId: string,
   amount: number,
   description: string,
-  type: 'IN' | 'OUT',
-  userId?: string
+  type: 'IN' | 'OUT'
 ): Promise<{ success: boolean; pettyCash?: any; error?: string }> {
   try {
     const pettyCash = await prisma.pettyCash.create({
@@ -196,7 +193,6 @@ export async function recordPettyCash(
         amount: type === 'IN' ? amount : -amount,
         description,
         type: type === 'IN' ? 'IN' : 'OUT',
-        userId,
       },
     });
     
