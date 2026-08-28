@@ -13,7 +13,6 @@ const nextConfig = {
         hostname: '**',
       },
     ],
-    maximumFileSize: '2mb',
   },
   async headers() {
     return [
