@@ -32,10 +32,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
     
-    if (!result.user.isActive) {
-      return NextResponse.json({ error: 'Account is disabled' }, { status: 403 });
-    }
-    
     return NextResponse.json({
       success: true,
       user: { id: result.user.id, email: result.user.email, role: result.user.role, storeId: result.user.storeId, firstName: result.user.firstName, lastName: result.user.lastName },
