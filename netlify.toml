@@ -3,19 +3,16 @@
 
 [build]
   command = "npm run build"
-  publish = ".next"
+  publish = ".next/standalone"
 
 [build.environment]
   NODE_VERSION = "18"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
-# For Next.js standalone mode
-[functions]
-  server = "node .next/standalone/server.js"
-
+# For Next.js standalone mode - server runs directly
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/server"
+  to = "/"
   status = 200
 
 # Environment variables (set these in Netlify UI Dashboard)
