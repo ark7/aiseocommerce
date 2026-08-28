@@ -30,7 +30,7 @@ export interface AuthResult {
 
 export async function generateToken(payload: UserPayload): Promise<string> {
   const secret = new TextEncoder().encode(JWT_SECRET);
-  const token = await new SignJWT(payload)
+  const token = await new SignJWT({ ...payload } as any)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRES_IN)
@@ -40,7 +40,7 @@ export async function generateToken(payload: UserPayload): Promise<string> {
 
 export async function generateRefreshToken(payload: UserPayload): Promise<string> {
   const secret = new TextEncoder().encode(JWT_SECRET);
-  const token = await new SignJWT({ ...payload, type: 'refresh' })
+  const token = await new SignJWT({ ...payload, type: 'refresh' } as any)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(REFRESH_TOKEN_EXPIRES_IN)
