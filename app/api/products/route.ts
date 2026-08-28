@@ -113,7 +113,8 @@ export async function POST(request: Request) {
     const productData: Record<string, any> = {};
     const images: File[] = [];
     
-    for (const [key, value] of formData.entries()) {
+    const entries = Array.from(formData.entries());
+    for (const [key, value] of entries) {
       if (key === 'images' && value instanceof File) {
         images.push(value);
       } else {
