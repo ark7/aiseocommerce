@@ -41,7 +41,6 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
       }),
       prisma.ledger.count({ where }),
       prisma.ledger.groupBy({
@@ -95,7 +94,6 @@ export async function POST(request: Request) {
         description,
         category,
         referenceType: 'MANUAL',
-        userId: user.id,
       },
     });
     
