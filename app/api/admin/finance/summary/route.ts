@@ -97,7 +97,6 @@ export async function POST(request: Request) {
         description,
         category,
         referenceType: 'MANUAL',
-        userId: user.id,
       },
     });
     
