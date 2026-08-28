@@ -143,7 +143,7 @@ export async function loginUser(
 
 export async function refreshAccessToken(refreshToken: string): Promise<{ token: string; refreshToken: string } | null> {
   try {
-    const payload = await verifyToken(refreshToken);
+    const payload = await verifyToken(refreshToken) as any;
     if (!payload || payload.type !== 'refresh') return null;
     
     const newToken = await generateToken({
