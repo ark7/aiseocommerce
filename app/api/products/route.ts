@@ -176,7 +176,8 @@ export async function PATCH(request: Request) {
     const images: File[] = [];
     const deletedImageIds: string[] = [];
     
-    for (const [key, value] of formData.entries()) {
+    const entries = Array.from(formData.entries());
+    for (const [key, value] of entries) {
       if (key === 'id') continue;
       else if (key === 'images' && value instanceof File) images.push(value);
       else if (key.startsWith('deleteImage_')) deletedImageIds.push(value as string);
