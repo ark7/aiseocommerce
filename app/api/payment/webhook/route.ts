@@ -105,7 +105,10 @@ export async function POST(request: Request) {
     
     if (!result) return NextResponse.json({ error: 'Invalid result' }, { status: 400 });
     
-    const order = await prisma.order.findUnique({ where: { id: result.orderId } });
+    const order = await prisma.order.findUnique({
+      where: { id: result.orderId },
+      include: { payments: true }
+    });
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     
     const existingPayment = order.payments?.find((p: any) => p.transactionId === result.transactionId);
