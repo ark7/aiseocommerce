@@ -52,7 +52,7 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
-    return payload as UserPayload;
+    return payload as any as UserPayload;
   } catch {
     return null;
   }
