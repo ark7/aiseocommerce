@@ -29,7 +29,17 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get('productId');
+    const lowStock = searchParams.get('lowStock');
     const limit = parseInt(searchParams.get('limit') || '50');
+    const threshold = parseInt(searchParams.get('threshold') || '5');
+    
+    // GET /api/admin/stock?lowStock=true - Get low stock products
+    if (lowStock === 'true') {
+      const products = await getLowStockProducts(user.storeId, threshold);
+      return NextResponse.json({ success: true, products });
+    }
+    
+    // GET /api/admin/stock?productId=xxx - Get stock history
     if (!productId) return NextResponse.json({ error: 'productId required' }, { status: 400 });
     
     const product = await prisma.product.findUnique({ where: { id: productId } });
@@ -98,25 +108,5 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true, stockLog: result.stockLog });
   } catch (error) {
     return NextResponse.json({ error: 'Adjust stock failed' }, { status: 500 });
-  }
-}
-
-export async function GET_LOW_STOCK(request: Request) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
-    
-    const { searchParams } = new URL(request.url);
-    const threshold = parseInt(searchParams.get('threshold') || '5');
-    const products = await getLowStockProducts(user.storeId, threshold);
-    return NextResponse.json({ success: true, products });
-  } catch (error) {
-    return NextResponse.json({ error: 'Fetch failed' }, { status: 500 });
   }
 }

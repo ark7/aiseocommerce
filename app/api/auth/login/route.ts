@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { loginUser, incrementLoginAttempts } from '@/lib/auth';
-import { getIPAddress } from '@/middleware';
+import { loginUser } from '@/lib/auth';
+import { getIPAddress, incrementLoginAttempts } from '@/middleware';
 import { z } from 'zod';
 
 const loginSchema = z.object({
