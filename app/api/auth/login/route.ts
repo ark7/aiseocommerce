@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { loginUser } from '@/lib/auth';
 import { getIPAddress, incrementLoginAttempts } from '@/middleware';
@@ -9,7 +10,7 @@ const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validation = loginSchema.safeParse(body);
