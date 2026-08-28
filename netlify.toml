@@ -1,15 +1,13 @@
 # Netlify Configuration for Next.js 14 AI SEO E-Commerce SaaS
-# Using standalone output mode
 
 [build]
   command = "npm run build"
-  publish = ".next/standalone"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
-# For Next.js standalone mode - server runs directly
 [[redirects]]
   from = "/*"
   to = "/"
