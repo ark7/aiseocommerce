@@ -115,9 +115,8 @@ export async function POST(request: Request) {
     if (existingPayment) return NextResponse.json({ success: true, message: 'Already processed' });
     
     await prisma.$transaction([
-      prisma.payment.upsert({
-        where: { transactionId: result.transactionId },
-        create: {
+      prisma.payment.create({
+        data: {
           orderId: result.orderId,
           method: gateway.toUpperCase() as any,
           amount: order.totalAmount,
@@ -125,7 +124,6 @@ export async function POST(request: Request) {
           gatewayResponse: JSON.stringify(payload),
           status: result.status as any,
         },
-        update: { status: result.status as any, gatewayResponse: JSON.stringify(payload) },
       }),
       prisma.order.update({
         where: { id: result.orderId },
