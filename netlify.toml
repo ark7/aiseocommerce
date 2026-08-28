@@ -1,29 +1,29 @@
-# Netlify Configuration for AI SEO E-Commerce SaaS
+# Netlify Configuration for Next.js 14 AI SEO E-Commerce SaaS
+# Using standalone output mode
 
 [build]
-  command = "npm install && npm run build"
+  command = "npm run build"
   publish = ".next"
-  functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
-# Redirect all requests to Next.js server
+# For Next.js standalone mode
+[functions]
+  server = "node .next/standalone/server.js"
+
 [[redirects]]
   from = "/*"
-  to = "/.netlify/functions/server/:splat"
+  to = "/.netlify/functions/server"
   status = 200
 
-[functions]
-  included_functions = ["server"]
-
-# Environment variables (set these in Netlify UI)
+# Environment variables (set these in Netlify UI Dashboard)
 # DATABASE_URL = "postgresql://user:password@host:port/database?sslmode=require"
-# JWT_SECRET = "your-super-strong-secret-key"
+# JWT_SECRET = "your-strong-secret-key"
 # NEXT_PUBLIC_APP_URL = "https://your-site.netlify.app"
 
-# Headers for security
+# Security Headers
 [[headers]]
   for = "/*"
   [headers.values]
@@ -31,9 +31,7 @@
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'"
 
-# Caching
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
@@ -44,7 +42,6 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Context-specific configuration
 [context.production]
   command = "npm run build"
 

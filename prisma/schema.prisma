@@ -21,11 +21,13 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  products  Product[]
-  orders    Order[]
-  ledgers   Ledger[]
-  settings  StoreSettings?
+  users       User[]
+  products    Product[]
+  orders      Order[]
+  ledgers     Ledger[]
+  settings    StoreSettings?
+  categories  Category[]
+  pettyCashes PettyCash[]
 
   @@map("stores")
 }
@@ -66,8 +68,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders        Order[]
-  payments      Payment[]
+  orders           Order[]
+  payments         Payment[]
+  stockLogs        StockLog[]
+  approvedPettyCash PettyCash[]
 
   @@unique([storeId, email])
   @@map("users")
