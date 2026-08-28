@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     if (!store) return { title: 'Store Not Found' };
     
     const product = await prisma.product.findUnique({
-      where: { storeId: store.id, slug: params.slug },
+      where: { storeId_slug: { storeId: store.id, slug: params.slug } },
       include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
     });
     if (!product) return { title: 'Product Not Found' };
@@ -57,7 +57,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     if (!store) return notFound();
     
     const product = await prisma.product.findUnique({
-      where: { storeId: store.id, slug: params.slug },
+      where: { storeId_slug: { storeId: store.id, slug: params.slug } },
       include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
     });
     if (!product || !product.isPublished) return notFound();
