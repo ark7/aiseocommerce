@@ -222,7 +222,7 @@ async function main() {
       id: 'demo-admin-001',
       storeId: store.id,
       email: 'admin@demo-store.local',
-      passwordHash: '$2a$10$xJwL5v5z3b3Z3b3Z3b3Z3u', // placeholder hash
+      passwordHash: '$2a$10$n0.McLoLU/q/CWNQnT/NfOve.baoxIJW8zIW41IxJzJXCrZBsu4AK', // bcrypt hash of 'password'
       firstName: 'Admin',
       lastName: 'Demo',
       phone: '+62 812 3456 7890',
@@ -239,7 +239,7 @@ async function main() {
       id: 'demo-staff-001',
       storeId: store.id,
       email: 'staff@demo-store.local',
-      passwordHash: '$2a$10$xJwL5v5z3b3Z3b3Z3b3Z3u',
+      passwordHash: '$2a$10$n0.McLoLU/q/CWNQnT/NfOve.baoxIJW8zIW41IxJzJXCrZBsu4AK', // bcrypt hash of 'password'
       firstName: 'Staff',
       lastName: 'Demo',
       phone: '+62 812 3456 7891',
@@ -258,7 +258,7 @@ async function main() {
         id: `demo-customer-${String(i + 1).padStart(2, '0')}`,
         storeId: store.id,
         email: `customer${i + 1}@demo-store.local`,
-        passwordHash: '$2a$10$xJwL5v5z3b3Z3b3Z3b3Z3u',
+        passwordHash: '$2a$10$n0.McLoLU/q/CWNQnT/NfOve.baoxIJW8zIW41IxJzJXCrZBsu4AK', // bcrypt hash of 'password'
         firstName: faker.person.firstName(),
         lastName: faker.person.lastName(),
         phone: faker.phone.number(),
