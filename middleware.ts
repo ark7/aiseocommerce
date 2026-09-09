@@ -1,7 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
 import { logger } from '@/lib/logger';
-import { randomUUID } from 'crypto';
+
+// Dynamic imports for Node.js-specific modules
+// These will only be loaded in Node.js runtime
+let jwtVerify: any;
+let randomUUID: () => string;
+
+async function loadNodeModules() {
+  if (!jwtVerify) {
+    const jose = await import('jose');
+    jwtVerify = jose.jwtVerify;
+  }
+  if (!randomUUID) {
+    const crypto = await import('node:crypto');
+    randomUUID = crypto.randomUUID;
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -117,6 +131,9 @@ function addCorsHeaders(response: NextResponse): NextResponse {
 }
 
 export async function middleware(request: NextRequest) {
+  // Load Node.js modules dynamically
+  await loadNodeModules();
+  
   const path = request.nextUrl.pathname;
   const ip = getIPAddress(request);
   const requestId = randomUUID();
