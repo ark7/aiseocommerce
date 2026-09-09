@@ -8,10 +8,10 @@
   NODE_VERSION = "18"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
-[[redirects]]
-  from = "/*"
-  to = "/"
-  status = 200
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+
 
 # Environment variables (set these in Netlify UI Dashboard)
 # DATABASE_URL = "postgresql://user:password@host:port/database?sslmode=require"
