@@ -1,20 +1,25 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
 
-// Dynamic imports for Node.js-specific modules
-// These will only be loaded in Node.js runtime
-let jwtVerify: any;
-let randomUUID: () => string;
+// Lazy load Node.js-specific modules
+let jwtVerifyCache: any = null;
+let randomUUIDCache: (() => string) | null = null;
 
-async function loadNodeModules() {
-  if (!jwtVerify) {
+async function getJwtVerify() {
+  if (!jwtVerifyCache) {
     const jose = await import('jose');
-    jwtVerify = jose.jwtVerify;
+    jwtVerifyCache = jose.jwtVerify;
   }
-  if (!randomUUID) {
-    const crypto = await import('node:crypto');
-    randomUUID = crypto.randomUUID;
+  return jwtVerifyCache;
+}
+
+async function getRandomUUID() {
+  if (!randomUUIDCache) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const crypto = require('crypto');
+    randomUUIDCache = crypto.randomUUID;
   }
+  return randomUUIDCache;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -99,6 +104,7 @@ async function incrementLoginAttempts(ip: string): Promise<void> {
 
 async function verifyJWT(token: string) {
   try {
+    const jwtVerify = await getJwtVerify();
     const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET));
     return payload as { id: string; storeId: string; role: string; email: string };
   } catch {
@@ -131,12 +137,9 @@ function addCorsHeaders(response: NextResponse): NextResponse {
 }
 
 export async function middleware(request: NextRequest) {
-  // Load Node.js modules dynamically
-  await loadNodeModules();
-  
   const path = request.nextUrl.pathname;
   const ip = getIPAddress(request);
-  const requestId = randomUUID();
+  const requestId = (await getRandomUUID())();
   const userAgent = request.headers.get('user-agent') || '';
   const startTime = Date.now();
   
