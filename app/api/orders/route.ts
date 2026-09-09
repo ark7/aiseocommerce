@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { processOrderPayment } from '@/services/transactionService';
+import { auditOrderCreated, auditOrderStatusChanged } from '@/services/auditService';
+import { getIPAddress } from '@/middleware';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({
@@ -78,6 +80,8 @@ export async function POST(request: Request) {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     let user = null;
+    const ip = getIPAddress(request);
+    
     if (token) user = await verifyToken(token);
     
     const body = await request.json();
@@ -138,6 +142,21 @@ export async function POST(request: Request) {
       include: { orderItems: { include: { product: true } } },
     });
     
+    // Log audit for order creation
+    await auditOrderCreated(
+      order.id,
+      user?.id || 'guest',
+      store.id,
+      {
+        orderNumber,
+        totalAmount,
+        customerName,
+        customerEmail,
+        itemCount: items.length,
+      },
+      ip
+    );
+    
     return NextResponse.json({ success: true, order });
   } catch (error) {
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -148,6 +167,8 @@ export async function PATCH(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
+    const ip = getIPAddress(request);
+    
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     const user = await verifyToken(token);
@@ -164,10 +185,24 @@ export async function PATCH(request: Request) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     if (order.storeId !== user.storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     
+    const oldStatus = order.status;
+    
     await prisma.order.update({
       where: { id: orderId },
       data: { status },
     });
+    
+    // Log audit for status change
+    if (oldStatus !== status) {
+      await auditOrderStatusChanged(
+        orderId,
+        user.id,
+        user.storeId,
+        oldStatus,
+        status,
+        ip
+      );
+    }
     
     if (status === 'PAID') {
       await processOrderPayment(orderId, user.id);

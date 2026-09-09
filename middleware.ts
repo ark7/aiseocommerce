@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { logger } from '@/lib/logger';
+import { randomUUID } from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable is required in production');
+}
 
 const PROTECTED_PATHS = [
   /^\/admin/,
@@ -96,25 +102,68 @@ function extractToken(request: NextRequest): string | null {
   return request.cookies.get('token')?.value || null;
 }
 
+const ALLOWED_ORIGINS = [
+  'https://localhost:3000',
+  'http://localhost:3000',
+];
+
+function addCorsHeaders(response: NextResponse): NextResponse {
+  const origin = response.headers.get('origin') || ALLOWED_ORIGINS[0];
+  response.headers.set('Access-Control-Allow-Origin', '*');
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const ip = getIPAddress(request);
+  const requestId = randomUUID();
+  const userAgent = request.headers.get('user-agent') || '';
+  const startTime = Date.now();
+  
+  const logContext = {
+    requestId,
+    ip,
+    method: request.method,
+    path,
+    userAgent: userAgent.substring(0, 100),
+  };
+  
+  logger.info(`Request started`, logContext);
+  
+  if (request.method === 'OPTIONS') {
+    logger.info(`CORS preflight`, logContext);
+    return addCorsHeaders(
+      NextResponse.json({}, { status: 200 })
+    );
+  }
   
   if (!(await checkRateLimit(ip, path))) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    logger.warn('Rate limit exceeded', logContext);
+    return addCorsHeaders(
+      NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    );
   }
   
   if (path === '/api/auth/login' && request.method === 'POST') {
     if (!(await checkLoginBruteForce(ip))) {
-      return NextResponse.json({ error: 'Too many login attempts' }, { status: 429 });
+      logger.warn('Too many login attempts', logContext);
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Too many login attempts' }, { status: 429 })
+      );
     }
   }
   
   if (isProtectedPath(path)) {
     const token = extractToken(request);
     if (!token) {
+      logger.warn('Unauthorized: No token', logContext);
       if (path.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        );
       }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('from', path);
@@ -123,17 +172,25 @@ export async function middleware(request: NextRequest) {
     
     const user = await verifyJWT(token);
     if (!user) {
+      logger.warn('Invalid token', { ...logContext, tokenPreview: token.substring(0, 8) });
       if (path.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+        );
       }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('from', path);
       return NextResponse.redirect(loginUrl);
     }
     
+    logger.info('Authentication successful', { ...logContext, userId: user.id, role: user.role });
+    
     if ((path.startsWith('/admin') || path.startsWith('/api/admin')) && user.role !== 'ADMIN') {
+      logger.warn('Forbidden: Insufficient permissions', { ...logContext, userId: user.id, role: user.role });
       if (path.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        );
       }
       return NextResponse.redirect(new URL('/unauthorized', request.url));
     }
@@ -142,10 +199,19 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set('x-user-id', user.id);
     requestHeaders.set('x-user-role', user.role);
     requestHeaders.set('x-user-store', user.storeId);
-    return NextResponse.next({ request: { headers: requestHeaders } });
+    requestHeaders.set('x-request-id', requestId);
+    
+    const duration = Date.now() - startTime;
+    logger.info(`Request completed`, { ...logContext, userId: user.id, duration });
+    
+    return addCorsHeaders(
+      NextResponse.next({ request: { headers: requestHeaders } })
+    );
   }
   
-  return NextResponse.next();
+  const duration = Date.now() - startTime;
+  logger.info(`Request completed`, { ...logContext, duration });
+  return addCorsHeaders(NextResponse.next());
 }
 
 export const config = {

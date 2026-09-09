@@ -3,8 +3,13 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { getIPAddress, incrementLoginAttempts } from '@/middleware';
 import { NextRequest } from 'next/server';
+import { logger } from './logger';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET environment variable is required in production');
+}
 const JWT_EXPIRES_IN = '7d';
 const REFRESH_TOKEN_EXPIRES_IN = '30d';
 
@@ -98,7 +103,7 @@ export async function registerUser(
       refreshToken: await generateRefreshToken(payload),
     };
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error', {}, error instanceof Error ? error : String(error));
     return null;
   }
 }
@@ -136,7 +141,7 @@ export async function loginUser(
       refreshToken: await generateRefreshToken(payload),
     };
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error', {}, error instanceof Error ? error : String(error));
     return null;
   }
 }
@@ -168,7 +173,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ token:
 
 export async function logoutUser(token: string): Promise<void> {
   // In production, use Redis to blacklist token
-  console.log('Token blacklisted:', token.substring(0, 8) + '...');
+  logger.info('Token blacklisted', { tokenPreview: token.substring(0, 8) + '...' });
 }
 
 export async function getUserById(id: string) {

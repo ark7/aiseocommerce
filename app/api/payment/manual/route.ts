@@ -1,32 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
-import { writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { randomUUID } from 'crypto';
 
-const UPLOAD_DIR = './public/uploads';
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
-
-async function ensureUploadDir() {
-  await mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
-}
-
-function generateFilename(originalName: string): string {
-  const ext = originalName.split('.').pop();
-  return `${randomUUID()}.${ext}`;
-}
-
-async function saveFile(file: File, filename: string): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const filePath = join(UPLOAD_DIR, filename);
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
-}
 
 export async function POST(request: Request) {
   try {
-    await ensureUploadDir();
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -56,8 +35,13 @@ export async function POST(request: Request) {
     const existingPayment = await prisma.payment.findFirst({ where: { orderId } });
     if (existingPayment) return NextResponse.json({ error: 'Payment already exists' }, { status: 400 });
     
-    const filename = generateFilename(proofFile.name);
-    const proofUrl = await saveFile(proofFile, filename);
+    const buffer = Buffer.from(await proofFile.arrayBuffer());
+    const proofData = buffer.toString('base64');
+    const fileInfo = {
+      name: proofFile.name,
+      type: proofFile.type,
+      size: proofFile.size,
+    };
     
     await prisma.$transaction([
       prisma.payment.create({
@@ -65,8 +49,8 @@ export async function POST(request: Request) {
           orderId,
           method: 'MANUAL',
           amount: order.totalAmount,
-          proofUrl,
-          proofFile: filename,
+          proofData,
+          proofFile: JSON.stringify(fileInfo),
           status: 'PENDING',
         },
       }),
@@ -79,7 +63,6 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: 'Payment proof uploaded. Waiting for verification.',
-      proofUrl,
     });
   } catch (error) {
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

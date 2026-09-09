@@ -233,6 +233,7 @@ model Payment {
   amount      Float
   proofUrl    String?
   proofFile   String?
+  proofData   String?       @db.Text
   transactionId String?
   gatewayResponse String? @db.Text
   status      PaymentStatus @default(PENDING)

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { auditPaymentVerified } from '@/services/auditService';
+import { getIPAddress } from '@/middleware';
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
+    const ip = getIPAddress(request);
+    
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     
     const user = await verifyToken(token);
@@ -27,7 +31,10 @@ export async function POST(request: Request) {
     if (payment.method !== 'MANUAL') return NextResponse.json({ error: 'Only manual payments' }, { status: 400 });
     if (payment.status !== 'PENDING') return NextResponse.json({ error: 'Already processed' }, { status: 400 });
     
-    if (action.toUpperCase() === 'APPROVE') {
+    const actionType = action.toUpperCase() as 'APPROVE' | 'REJECT';
+    const newStatus = actionType === 'APPROVE' ? 'PAID' : 'FAILED';
+    
+    if (actionType === 'APPROVE') {
       await prisma.$transaction([
         prisma.payment.update({
           where: { id: paymentId },
@@ -38,12 +45,36 @@ export async function POST(request: Request) {
           data: { status: 'PAID' },
         }),
       ]);
+      
+      // Log audit
+      await auditPaymentVerified(
+        paymentId,
+        user.id,
+        user.storeId,
+        'APPROVE',
+        'PENDING',
+        'PAID',
+        ip
+      );
+      
       return NextResponse.json({ success: true, message: 'Payment approved', payment: { id: payment.id, status: 'PAID' } });
     } else {
       await prisma.payment.update({
         where: { id: paymentId },
         data: { status: 'FAILED', verifiedById: user.id, verifiedAt: new Date() },
       });
+      
+      // Log audit
+      await auditPaymentVerified(
+        paymentId,
+        user.id,
+        user.storeId,
+        'REJECT',
+        'PENDING',
+        'FAILED',
+        ip
+      );
+      
       return NextResponse.json({ success: true, message: 'Payment rejected', payment: { id: payment.id, status: 'FAILED' } });
     }
   } catch (error) {
@@ -72,9 +103,37 @@ export async function GET(request: Request) {
           method: 'MANUAL',
           status: status.toUpperCase() as any,
         },
-        include: {
-          order: { include: { orderItems: { include: { product: { select: { id: true, name: true, sellingPrice: true } } } } } },
+        select: {
+          id: true,
+          orderId: true,
+          method: true,
+          amount: true,
+          status: true,
+          proofFile: true,
+          createdAt: true,
+          updatedAt: true,
+          verifiedById: true,
+          verifiedAt: true,
           verifiedBy: { select: { id: true, firstName: true, lastName: true } },
+          order: { 
+            select: { 
+              id: true, 
+              status: true, 
+              totalAmount: true,
+              orderNumber: true,
+              customerName: true,
+              customerEmail: true,
+              orderItems: { 
+                select: { 
+                  id: true, 
+                  productId: true, 
+                  quantity: true, 
+                  totalPrice: true,
+                  product: { select: { id: true, name: true, sellingPrice: true } }
+                } 
+              }
+            } 
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
