@@ -91,8 +91,17 @@ export async function POST(request: Request) {
     const { items, customerName, customerEmail, customerPhone, shippingAddress, notes } = validation.data;
     const host = request.headers.get('host');
     const domain = host?.split(':')[0];
-    const store = await prisma.store.findUnique({ where: { domain } });
-    if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+    
+    // Try to find store by domain, or use the first store for local development
+    let store = await prisma.store.findUnique({ where: { domain } });
+    
+    // Fallback: if no store found by domain, use the first available store (for local dev)
+    if (!store) {
+      store = await prisma.store.findFirst();
+      if (!store) {
+        return NextResponse.json({ error: 'No store configured' }, { status: 500 });
+      }
+    }
     
     let subtotal = 0;
     const orderItems: any[] = [];
