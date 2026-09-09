@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { processOrderPayment } from '@/services/transactionService';
 import { auditOrderCreated, auditOrderStatusChanged } from '@/services/auditService';
-import { getIPAddress } from '@/middleware';
+import { getIPAddress } from '@/lib/ip';
 import { z } from 'zod';
 
 const createOrderSchema = z.object({

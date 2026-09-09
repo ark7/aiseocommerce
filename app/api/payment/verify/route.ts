@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { auditPaymentVerified } from '@/services/auditService';
-import { getIPAddress } from '@/middleware';
+import { getIPAddress } from '@/lib/ip';
 
 export async function POST(request: Request) {
   try {

@@ -72,6 +72,7 @@ model User {
   payments         Payment[]
   stockLogs        StockLog[]
   approvedPettyCash PettyCash[]
+  auditLogs        AuditLog[]
 
   @@unique([storeId, email])
   @@map("users")
@@ -312,6 +313,7 @@ model AuditLog {
   id          String   @id @default(cuid())
   storeId     String?
   userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
   action      String
   entityType  String
   entityId    String

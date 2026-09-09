@@ -44,7 +44,7 @@ class Logger {
       message,
       context,
       timestamp: new Date().toISOString(),
-      error: error ? (error instanceof Error ? { message: error.message, stack: error.stack } : error) : undefined,
+      error: error instanceof Error ? error : (error || undefined),
     };
   }
 

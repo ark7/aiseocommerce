@@ -2,8 +2,29 @@ import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { loginUser } from '@/lib/auth';
-import { getIPAddress, incrementLoginAttempts } from '@/middleware';
+import { getIPAddress } from '@/lib/ip';
 import { z } from 'zod';
+
+// Simple rate limit tracking (in-memory, resets on each deploy)
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+
+async function incrementLoginAttempts(ip: string): Promise<void> {
+  const key = `login_attempts:${ip}`;
+  const existing = loginAttempts.get(key);
+  const now = Date.now();
+  
+  if (existing) {
+    if (now > existing.resetTime) {
+      loginAttempts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    } else {
+      existing.count++;
+    }
+  } else {
+    loginAttempts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+  }
+}
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
