@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
 
-// Lazy load Node.js-specific modules
+// Lazy load jose for JWT verification (Node.js only)
 let jwtVerifyCache: any = null;
-let randomUUIDCache: (() => string) | null = null;
 
 async function getJwtVerify() {
   if (!jwtVerifyCache) {
@@ -13,13 +12,12 @@ async function getJwtVerify() {
   return jwtVerifyCache;
 }
 
-async function getRandomUUID() {
-  if (!randomUUIDCache) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    randomUUIDCache = crypto.randomUUID;
-  }
-  return randomUUIDCache;
+// Simple UUID v4 generator (Edge-compatible)
+function generateRequestId(): string {
+  // Use timestamp + random for simplicity instead of crypto.randomUUID
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 11);
+  return `${timestamp}-${random}`;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -139,7 +137,7 @@ function addCorsHeaders(response: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const ip = getIPAddress(request);
-  const requestId = (await getRandomUUID())();
+  const requestId = generateRequestId();
   const userAgent = request.headers.get('user-agent') || '';
   const startTime = Date.now();
   
