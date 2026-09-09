@@ -216,6 +216,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: '/:path*',
+  runtime: 'nodejs', // Use Node.js runtime instead of Edge Runtime
 };
 
 export { getIPAddress, checkLoginBruteForce, incrementLoginAttempts, verifyJWT as verifyToken, isProtectedPath, extractToken };
