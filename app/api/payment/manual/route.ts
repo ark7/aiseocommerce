@@ -58,6 +58,16 @@ export async function POST(request: Request) {
         where: { id: orderId },
         data: { status: 'MANUAL_VERIFICATION' },
       }),
+      prisma.auditLog.create({
+        data: {
+          storeId: user.storeId,
+          userId: user.id,
+          action: 'MANUAL_PAYMENT_UPLOAD',
+          entityType: 'Order',
+          entityId: orderId,
+          newValue: JSON.stringify({ fileInfo, amount: order.totalAmount }),
+        },
+      }),
     ]);
     
     return NextResponse.json({
