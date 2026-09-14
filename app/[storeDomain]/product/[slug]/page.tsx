@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { generateProductSEO, generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/seo';
 import { Metadata } from 'next';
 import Image from 'next/image';
+import DOMPurify from 'isomorphic-dompurify';
 import AddToCartButton from '@/components/AddToCartButton';
 
 interface ProductPageProps {
@@ -182,7 +183,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <h3 className="sr-only">Description</h3>
                 <div className="text-base text-gray-700 space-y-6">
                   {product.shortDescription && <p className="font-medium">{product.shortDescription}</p>}
-                  {product.description && <div dangerouslySetInnerHTML={{ __html: product.description }} />}
+                  {product.description && <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description) }} />}
                 </div>
               </div>
               

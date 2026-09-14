@@ -35,6 +35,17 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/**
+ * Escape a JSON-LD payload for inline embedding inside a <script> tag.
+ *
+ * A value containing "</script>" would otherwise terminate the tag early and
+ * let the rest be parsed as markup. Every "<" is escaped, which keeps the
+ * JSON valid while making tag termination impossible.
+ */
+export function escapeJsonLd(json: string): string {
+  return json.replace(/</g, '\\u003c');
+}
+
 function generateSEOFromProductData(product: ProductData): SEOData {
   const storeName = product.store?.name || '';
   const categoryName = product.category?.name || '';
@@ -192,7 +203,7 @@ export function generateProductStructuredData(product: ProductData): string {
     },
     "aggregateRating": { "@type": "AggregateRating", "ratingValue": "5", "reviewCount": "0" },
   };
-  return JSON.stringify(structuredData);
+  return escapeJsonLd(JSON.stringify(structuredData));
 }
 
 export function generateBreadcrumbStructuredData(storeName: string, category?: string, productName?: string): string {
@@ -210,7 +221,7 @@ export function generateBreadcrumbStructuredData(storeName: string, category?: s
   if (productName) {
     items.push({ "@type": "ListItem", "position": category ? 3 : 2, "name": productName });
   }
-  return JSON.stringify({ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items });
+  return escapeJsonLd(JSON.stringify({ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items }));
 }
 
 const seo = {
