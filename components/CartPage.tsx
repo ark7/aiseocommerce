@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import { z } from 'zod'
 
 interface CartItem {
@@ -31,6 +32,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'MANUAL' | 'MIDTRANS'>('MANUAL')
 
   useEffect(() => {
     if (storeDomain) {
@@ -101,30 +103,34 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       const orderData = await orderResponse.json()
       const orderId = orderData.order.id
 
-      // Then proceed to checkout
+      // Create the payment intent with the method the customer picked
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           storeId,
           orderId,
-          paymentMethod: 'MIDTRANS', // Default to Midtrans
+          paymentMethod,
         }),
       })
 
       if (!checkoutResponse.ok) {
-        throw new Error('Failed to initiate checkout')
+        throw new Error('Gagal memulai pembayaran')
       }
-
-      const checkoutData = await checkoutResponse.json()
-      const paymentUrl = checkoutData.paymentGatewayResponse.redirectUrl
 
       // Clear cart after successful checkout
       localStorage.removeItem(`cart_${storeDomain}`)
       setCartItems([])
 
-      // Redirect to payment gateway
-      window.location.href = paymentUrl
+      // A manual transfer has no gateway to visit - the customer uploads the
+      // proof from the order page instead.
+      if (paymentMethod === 'MANUAL') {
+        window.location.href = `/${storeDomain}/orders/${orderId}`
+        return
+      }
+
+      const checkoutData = await checkoutResponse.json()
+      window.location.href = checkoutData.paymentGatewayResponse.redirectUrl
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Checkout failed')
     } finally {
@@ -132,79 +138,136 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     }
   }
 
-  if (error) {
-    return <div className="text-red-500">{error}</div>
-  }
-
-  if (isLoading) {
-    return <div>Processing checkout...</div>
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">Your Cart</h1>
-
-      {cartItems.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500">Your cart is empty</p>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Link href={`/${storeDomain}`} className="text-lg font-semibold text-gray-900">
+            {storeDomain || 'Toko'}
+          </Link>
+          <nav className="flex items-center space-x-6 text-sm">
+            <Link href={`/${storeDomain}`} className="text-gray-600 hover:text-indigo-600">Beranda</Link>
+            <Link href={`/${storeDomain}/products`} className="text-gray-600 hover:text-indigo-600">Produk</Link>
+            <Link href={`/${storeDomain}/categories`} className="text-gray-600 hover:text-indigo-600">Kategori</Link>
+            <Link href={`/${storeDomain}/orders`} className="text-gray-600 hover:text-indigo-600">Pesanan Saya</Link>
+          </nav>
         </div>
-      ) : (
-        <div className="space-y-4">
-          {cartItems.map(item => (
-            <div key={item.productId} className="flex items-center border-b pb-4">
-              {item.imageUrl && (
-                <Image
-                  src={item.imageUrl}
-                  alt={item.name}
-                  width={80}
-                  height={80}
-                  className="w-20 h-20 object-cover mr-4"
-                />
-              )}
-              <div className="flex-1">
-                <h3 className="font-medium">{item.name}</h3>
-                <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
-              </div>
-              <div className="flex items-center">
+      </header>
+
+      <main className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Keranjang</h1>
+
+        {error && (
+          <div className="mb-4 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+        )}
+
+        {cartItems.length === 0 ? (
+          <div className="bg-white rounded-lg shadow border px-4 py-16 text-center">
+            <p className="text-gray-500 mb-4">Keranjang Anda masih kosong.</p>
+            <Link
+              href={`/${storeDomain}`}
+              className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Mulai Belanja
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {cartItems.map(item => (
+              <div key={item.productId} className="bg-white rounded-lg shadow border p-4 flex items-center">
+                {item.imageUrl && (
+                  <Image
+                    src={item.imageUrl}
+                    alt={item.name}
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 object-cover rounded mr-4"
+                  />
+                )}
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">{item.name}</h3>
+                  <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
+                </div>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                    className="px-2 py-1 border rounded-l"
+                    disabled={item.quantity <= 1}
+                  >
+                    -
+                  </button>
+                  <span className="px-4 py-1 border-t border-b">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                    className="px-2 py-1 border rounded-r"
+                  >
+                    +
+                  </button>
+                </div>
                 <button
-                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                  className="px-2 py-1 border rounded-l"
-                  disabled={item.quantity <= 1}
+                  onClick={() => removeItem(item.productId)}
+                  className="ml-4 text-red-500 hover:text-red-700"
                 >
-                  -
-                </button>
-                <span className="px-4 py-1 border-t border-b">{item.quantity}</span>
-                <button
-                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                  className="px-2 py-1 border rounded-r"
-                >
-                  +
+                  Hapus
                 </button>
               </div>
+            ))}
+
+            <div className="bg-white rounded-lg shadow border p-4">
+              <div className="flex justify-between font-bold text-lg text-gray-900">
+                <span>Total</span>
+                <span>Rp {calculateTotal().toLocaleString()}</span>
+              </div>
+
+              <fieldset className="mt-4 pt-4 border-t">
+                <legend className="text-sm font-medium text-gray-700 mb-2">Metode Pembayaran</legend>
+                <div className="space-y-2">
+                  <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-indigo-300">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="MANUAL"
+                      checked={paymentMethod === 'MANUAL'}
+                      onChange={() => setPaymentMethod('MANUAL')}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-gray-900">Transfer Manual</span>
+                      <span className="block text-xs text-gray-500">
+                        Transfer ke rekening toko, lalu unggah bukti bayar. Dikonfirmasi admin.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:border-indigo-300">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="MIDTRANS"
+                      checked={paymentMethod === 'MIDTRANS'}
+                      onChange={() => setPaymentMethod('MIDTRANS')}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-gray-900">Midtrans</span>
+                      <span className="block text-xs text-gray-500">
+                        Bayar online lewat halaman payment gateway.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+
               <button
-                onClick={() => removeItem(item.productId)}
-                className="ml-4 text-red-500 hover:text-red-700"
+                onClick={handleCheckout}
+                disabled={isLoading}
+                className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
               >
-                Remove
+                {isLoading ? 'Memproses...' : 'Lanjut ke Pembayaran'}
               </button>
             </div>
-          ))}
-
-          <div className="mt-6 pt-4 border-t">
-            <div className="flex justify-between font-bold text-lg">
-              <span>Total</span>
-              <span>Rp {calculateTotal().toLocaleString()}</span>
-            </div>
-            <button
-              onClick={handleCheckout}
-              className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
-              disabled={isLoading}
-            >
-              Proceed to Checkout
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   )
 }
