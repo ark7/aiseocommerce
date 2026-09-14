@@ -110,9 +110,9 @@ describe('POST /api/checkout', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        storeId: 'invalid-uuid',
+        storeId: mockOrder.storeId,
         orderId: mockOrder.id,
-        paymentMethod: 'MIDTRANS',
+        paymentMethod: 'BITCOIN',
       }),
     });
 

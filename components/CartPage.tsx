@@ -1,6 +1,7 @@
+'use client'
+
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { useRouter, useParams } from 'next/navigation'
 import { z } from 'zod'
 
 interface CartItem {
@@ -11,25 +12,29 @@ interface CartItem {
   imageUrl?: string
 }
 
+// Prisma ids are cuids, and seeded rows use plain strings like demo-prod-001.
+// Validating as uuid rejected every real cart item.
 const CartItemSchema = z.object({
-  productId: z.string().uuid(),
+  productId: z.string().min(1),
   name: z.string(),
   price: z.number().positive(),
   quantity: z.number().int().positive(),
   imageUrl: z.string().url().optional(),
 })
 
-const CartPage = () => {
-  const router = useRouter()
-  const params = useParams()
-  const storeId = params?.storeDomain as string || ''
+interface CartPageProps {
+  storeId: string
+  storeDomain: string
+}
+
+const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (storeId) {
-      const storedCart = localStorage.getItem(`cart_${storeId}`)
+    if (storeDomain) {
+      const storedCart = localStorage.getItem(`cart_${storeDomain}`)
       if (storedCart) {
         try {
           const parsedCart = JSON.parse(storedCart)
@@ -40,7 +45,7 @@ const CartPage = () => {
         }
       }
     }
-  }, [storeId])
+  }, [storeDomain])
 
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return
@@ -50,13 +55,13 @@ const CartPage = () => {
     )
 
     setCartItems(updatedItems)
-    localStorage.setItem(`cart_${storeId}`, JSON.stringify(updatedItems))
+    localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
   }
 
   const removeItem = (productId: string) => {
     const updatedItems = cartItems.filter(item => item.productId !== productId)
     setCartItems(updatedItems)
-    localStorage.setItem(`cart_${storeId}`, JSON.stringify(updatedItems))
+    localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
   }
 
   const calculateTotal = () => {
@@ -109,7 +114,7 @@ const CartPage = () => {
       const paymentUrl = checkoutData.paymentGatewayResponse.redirectUrl
 
       // Clear cart after successful checkout
-      localStorage.removeItem(`cart_${storeId}`)
+      localStorage.removeItem(`cart_${storeDomain}`)
       setCartItems([])
 
       // Redirect to payment gateway

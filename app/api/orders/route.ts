@@ -3,15 +3,17 @@ import { createOrder } from '@/services/transactionService'
 import { z } from 'zod'
 
 // Define schema for order creation
+// Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
+// so uuid() rejected every real id.
 const OrderSchema = z.object({
-  storeId: z.string().uuid(),
+  storeId: z.string().min(1),
   items: z.array(
     z.object({
-      productId: z.string().uuid(),
+      productId: z.string().min(1),
       quantity: z.number().int().positive(),
     })
   ).min(1),
-  customerId: z.string().uuid().optional(),
+  customerId: z.string().min(1).optional(),
 })
 
 export async function POST(request: Request) {

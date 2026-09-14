@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 
+// Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
+// so uuid() rejected every real id.
 const CheckoutSchema = z.object({
-  storeId: z.string().uuid(),
-  orderId: z.string().uuid(),
+  storeId: z.string().min(1),
+  orderId: z.string().min(1),
   paymentMethod: z.enum(['MANUAL', 'MIDTRANS', 'FLIP', 'BANK_TRANSFER', 'CASH_ON_DELIVERY']),
 })
 

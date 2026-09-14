@@ -194,7 +194,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     {product.stock > 0 && <span className="ml-1">{product.stock} available</span>}
                   </span>
                 </div>
-                <AddToCartButton productId={product.id} storeId={store.id} price={product.sellingPrice} name={product.name} stock={product.stock} />
+                <AddToCartButton productId={product.id} storeDomain={params.storeDomain} price={product.sellingPrice} name={product.name} stock={product.stock} />
               </div>
               
               <section className="mt-10 border-t border-gray-200 pt-10">
