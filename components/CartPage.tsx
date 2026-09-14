@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import StoreHeader from '@/components/StoreHeader'
 import { z } from 'zod'
 
 interface CartItem {
@@ -140,19 +141,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href={`/${storeDomain}`} className="text-lg font-semibold text-gray-900">
-            {storeDomain || 'Toko'}
-          </Link>
-          <nav className="flex items-center space-x-6 text-sm">
-            <Link href={`/${storeDomain}`} className="text-gray-600 hover:text-indigo-600">Beranda</Link>
-            <Link href={`/${storeDomain}/products`} className="text-gray-600 hover:text-indigo-600">Produk</Link>
-            <Link href={`/${storeDomain}/categories`} className="text-gray-600 hover:text-indigo-600">Kategori</Link>
-            <Link href={`/${storeDomain}/orders`} className="text-gray-600 hover:text-indigo-600">Pesanan Saya</Link>
-          </nav>
-        </div>
-      </header>
+      <StoreHeader storeDomain={storeDomain} />
 
       <main className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Keranjang</h1>

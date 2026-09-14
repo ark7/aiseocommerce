@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import StoreHeader from '@/components/StoreHeader';
 
 interface OrderItem {
   id: string;
@@ -167,16 +168,24 @@ export default function CustomerOrderDetailPage() {
   };
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-12 text-center text-gray-500">Memuat pesanan...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <StoreHeader storeDomain={storeDomain} />
+        <div className="container mx-auto px-4 py-12 text-center text-gray-500">Memuat pesanan...</div>
+      </div>
+    );
   }
 
   if (!order) {
     return (
-      <div className="container mx-auto px-4 py-12 max-w-3xl">
-        <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg">{error || 'Pesanan tidak ditemukan.'}</div>
-        <Link href={`/${storeDomain}/orders`} className="inline-block mt-4 text-indigo-600 hover:text-indigo-900">
-          &larr; Kembali ke pesanan saya
-        </Link>
+      <div className="min-h-screen bg-gray-50">
+        <StoreHeader storeDomain={storeDomain} />
+        <div className="container mx-auto px-4 py-12 max-w-3xl">
+          <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg">{error || 'Pesanan tidak ditemukan.'}</div>
+          <Link href={`/${storeDomain}/orders`} className="inline-block mt-4 text-indigo-600 hover:text-indigo-900">
+            &larr; Kembali ke pesanan saya
+          </Link>
+        </div>
       </div>
     );
   }
@@ -186,7 +195,9 @@ export default function CustomerOrderDetailPage() {
   const canUploadProof = order.status === 'PENDING' && payment?.method === 'MANUAL';
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <div className="min-h-screen bg-gray-50">
+      <StoreHeader storeDomain={storeDomain} />
+      <div className="container mx-auto px-4 py-8 max-w-3xl">
       <Link href={`/${storeDomain}/orders`} className="text-sm text-indigo-600 hover:text-indigo-900">
         &larr; Kembali ke pesanan saya
       </Link>
@@ -314,6 +325,7 @@ export default function CustomerOrderDetailPage() {
             Bukti bayar sedang diperiksa admin.
           </div>
         )}
+      </div>
       </div>
     </div>
   );

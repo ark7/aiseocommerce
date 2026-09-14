@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import StoreHeader from '@/components/StoreHeader';
 
 export default function StoreHome() {
   const pathname = usePathname();
@@ -102,14 +103,12 @@ export default function StoreHome() {
   if (loading && products.length === 0) {
     return (
       <div className="min-h-screen">
-        <header className="bg-white shadow-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex justify-between items-center">
-              <div className="animate-pulse w-48 h-8 bg-gray-200 rounded"></div>
-              <div className="animate-pulse w-24 h-8 bg-gray-200 rounded"></div>
-            </div>
-          </div>
-        </header>
+        <StoreHeader
+          storeDomain={storeDomain}
+          storeName={store?.name}
+          storeLogo={store?.logo}
+          storeAddress={store?.address}
+        />
         
         <main className="max-w-7xl mx-auto px-4 py-8">
           <div className="animate-pulse w-64 h-10 bg-gray-200 rounded mb-8"></div>
@@ -150,64 +149,12 @@ export default function StoreHome() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex justify-between items-center">
-            <Link href={`/${storeDomain}`} className="flex items-center space-x-2">
-              {store?.logo && (
-                <Image
-                  src={store.logo}
-                  alt={store.name}
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded"
-                  unoptimized
-                />
-              )}
-              {!store?.logo && (
-                <div className="w-10 h-10 bg-indigo-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">{store?.name?.[0]}</span>
-                </div>
-              )}
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">{store?.name || 'Toko Online'}</h1>
-                {store?.address && (
-                  <p className="text-sm text-gray-500 truncate max-w-md">{store.address}</p>
-                )}
-              </div>
-            </Link>
-            
-            <nav className="hidden md:flex items-center space-x-6">
-              <Link href={`/${storeDomain}`} className="text-gray-600 hover:text-indigo-600">Beranda</Link>
-              <Link href={`/${storeDomain}/products`} className="text-gray-600 hover:text-indigo-600">Produk</Link>
-              <Link href={`/${storeDomain}/categories`} className="text-gray-600 hover:text-indigo-600">Kategori</Link>
-              <Link href={`/${storeDomain}/contact`} className="text-gray-600 hover:text-indigo-600">Kontak</Link>
-              <Link href={`/${storeDomain}/orders`} className="text-gray-600 hover:text-indigo-600">Pesanan Saya</Link>
-            </nav>
-            
-            <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full hover:bg-gray-100">
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
-              <Link
-                href={`/${storeDomain}/cart`}
-                className="relative p-2 rounded-full hover:bg-gray-100"
-              >
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-                {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white text-xs rounded-full flex items-center justify-center">
-                    {cartItemCount}
-                  </span>
-                )}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+      <StoreHeader
+        storeDomain={storeDomain}
+        storeName={store?.name}
+        storeLogo={store?.logo}
+        storeAddress={store?.address}
+      />
 
       {/* Hero Banner */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-16">

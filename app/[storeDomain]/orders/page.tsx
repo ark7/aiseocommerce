@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import StoreHeader from '@/components/StoreHeader';
 
 interface OrderRow {
   id: string;
@@ -85,7 +86,9 @@ export default function CustomerOrdersPage() {
   }, [fetchOrders]);
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="min-h-screen bg-gray-50">
+      <StoreHeader storeDomain={storeDomain} />
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Pesanan Saya</h1>
 
       {error && (
@@ -134,6 +137,7 @@ export default function CustomerOrdersPage() {
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }
