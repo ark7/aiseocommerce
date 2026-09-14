@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -18,22 +18,7 @@ export default function StoreHome() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
 
-  useEffect(() => {
-    fetchStoreData();
-    updateCartCount();
-    
-    // Listen for storage changes (cart updates)
-    window.addEventListener('storage', updateCartCount);
-    return () => window.removeEventListener('storage', updateCartCount);
-  }, [storeDomain]);
-
-  useEffect(() => {
-    if (storeDomain) {
-      fetchProducts();
-    }
-  }, [storeDomain, searchQuery, selectedCategory]);
-
-  const updateCartCount = () => {
+  const updateCartCount = useCallback(() => {
     const cart = localStorage.getItem(`cart_${storeDomain}`);
     if (cart) {
       const cartItems = JSON.parse(cart);
@@ -42,9 +27,9 @@ export default function StoreHome() {
     } else {
       setCartItemCount(0);
     }
-  };
+  }, [storeDomain]);
 
-  const fetchStoreData = async () => {
+  const fetchStoreData = useCallback(async () => {
     try {
       const response = await fetch(`/api/stores/${storeDomain}`);
       if (response.ok) {
@@ -54,28 +39,28 @@ export default function StoreHome() {
     } catch (err) {
       console.error('Failed to fetch store:', err);
     }
-  };
+  }, [storeDomain]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      
+
       const params = new URLSearchParams({
         storeId: store?.id || '',
         isPublished: 'true',
         limit: '8',
       });
-      
+
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory) params.append('categoryId', selectedCategory);
-      
+
       // Fetch all products
       const productsResponse = await fetch(`/api/products?${params.toString()}`);
       if (productsResponse.ok) {
         const data = await productsResponse.json();
         setProducts(data.products || []);
       }
-      
+
       // Fetch featured products
       params.set('isFeatured', 'true');
       params.set('limit', '4');
@@ -84,20 +69,35 @@ export default function StoreHome() {
         const data = await featuredResponse.json();
         setFeaturedProducts(data.products || []);
       }
-      
+
       // Fetch categories
       const categoriesResponse = await fetch(`/api/categories?storeId=${store?.id || ''}`);
       if (categoriesResponse.ok) {
         const data = await categoriesResponse.json();
         setCategories(data.categories || []);
       }
-      
+
       setLoading(false);
     } catch (err) {
       setError('Gagal memuat produk');
       setLoading(false);
     }
-  };
+  }, [store?.id, searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    fetchStoreData();
+    updateCartCount();
+
+    // Listen for storage changes (cart updates)
+    window.addEventListener('storage', updateCartCount);
+    return () => window.removeEventListener('storage', updateCartCount);
+  }, [fetchStoreData, updateCartCount]);
+
+  useEffect(() => {
+    if (storeDomain) {
+      fetchProducts();
+    }
+  }, [storeDomain, fetchProducts]);
 
   if (loading && products.length === 0) {
     return (

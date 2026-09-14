@@ -51,43 +51,56 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   }
 }
 
+async function loadProductPage(params: ProductPageProps['params']) {
+  const store = await prisma.store.findUnique({ where: { domain: params.storeDomain }, include: { settings: true } });
+  if (!store) return null;
+
+  const product = await prisma.product.findUnique({
+    where: { storeId_slug: { storeId: store.id, slug: params.slug } },
+    include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
+  });
+  if (!product || !product.isPublished) return null;
+
+  const relatedProducts = await prisma.product.findMany({
+    where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
+    take: 4,
+    select: { id: true, name: true, slug: true, sellingPrice: true, images: { where: { isPrimary: true }, take: 1 } },
+  });
+
+  const productStructuredData = generateProductStructuredData({
+    ...product,
+    store: { name: store.name, domain: store.domain },
+  });
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData(
+    store.name,
+    product.category?.name,
+    product.name
+  );
+
+  const formattedPrice = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(product.sellingPrice);
+
+  const formattedDiscountPrice = product.discountPrice
+    ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.discountPrice)
+    : null;
+
+  return { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice };
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
+  let data;
   try {
-    const store = await prisma.store.findUnique({ where: { domain: params.storeDomain }, include: { settings: true } });
-    if (!store) return notFound();
-    
-    const product = await prisma.product.findUnique({
-      where: { storeId_slug: { storeId: store.id, slug: params.slug } },
-      include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
-    });
-    if (!product || !product.isPublished) return notFound();
-    
-    const relatedProducts = await prisma.product.findMany({
-      where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
-      take: 4,
-      select: { id: true, name: true, slug: true, sellingPrice: true, images: { where: { isPrimary: true }, take: 1 } },
-    });
-    
-    const productStructuredData = generateProductStructuredData({
-      ...product,
-      store: { name: store.name, domain: store.domain },
-    });
-    const breadcrumbStructuredData = generateBreadcrumbStructuredData(
-      store.name,
-      product.category?.name,
-      product.name
-    );
-    
-    const formattedPrice = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(product.sellingPrice);
-    
-    const formattedDiscountPrice = product.discountPrice
-      ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.discountPrice)
-      : null;
-    
+    data = await loadProductPage(params);
+  } catch {
+    return notFound();
+  }
+  if (!data) return notFound();
+
+  const { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice } = data;
+
     return (
       <div className="min-h-screen bg-gray-50">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productStructuredData }} />
@@ -222,7 +235,4 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
       </div>
     );
-  } catch {
-    return notFound();
-  }
 }

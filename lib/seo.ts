@@ -213,10 +213,12 @@ export function generateBreadcrumbStructuredData(storeName: string, category?: s
   return JSON.stringify({ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": items });
 }
 
-export default {
+const seo = {
   generateProductSEO,
   generateStoreSEO,
   generateCategorySEO,
   generateProductStructuredData,
   generateBreadcrumbStructuredData,
 };
+
+export default seo;

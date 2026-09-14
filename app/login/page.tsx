@@ -24,7 +24,7 @@ export default function LoginPage() {
     
     // Fetch available stores for demo
     fetchStores();
-  }, []);
+  }, [router]);
 
   const fetchStores = async () => {
     try {
