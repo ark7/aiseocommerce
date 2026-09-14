@@ -75,12 +75,18 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     setError(null)
 
     try {
+      // Link the order to the signed-in customer so it shows up in their order
+      // history and they can confirm receipt later.
+      const storedUser = localStorage.getItem('user')
+      const customerId = storedUser ? JSON.parse(storedUser).id : undefined
+
       // First create order
       const orderResponse = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           storeId,
+          customerId,
           items: cartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,

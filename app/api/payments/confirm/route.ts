@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-import { processOrderPayment } from '@/services/transactionService'
+import { processOrderPayment, releaseStock } from '@/services/transactionService'
+import { requireStoreRole } from '@/lib/auth'
+import { auditPaymentVerified } from '@/services/auditService'
 
 // Define schema for payment confirmation
+// Prisma ids are cuids (seeded rows use plain strings), so uuid() rejected real ids.
 const ConfirmationSchema = z.object({
-  orderId: z.string().uuid(),
+  orderId: z.string().min(1),
   paymentGatewayId: z.string(),
   status: z.enum(['success', 'failure']),
   gatewayResponse: z.any().optional(),
@@ -92,11 +95,10 @@ export async function POST(request: Request) {
   }
 }
 
-// Add manual confirmation option
+// Manual confirmation: an admin approves or rejects an uploaded payment proof.
 const ManualConfirmationSchema = z.object({
-  orderId: z.string().uuid(),
-  userId: z.string().uuid(),
-  storeId: z.string().uuid(),
+  orderId: z.string().min(1),
+  action: z.enum(['approve', 'reject']),
 })
 
 export async function PUT(request: Request) {
@@ -104,29 +106,19 @@ export async function PUT(request: Request) {
     const body = await request.json()
     const validatedData = ManualConfirmationSchema.parse(body)
 
-    // Verify user has permission to confirm payments for this store
-    const user = await prisma.user.findUnique({
-      where: { id: validatedData.userId },
-    })
-
-    if (!user || user.storeId !== validatedData.storeId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
-
-    // Find the order
     const order = await prisma.order.findUnique({
       where: { id: validatedData.orderId },
       include: { payments: true },
     })
 
     if (!order) {
-      return NextResponse.json(
-        { error: 'Order not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    // The caller's identity comes from the bearer token, never from the body.
+    const user = await requireStoreRole(request, order.storeId, ['ADMIN', 'STAFF'])
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
     if (order.status !== 'MANUAL_VERIFICATION') {
@@ -136,9 +128,33 @@ export async function PUT(request: Request) {
       )
     }
 
-    // Process the order payment manually
-    const result = await processOrderPayment(order.id, validatedData.userId)
+    const payment = order.payments[0]
 
+    if (validatedData.action === 'reject') {
+      // releaseStock returns the reserved units and flips the order to CANCELLED.
+      const released = await releaseStock(order.id, user.id)
+      if (!released.success) {
+        return NextResponse.json({ error: released.error }, { status: 500 })
+      }
+
+      if (payment) {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: { status: 'FAILED', verifiedById: user.id, verifiedAt: new Date() },
+        })
+        await auditPaymentVerified(payment.id, user.id, order.storeId, 'REJECT', 'PENDING', 'FAILED')
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Payment rejected and stock released',
+        released: released.released,
+      })
+    }
+
+    // Approve. processOrderPayment moves the order to PROCESSING itself; it no
+    // longer touches stock because the units were reserved at order creation.
+    const result = await processOrderPayment(order.id, user.id)
     if (!result.success) {
       return NextResponse.json(
         { error: 'Failed to process order', details: result.error },
@@ -146,24 +162,15 @@ export async function PUT(request: Request) {
       )
     }
 
-    // Update order status
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'PAID' },
-    })
-
-    // Update payment status
-    if (order.payments.length > 0) {
+    if (payment) {
       await prisma.payment.update({
-        where: { id: order.payments[0].id },
-        data: { status: 'PAID' },
+        where: { id: payment.id },
+        data: { status: 'PAID', verifiedById: user.id, verifiedAt: new Date() },
       })
+      await auditPaymentVerified(payment.id, user.id, order.storeId, 'APPROVE', 'PENDING', 'PAID')
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Order confirmed manually',
-    })
+    return NextResponse.json({ success: true, message: 'Order confirmed manually' })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

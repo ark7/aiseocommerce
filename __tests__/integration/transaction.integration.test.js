@@ -186,16 +186,6 @@ describe('Transaction Flow Integration Tests', () => {
         ],
       };
 
-      const mockStockLog = {
-        id: 'stock-log-1',
-        productId: product.id,
-        type: 'OUT',
-        quantity: 2,
-        previousStock: 10,
-        newStock: 8,
-        referenceId: mockOrder.id,
-        userId: TEST_USER_ID,
-      };
       const mockLedger = {
         id: 'ledger-1',
         storeId: TEST_STORE_ID,
@@ -208,9 +198,9 @@ describe('Transaction Flow Integration Tests', () => {
 
       jest.spyOn(prisma.order, 'findUnique').mockResolvedValue(mockOrder);
       jest.spyOn(prisma, '$transaction').mockImplementation(async (callback) => {
+        // Stock is no longer touched here - it was reserved when the order was
+        // created, so approval only writes the ledger entry and moves the status.
         const tx = {
-          stockLog: { create: jest.fn().mockResolvedValue(mockStockLog) },
-          product: { update: jest.fn().mockResolvedValue({}) },
           ledger: { create: jest.fn().mockResolvedValue(mockLedger) },
           order: { update: jest.fn().mockResolvedValue({}) },
         };
@@ -221,9 +211,6 @@ describe('Transaction Flow Integration Tests', () => {
 
       expect(result.success).toBe(true);
       expect(result.orderId).toBe(mockOrder.id);
-      expect(result.stockLogs).toHaveLength(1);
-      expect(result.stockLogs[0].type).toBe('OUT');
-      expect(result.stockLogs[0].quantity).toBe(2);
       expect(result.ledgerEntry).toBeDefined();
       expect(result.ledgerEntry.type).toBe('INCOME');
       expect(result.ledgerEntry.amount).toBe(mockOrder.totalAmount);

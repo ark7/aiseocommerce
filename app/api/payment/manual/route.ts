@@ -32,9 +32,13 @@ export async function POST(request: Request) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     if (order.storeId !== user.storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     
-    const existingPayment = await prisma.payment.findFirst({ where: { orderId } });
-    if (existingPayment) return NextResponse.json({ error: 'Payment already exists' }, { status: 400 });
-    
+    if (order.status !== 'PENDING' && order.status !== 'MANUAL_VERIFICATION') {
+      return NextResponse.json(
+        { error: 'Order is not waiting for payment' },
+        { status: 400 }
+      );
+    }
+
     const buffer = Buffer.from(await proofFile.arrayBuffer());
     const proofData = buffer.toString('base64');
     const fileInfo = {
@@ -42,18 +46,23 @@ export async function POST(request: Request) {
       type: proofFile.type,
       size: proofFile.size,
     };
-    
+
+    // /api/checkout already created a PENDING payment for this order, so attach
+    // the proof to it instead of trying to create a second one.
+    const existingPayment = await prisma.payment.findFirst({ where: { orderId } });
+
+    const paymentData = {
+      method: 'MANUAL' as const,
+      amount: order.totalAmount,
+      proofData,
+      proofFile: JSON.stringify(fileInfo),
+      status: 'PENDING' as const,
+    };
+
     await prisma.$transaction([
-      prisma.payment.create({
-        data: {
-          orderId,
-          method: 'MANUAL',
-          amount: order.totalAmount,
-          proofData,
-          proofFile: JSON.stringify(fileInfo),
-          status: 'PENDING',
-        },
-      }),
+      existingPayment
+        ? prisma.payment.update({ where: { id: existingPayment.id }, data: paymentData })
+        : prisma.payment.create({ data: { orderId, ...paymentData } }),
       prisma.order.update({
         where: { id: orderId },
         data: { status: 'MANUAL_VERIFICATION' },

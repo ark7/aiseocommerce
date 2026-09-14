@@ -182,6 +182,7 @@ export default function StoreHome() {
               <Link href={`/${storeDomain}/products`} className="text-gray-600 hover:text-indigo-600">Produk</Link>
               <Link href={`/${storeDomain}/categories`} className="text-gray-600 hover:text-indigo-600">Kategori</Link>
               <Link href={`/${storeDomain}/contact`} className="text-gray-600 hover:text-indigo-600">Kontak</Link>
+              <Link href={`/${storeDomain}/orders`} className="text-gray-600 hover:text-indigo-600">Pesanan Saya</Link>
             </nav>
             
             <div className="flex items-center space-x-4">
@@ -425,6 +426,7 @@ export default function StoreHome() {
                 <li><Link href={`/${storeDomain}/products`} className="hover:text-white">Produk</Link></li>
                 <li><Link href={`/${storeDomain}/categories`} className="hover:text-white">Kategori</Link></li>
                 <li><Link href={`/${storeDomain}/contact`} className="hover:text-white">Kontak</Link></li>
+                <li><Link href={`/${storeDomain}/orders`} className="hover:text-white">Pesanan Saya</Link></li>
               </ul>
             </div>
             <div>

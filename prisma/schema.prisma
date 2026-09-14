@@ -191,6 +191,10 @@ model Order {
   status          OrderStatus @default(PENDING)
   notes           String?     @db.Text
   shippingAddress String?     @db.Text
+  trackingUrl     String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  completedAt     DateTime?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
