@@ -35,7 +35,7 @@ class Logger {
   private shouldLog(level: LogLevel): boolean {
     const levelIndex = this.logLevels.indexOf(level);
     const minIndex = this.logLevels.indexOf(this.minLevel);
-    return levelIndex >= minIndex;
+    return levelIndex <= minIndex;
   }
 
   private formatLog(level: LogLevel, message: string, context?: LogContext, error?: Error | string): LogEntry {
