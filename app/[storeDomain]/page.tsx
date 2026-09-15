@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { notFound, usePathname } from 'next/navigation';
 import StoreHeader from '@/components/StoreHeader';
 
 export default function StoreHome() {
   const pathname = usePathname();
   const storeDomain = pathname.split('/')[1];
   const [store, setStore] = useState<any>(null);
+  const [storeMissing, setStoreMissing] = useState(false);
   const [products, setProducts] = useState([]);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -33,6 +34,10 @@ export default function StoreHome() {
   const fetchStoreData = useCallback(async () => {
     try {
       const response = await fetch(`/api/stores/${storeDomain}`);
+      if (response.status === 404) {
+        setStoreMissing(true);
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
         setStore(data.store);
@@ -99,6 +104,9 @@ export default function StoreHome() {
       fetchProducts();
     }
   }, [storeDomain, fetchProducts]);
+
+  // An unknown store domain should 404, not render an empty shopfront.
+  if (storeMissing) notFound();
 
   if (loading && products.length === 0) {
     return (
