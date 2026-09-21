@@ -21,7 +21,8 @@ export interface FinanceSummary {
 export async function createOrder(
   storeId: string,
   items: { productId: string; quantity: number }[],
-  customerId?: string
+  customerId?: string,
+  attribution?: Record<string, unknown>
 ) {
   try {
     return await prisma.$transaction(async (tx) => {
@@ -39,6 +40,11 @@ export async function createOrder(
           shippingCost: 0,
           discount: 0,
           status: 'PENDING', // initial status before payment
+          // Campaign source for paid traffic; omitted when the order arrived
+          // with no attribution at all (direct or organic).
+          ...(attribution && Object.keys(attribution).length > 0
+            ? { attribution: attribution as object }
+            : {}),
         },
       });
 

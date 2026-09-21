@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { z } from 'zod';
+import { revalidateCategory } from '@/lib/revalidate';
 
 const createCategorySchema = z.object({
   name: z.string().min(1),
@@ -91,6 +92,8 @@ export async function POST(request: Request) {
       },
     });
     
+    await revalidateCategory(user.storeId, category.slug);
+
     return NextResponse.json({ success: true, category });
   } catch (error) {
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -131,6 +134,9 @@ export async function PATCH(request: Request) {
       data,
     });
     
+    // A renamed slug must also purge the URL it used to live at.
+    await revalidateCategory(user.storeId, updatedCategory.slug, category.slug);
+
     return NextResponse.json({ success: true, category: updatedCategory });
   } catch (error) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
@@ -165,6 +171,8 @@ export async function DELETE(request: Request) {
     if (childrenCount > 0) return NextResponse.json({ error: 'Cannot delete category with subcategories' }, { status: 400 });
     
     await prisma.category.delete({ where: { id } });
+    await revalidateCategory(user.storeId, category.slug);
+
     return NextResponse.json({ success: true, message: 'Category deleted' });
   } catch (error) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import StoreHeader from '@/components/StoreHeader';
+import { buildPurchaseCalls, fireOnce, getTrackingConfig } from '@/lib/tracking';
 
 interface OrderItem {
   id: string;
@@ -98,6 +99,26 @@ export default function CustomerOrderDetailPage() {
   useEffect(() => {
     if (orderId) fetchOrder();
   }, [orderId, fetchOrder]);
+
+  // Report the purchase once per order. Firing here rather than at checkout means
+  // the value is the order's final total, and reloading cannot double-count it.
+  useEffect(() => {
+    if (!order) return;
+
+    fireOnce(
+      `purchase:${order.id}`,
+      buildPurchaseCalls(getTrackingConfig(), {
+        orderId: order.id,
+        value: order.totalAmount,
+        items: order.orderItems.map((item) => ({
+          id: item.product?.id || item.id,
+          name: item.product?.name || 'Produk',
+          price: item.unitPrice,
+          quantity: item.quantity,
+        })),
+      })
+    );
+  }, [order]);
 
   const runAction = async (fn: () => Promise<Response>, successMessage: string) => {
     setBusy(true);

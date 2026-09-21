@@ -1,5 +1,9 @@
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
+import { buildAnalyticsTags, parseAnalyticsConfig } from '@/lib/analytics';
+import StoreTracking from '@/components/StoreTracking';
 
 /**
  * Guards every storefront route.
@@ -23,5 +27,38 @@ export default async function StoreLayout({
 
   if (!store) notFound();
 
-  return <>{children}</>;
+  // Analytics is a decoration: a failed settings read renders the storefront
+  // without tags instead of taking every page down with it.
+  let analyticsConfig: unknown = null;
+  try {
+    const settings = await prisma.storeSettings.findUnique({
+      where: { storeId: store.id },
+      select: { analyticsConfig: true },
+    });
+    analyticsConfig = settings?.analyticsConfig ?? null;
+  } catch (error) {
+    logger.warn('Storefront analytics settings unavailable', { domain: params.storeDomain });
+  }
+
+  const analyticsTags = buildAnalyticsTags(parseAnalyticsConfig(analyticsConfig));
+  const trackingConfig = parseAnalyticsConfig(analyticsConfig);
+
+  return (
+    <>
+      {/* Store-owner configured tags: Google Tag plus the social pixels that
+          matter for Indonesian storefronts (TikTok, Meta). */}
+      {analyticsTags.map((tag) => (
+        <Script
+          key={tag.id}
+          id={tag.id}
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: tag.script }}
+        />
+      ))}
+      {/* Hands the same config to React so product and order pages can report
+          conversions, and records which campaign landed this visitor. */}
+      <StoreTracking config={trackingConfig} />
+      {children}
+    </>
+  );
 }

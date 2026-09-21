@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import StoreHeader from '@/components/StoreHeader'
+import { readStoredAttribution } from '@/lib/attribution'
 import { z } from 'zod'
 
 interface CartItem {
@@ -94,6 +95,9 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
             productId: item.productId,
             quantity: item.quantity,
           })),
+          // First-touch campaign, so an order can be traced back to the ad that
+          // paid for the click.
+          attribution: readStoredAttribution() ?? undefined,
         }),
       })
 

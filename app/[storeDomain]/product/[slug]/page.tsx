@@ -6,9 +6,43 @@ import Image from 'next/image';
 import DOMPurify from 'isomorphic-dompurify';
 import AddToCartButton from '@/components/AddToCartButton';
 import StoreHeader from '@/components/StoreHeader';
+import ProductImageGallery from './ProductImageGallery';
 
 interface ProductPageProps {
   params: { storeDomain: string; slug: string };
+}
+
+/**
+ * Safety net only — metadata edits purge this page immediately via
+ * lib/revalidate.ts. The window is what covers a change made outside the app
+ * (direct DB edit, import script).
+ */
+export const revalidate = 300;
+
+/** Slugs outside the prerendered set still render on demand. */
+export const dynamicParams = true;
+
+/**
+ * Prerender published products so crawlers and AI answer engines receive
+ * complete HTML with its metadata, not a client-rendered shell.
+ */
+export async function generateStaticParams() {
+  try {
+    const products = await prisma.product.findMany({
+      where: { isPublished: true },
+      select: { slug: true, store: { select: { domain: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 500,
+    });
+
+    return products.map((product) => ({
+      storeDomain: product.store.domain,
+      slug: product.slug,
+    }));
+  } catch {
+    // A build-time DB hiccup must not fail the build; pages render on demand.
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -140,28 +174,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
             <div className="flex flex-col-reverse">
-              <div className="hidden mt-6 w-full max-w-2xl mx-auto sm:block lg:max-w-none">
-                <div className="grid grid-cols-4 gap-6">
-                  {product.images.map((image, index) => (
-                    <button key={image.id} className="relative h-24 bg-white rounded-md flex items-center justify-center text-sm font-medium uppercase text-gray-900 cursor-pointer hover:bg-gray-50">
-                      <span className="absolute -inset-0.5 rounded-md overflow-hidden">
-                        <Image src={image.url} alt={image.altText || `Product image ${index + 1}`} width={200} height={200} className="w-full h-full object-cover object-center" />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="w-full aspect-w-1 aspect-h-1">
-                <div className="bg-white rounded-lg overflow-hidden">
-                  {product.images.length > 0 ? (
-                    <Image src={product.images[0].url} alt={product.images[0].altText || product.name} width={800} height={800} className="w-full h-full object-cover object-center" priority />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">No image available</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ProductImageGallery images={product.images} name={product.name} />
             </div>
             
             <div className="mt-10 px-4 sm:px-0 sm:mt-16 lg:mt-0">

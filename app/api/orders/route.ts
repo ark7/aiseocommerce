@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { OrderStatus } from '@prisma/client'
 import { z } from 'zod'
+import { AttributionSchema } from '@/lib/attribution'
 
 // Define schema for order creation
 // Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
@@ -17,6 +18,9 @@ const OrderSchema = z.object({
     })
   ).min(1),
   customerId: z.string().min(1).optional(),
+  // Campaign source captured on the storefront; validated and length-capped
+  // before it reaches the Order.attribution JSON column.
+  attribution: AttributionSchema.optional(),
 })
 
 // List orders for the caller's store. Customers only see their own.
@@ -60,7 +64,8 @@ export async function POST(request: Request) {
     const order = await createOrder(
       validatedData.storeId,
       validatedData.items,
-      validatedData.customerId
+      validatedData.customerId,
+      validatedData.attribution
     )
 
     return NextResponse.json({

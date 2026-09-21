@@ -5,6 +5,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import { revalidateProduct } from '@/lib/revalidate';
 
 const UPLOAD_DIR = './public/uploads';
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
@@ -153,7 +154,10 @@ export async function POST(request: Request) {
       },
       include: { images: true, category: true },
     });
-    
+
+    // A new listing must be crawlable before the ISR window expires.
+    await revalidateProduct(user.storeId, product.slug);
+
     return NextResponse.json({ success: true, product });
   } catch (error) {
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -227,7 +231,11 @@ export async function PATCH(request: Request) {
       },
       include: { images: true, category: true },
     });
-    
+
+    // Pass the old slug too: a rename has to purge the URL it used to live at,
+    // otherwise the stale page keeps being served from the cache.
+    await revalidateProduct(user.storeId, product.slug, existingProduct.slug);
+
     return NextResponse.json({ success: true, product });
   } catch (error) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
@@ -262,6 +270,8 @@ export async function DELETE(request: Request) {
     }
     
     await prisma.product.delete({ where: { id } });
+    await revalidateProduct(user.storeId, product.slug);
+
     return NextResponse.json({ success: true, message: 'Product deleted' });
   } catch (error) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

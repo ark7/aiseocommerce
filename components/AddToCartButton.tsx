@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { buildAddToCartCalls, getTrackingConfig, sendTrackingCalls } from '@/lib/tracking';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -37,6 +38,15 @@ export default function AddToCartButton({ productId, storeDomain, price, name, s
         cart.push(cartItem);
       }
       localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(cart));
+
+      // Report the conversion before navigating away — an add_to_cart that never
+      // reaches the ad platforms starves their bidding of the signal.
+      sendTrackingCalls(
+        buildAddToCartCalls(getTrackingConfig(), {
+          item: { id: productId, name, price, quantity },
+        })
+      );
+
       router.push(`/${storeDomain}/cart`);
     } catch {
       setError('Failed to add to cart');

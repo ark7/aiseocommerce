@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { nextStatuses, STATUS_LABELS } from '@/lib/orderStatus';
+import type { OrderStatus } from '@prisma/client';
 
 interface OrderItem {
   id: string;
@@ -42,9 +44,36 @@ interface OrderDetail {
   deliveredAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /** Campaign that brought this order in; null for direct or organic traffic. */
+  attribution: Attribution | null;
   orderItems: OrderItem[];
   payments: PaymentInfo[];
 }
+
+interface Attribution {
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  term?: string;
+  content?: string;
+  gclid?: string;
+  fbclid?: string;
+  landingPage?: string;
+  referrer?: string;
+  capturedAt?: string;
+}
+
+const ATTRIBUTION_LABELS: { key: keyof Attribution; label: string }[] = [
+  { key: 'source', label: 'Sumber' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'campaign', label: 'Campaign' },
+  { key: 'term', label: 'Keyword' },
+  { key: 'content', label: 'Konten Iklan' },
+  { key: 'gclid', label: 'Google Click ID' },
+  { key: 'fbclid', label: 'Meta Click ID' },
+  { key: 'landingPage', label: 'Halaman Masuk' },
+  { key: 'referrer', label: 'Referrer' },
+];
 
 function formatIDR(amount: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -166,6 +195,33 @@ export default function AdminOrderDetailPage() {
     );
   };
 
+  /** Cancelling or refunding puts stock back and writes a reversing ledger entry. */
+  const REVERSING: OrderStatus[] = ['CANCELLED', 'REFUNDED'];
+
+  const changeStatus = (status: OrderStatus) => {
+    if (
+      REVERSING.includes(status) &&
+      !window.confirm(
+        `Ubah status ke "${STATUS_LABELS[status]}"? Stok dikembalikan dan jurnal pembalik dicatat.`
+      )
+    ) {
+      return;
+    }
+
+    const headers = authHeaders();
+    if (!headers) return;
+
+    return runAction(
+      () =>
+        fetch(`/api/admin/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        }),
+      `Status pesanan diubah ke ${STATUS_LABELS[status]}.`
+    );
+  };
+
   const loadProof = async (paymentId: string) => {
     try {
       setError(null);
@@ -225,6 +281,29 @@ export default function AdminOrderDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {order.attribution && Object.keys(order.attribution).length > 0 && (
+            <div className="bg-white p-6 rounded-lg shadow border">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Sumber Campaign</h2>
+              <dl className="space-y-2 text-sm">
+                {ATTRIBUTION_LABELS.filter(({ key }) => order.attribution?.[key]).map(
+                  ({ key, label }) => (
+                    <div key={key} className="flex justify-between gap-4">
+                      <dt className="text-gray-500">{label}</dt>
+                      <dd className="text-gray-900 text-right break-all">
+                        {order.attribution?.[key]}
+                      </dd>
+                    </div>
+                  )
+                )}
+              </dl>
+              {order.attribution.capturedAt && (
+                <p className="mt-3 pt-3 border-t text-xs text-gray-500">
+                  Dilacak {new Date(order.attribution.capturedAt).toLocaleString('id-ID')}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="bg-white p-6 rounded-lg shadow border">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Item Pesanan</h2>
             <table className="min-w-full divide-y divide-gray-200">
@@ -305,6 +384,34 @@ export default function AdminOrderDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <div className="bg-white p-6 rounded-lg shadow border">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Ubah Status</h2>
+            <p className="text-sm text-gray-500 mb-3">
+              Status saat ini: <span className="text-gray-900">{STATUS_LABELS[order.status as OrderStatus] || order.status}</span>
+            </p>
+
+            {nextStatuses(order.status as OrderStatus).length === 0 ? (
+              <p className="text-sm text-gray-500">Pesanan ini sudah berstatus akhir.</p>
+            ) : (
+              <div className="space-y-2">
+                {nextStatuses(order.status as OrderStatus).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => changeStatus(status)}
+                    disabled={busy}
+                    className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors disabled:opacity-50 ${
+                      REVERSING.includes(status)
+                        ? 'border-red-200 text-red-700 hover:bg-red-50'
+                        : 'border-indigo-200 text-indigo-700 hover:bg-indigo-50'
+                    }`}
+                  >
+                    {STATUS_LABELS[status] || status}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white p-6 rounded-lg shadow border">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Pelanggan</h2>
             <div className="space-y-2 text-sm">
