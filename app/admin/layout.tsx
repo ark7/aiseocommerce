@@ -219,7 +219,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Page content */}
-        <main className="pt-16 p-4 md:p-6">
+        <main className="pt-16 px-4 pb-4 md:px-6 md:pb-6">
           {children}
         </main>
       </div>

@@ -136,7 +136,7 @@ export default function AdminAnalyticsSettingsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-3xl">
+    <div className="container mx-auto max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-2">Analytics &amp; Google Tag</h1>
       <p className="text-sm text-gray-500 mb-6">
         Sambungkan storefront ke Google Tag dan kanal sosial media. ID yang kosong berarti tag tidak

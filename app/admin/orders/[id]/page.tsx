@@ -242,12 +242,12 @@ export default function AdminOrderDetailPage() {
   };
 
   if (loading) {
-    return <div className="container mx-auto px-4 py-12 text-center text-gray-500">Memuat pesanan...</div>;
+    return <div className="container mx-auto text-center text-gray-500">Memuat pesanan...</div>;
   }
 
   if (!order) {
     return (
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto">
         <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg">{error || 'Pesanan tidak ditemukan'}</div>
         <Link href="/admin/orders" className="inline-block mt-4 text-indigo-600 hover:text-indigo-900">
           &larr; Kembali ke daftar pesanan
@@ -259,7 +259,7 @@ export default function AdminOrderDetailPage() {
   const payment = order.payments[0];
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto">
       <Link href="/admin/orders" className="text-sm text-indigo-600 hover:text-indigo-900">
         &larr; Kembali ke daftar pesanan
       </Link>

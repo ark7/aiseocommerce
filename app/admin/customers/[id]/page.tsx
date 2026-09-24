@@ -96,7 +96,7 @@ export default function AdminCustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-12 text-center text-gray-500">
+      <div className="container mx-auto text-center text-gray-500">
         Memuat pelanggan...
       </div>
     );
@@ -104,7 +104,7 @@ export default function AdminCustomerDetailPage() {
 
   if (!customer) {
     return (
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto">
         <div className="bg-red-50 text-red-700 px-4 py-3 rounded-lg">
           {error || 'Pelanggan tidak ditemukan'}
         </div>
@@ -119,7 +119,7 @@ export default function AdminCustomerDetailPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto">
       <Link href="/admin/customers" className="text-sm text-indigo-600 hover:text-indigo-900">
         &larr; Kembali ke daftar pelanggan
       </Link>
