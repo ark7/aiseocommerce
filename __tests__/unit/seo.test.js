@@ -3,6 +3,31 @@
  * Tests SEO metadata generation, truncation, formatting, and structured data
  */
 
+import { escapeJsonLd, generateProductStructuredData } from '@/lib/seo';
+
+describe('JSON-LD escaping', () => {
+  it('escapes the tag-open character so a value containing a closing script tag cannot break out', () => {
+    const json = JSON.stringify({ name: 'Acme</script><img src=x onerror=alert(1)>' });
+    const escaped = escapeJsonLd(json);
+
+    expect(escaped).not.toContain('<');
+    expect(escaped).toContain('\\u003c');
+    expect(JSON.parse(escaped)).toEqual(JSON.parse(json));
+  });
+
+  it('product structured data escapes a hostile product name', () => {
+    const out = generateProductStructuredData({
+      id: 'p1',
+      name: 'Evil</script><script>alert(1)</script>',
+      slug: 'evil',
+      sellingPrice: 1000,
+      store: { name: 'Shop', domain: 'shop.test' },
+    });
+
+    expect(out).not.toContain('<');
+  });
+});
+
 describe('SEO Functions', () => {
   describe('truncate function', () => {
     it('should not truncate strings shorter than maxLength', () => {

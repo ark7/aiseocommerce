@@ -2,16 +2,17 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { buildAddToCartCalls, getTrackingConfig, sendTrackingCalls } from '@/lib/tracking';
 
 interface AddToCartButtonProps {
   productId: string;
-  storeId: string;
+  storeDomain: string;
   price: number;
   name: string;
   stock: number;
 }
 
-export default function AddToCartButton({ productId, storeId, price, name, stock }: AddToCartButtonProps) {
+export default function AddToCartButton({ productId, storeDomain, price, name, stock }: AddToCartButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [quantity, setQuantity] = useState(1);
@@ -26,18 +27,27 @@ export default function AddToCartButton({ productId, storeId, price, name, stock
     setError(null);
 
     try {
-      const cartItem = { productId, name, price, quantity, storeId };
-      const existingCart = localStorage.getItem(`cart_${storeId}`);
+      const cartItem = { productId, name, price, quantity, storeDomain };
+      const existingCart = localStorage.getItem(`cart_${storeDomain}`);
       const cart = existingCart ? JSON.parse(existingCart) : [];
       const existingItemIndex = cart.findIndex((item: any) => item.productId === productId);
-      
+
       if (existingItemIndex >= 0) {
         cart[existingItemIndex].quantity += quantity;
       } else {
         cart.push(cartItem);
       }
-      localStorage.setItem(`cart_${storeId}`, JSON.stringify(cart));
-      router.push('/cart');
+      localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(cart));
+
+      // Report the conversion before navigating away — an add_to_cart that never
+      // reaches the ad platforms starves their bidding of the signal.
+      sendTrackingCalls(
+        buildAddToCartCalls(getTrackingConfig(), {
+          item: { id: productId, name, price, quantity },
+        })
+      );
+
+      router.push(`/${storeDomain}/cart`);
     } catch {
       setError('Failed to add to cart');
     } finally {

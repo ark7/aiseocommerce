@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -14,12 +14,7 @@ export default function ProductsList() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
 
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, [page, searchQuery, selectedCategory]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -28,19 +23,19 @@ export default function ProductsList() {
       }
 
       setLoading(true);
-      
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '12',
       });
-      
+
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory) params.append('categoryId', selectedCategory);
-      
+
       const response = await fetch(`/api/products?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setProducts(data.products || []);
@@ -54,9 +49,9 @@ export default function ProductsList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, searchQuery, selectedCategory]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
@@ -64,7 +59,7 @@ export default function ProductsList() {
       const response = await fetch('/api/categories', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setCategories(data.categories || []);
@@ -72,7 +67,12 @@ export default function ProductsList() {
     } catch (err) {
       console.error('Failed to fetch categories:', err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchCategories();
+  }, [fetchProducts, fetchCategories]);
 
   const handleDelete = async (productId: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;

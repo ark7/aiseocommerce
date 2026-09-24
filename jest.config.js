@@ -11,7 +11,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
+    '^.+\\.[tj]sx?$': ['ts-jest', {
       tsconfig: 'tsconfig.json',
     }],
   },

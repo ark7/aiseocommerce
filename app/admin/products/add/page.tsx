@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function AddProduct() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function AddProduct() {
         .trim();
       setFormData(prev => ({ ...prev, slug }));
     }
-  }, [formData.name]);
+  }, [formData.name, formData.slug]);
 
   const fetchCategories = async () => {
     try {
@@ -434,9 +435,11 @@ export default function AddProduct() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {imagePreviews.map((preview, index) => (
                   <div key={index} className="relative">
-                    <img
+                    <Image
                       src={preview}
                       alt={`Preview ${index + 1}`}
+                      width={400}
+                      height={128}
                       className="w-full h-32 object-cover rounded-lg"
                     />
                     <button

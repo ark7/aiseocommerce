@@ -214,6 +214,57 @@ export async function auditProductUpdated(
   );
 }
 
+export async function auditProductDeleted(
+  productId: string,
+  userId: string,
+  storeId: string,
+  data: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction(
+    'DELETE',
+    'PRODUCT',
+    productId,
+    userId,
+    storeId,
+    data,
+    null,
+    ipAddress
+  );
+}
+
+// Category actions
+export async function auditCategoryCreated(
+  categoryId: string,
+  userId: string,
+  storeId: string,
+  data: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction('CREATE', 'CATEGORY', categoryId, userId, storeId, null, data, ipAddress);
+}
+
+export async function auditCategoryUpdated(
+  categoryId: string,
+  userId: string,
+  storeId: string,
+  oldData: Record<string, any>,
+  newData: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction('UPDATE', 'CATEGORY', categoryId, userId, storeId, oldData, newData, ipAddress);
+}
+
+export async function auditCategoryDeleted(
+  categoryId: string,
+  userId: string,
+  storeId: string,
+  data: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction('DELETE', 'CATEGORY', categoryId, userId, storeId, data, null, ipAddress);
+}
+
 // Stock actions
 export async function auditStockAdjusted(
   productId: string,
@@ -299,7 +350,7 @@ export async function auditLedgerCreated(
   storeId: string,
   type: string,
   amount: number,
-  description: string,
+  description: string | null,
   ipAddress?: string
 ): Promise<void> {
   await logAuditAction(
@@ -314,6 +365,16 @@ export async function auditLedgerCreated(
   );
 }
 
+export async function auditLedgerDeleted(
+  ledgerId: string,
+  userId: string,
+  storeId: string,
+  data: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction('DELETE', 'LEDGER', ledgerId, userId, storeId, data, null, ipAddress);
+}
+
 export default {
   logAuditAction,
   getAuditLogs,
@@ -326,6 +387,11 @@ export default {
   // Product
   auditProductCreated,
   auditProductUpdated,
+  auditProductDeleted,
+  // Category
+  auditCategoryCreated,
+  auditCategoryUpdated,
+  auditCategoryDeleted,
   // Stock
   auditStockAdjusted,
   // User
@@ -334,4 +400,5 @@ export default {
   auditUserLogout,
   // Ledger
   auditLedgerCreated,
+  auditLedgerDeleted,
 };
