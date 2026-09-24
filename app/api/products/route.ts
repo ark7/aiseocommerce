@@ -418,10 +418,7 @@ export async function DELETE(request: Request) {
     if (product.storeId !== user.storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     
     for (const image of product.images) {
-      try {
-        const filePath = join(UPLOAD_DIR, image.url.replace('/uploads/', ''));
-        await import('fs/promises').then(fs => fs.unlink(filePath));
-      } catch {}
+      await removeUploadedFile(image.url);
     }
     
     await prisma.product.delete({ where: { id } });

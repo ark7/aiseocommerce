@@ -2,6 +2,7 @@ import { POST, PATCH, DELETE } from '@/app/api/products/route';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { auditProductUpdated, auditProductDeleted } from '@/services/auditService';
+import { unlink } from 'fs/promises';
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -292,5 +293,23 @@ describe('DELETE /api/products', () => {
 
     expect(response.status).toBe(404);
     expect(prisma.product.delete).not.toHaveBeenCalled();
+  });
+
+  it('removes the uploaded file alongside the row that pointed at it', async () => {
+    await DELETE(deleteRequest(ROW.id));
+
+    expect(unlink).toHaveBeenCalledWith(expect.stringContaining('a.jpg'));
+  });
+
+  it('leaves a file it does not own alone', async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue({
+      ...ROW,
+      images: [{ id: 'img-2', url: 'https://cdn.example.com/b.jpg' }],
+    });
+
+    await DELETE(deleteRequest(ROW.id));
+
+    expect(unlink).not.toHaveBeenCalled();
+    expect(prisma.product.delete).toHaveBeenCalled();
   });
 });
