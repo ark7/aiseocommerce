@@ -63,6 +63,34 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
   }
 }
 
+/**
+ * Read the bearer token off a request and return its payload.
+ * Returns null when the header is missing or the token does not verify.
+ * The caller's identity comes from the token, never from the request body.
+ */
+export async function requireUser(request: NextRequest | Request): Promise<UserPayload | null> {
+  const header = request.headers.get('authorization');
+  const token = header?.replace('Bearer ', '');
+  if (!token) return null;
+  return verifyToken(token);
+}
+
+/**
+ * Require an authenticated user whose role is listed and whose store matches
+ * `storeId`. Returns the payload, or null when any check fails.
+ */
+export async function requireStoreRole(
+  request: NextRequest | Request,
+  storeId: string,
+  roles: string[]
+): Promise<UserPayload | null> {
+  const user = await requireUser(request);
+  if (!user) return null;
+  if (user.storeId !== storeId) return null;
+  if (!roles.includes(user.role)) return null;
+  return user;
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 12);
 }

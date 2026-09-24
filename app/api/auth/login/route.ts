@@ -62,12 +62,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
     
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: { id: result.user.id, email: result.user.email, role: result.user.role, storeId: result.user.storeId, firstName: result.user.firstName, lastName: result.user.lastName },
       token: result.token,
       refreshToken: result.refreshToken,
     });
+
+    // middleware.ts gates /admin on a `token` cookie, so it has to be set here —
+    // the token in the body alone leaves every admin page bouncing to /login.
+    // ponytail: the client still reads localStorage for its Authorization
+    // headers; move those onto this cookie and drop localStorage the next time
+    // the admin pages are touched.
+    const isProduction = process.env.NODE_ENV === 'production';
+    response.cookies.set('token', result.token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+    response.cookies.set('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
+
+    return response;
   } catch (error) {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }

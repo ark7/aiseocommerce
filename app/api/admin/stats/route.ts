@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { logger } from '@/lib/logger';
+
+// Reads the Authorization header, so it can never be served statically. Without
+// this Next tries anyway at build time and logs a dynamic-usage error.
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
@@ -33,7 +38,9 @@ export async function GET(request: Request) {
       }),
     ]);
     
-    const revenue = paidOrders.reduce((sum, order: any) => sum + (order.total || 0), 0);
+    // `totalAmount` is the column on Order; there is no `total`, so the old
+    // read summed undefined and the dashboard showed Rp 0 forever.
+    const revenue = paidOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     
     const stats = {
       products: productsCount,
@@ -45,7 +52,11 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ success: true, stats });
   } catch (error) {
-    console.error('Stats error:', error);
+    logger.error(
+      'Failed to fetch stats',
+      undefined,
+      error instanceof Error ? error : String(error)
+    );
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
   }
 }

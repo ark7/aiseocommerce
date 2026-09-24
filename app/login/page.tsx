@@ -24,7 +24,7 @@ export default function LoginPage() {
     
     // Fetch available stores for demo
     fetchStores();
-  }, []);
+  }, [router]);
 
   const fetchStores = async () => {
     try {
@@ -201,7 +201,7 @@ export default function LoginPage() {
 
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
-            Demo credentials: admin@demo.com / password123
+            Demo credentials: admin@demo-store.local / password
           </p>
         </div>
       </div>

@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { z } from 'zod';
+import { revalidateCategory } from '@/lib/revalidate';
+import { getIPAddress } from '@/lib/ip';
+import {
+  auditCategoryCreated,
+  auditCategoryUpdated,
+  auditCategoryDeleted,
+} from '@/services/auditService';
 
 const createCategorySchema = z.object({
   name: z.string().min(1),
@@ -91,6 +98,18 @@ export async function POST(request: Request) {
       },
     });
     
+    await revalidateCategory(user.storeId, category.slug);
+
+    // After the write, never inside it: logAuditAction swallows its own
+    // failures, so logging can never fail a save that succeeded.
+    await auditCategoryCreated(
+      category.id,
+      user.id,
+      user.storeId,
+      { name: category.name, slug: category.slug, description: category.description, parentId: category.parentId },
+      getIPAddress(request)
+    );
+
     return NextResponse.json({ success: true, category });
   } catch (error) {
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -131,6 +150,22 @@ export async function PATCH(request: Request) {
       data,
     });
     
+    // A renamed slug must also purge the URL it used to live at.
+    await revalidateCategory(user.storeId, updatedCategory.slug, category.slug);
+
+    // Only the fields this request touched, with the values they replaced.
+    const before = Object.fromEntries(
+      Object.keys(data).map((key) => [key, (category as Record<string, unknown>)[key]])
+    );
+    await auditCategoryUpdated(
+      id,
+      user.id,
+      user.storeId,
+      before,
+      data,
+      getIPAddress(request)
+    );
+
     return NextResponse.json({ success: true, category: updatedCategory });
   } catch (error) {
     return NextResponse.json({ error: 'Update failed' }, { status: 500 });
@@ -165,6 +200,17 @@ export async function DELETE(request: Request) {
     if (childrenCount > 0) return NextResponse.json({ error: 'Cannot delete category with subcategories' }, { status: 400 });
     
     await prisma.category.delete({ where: { id } });
+    await revalidateCategory(user.storeId, category.slug);
+
+    // The row is gone, so this snapshot is the only record of what it was.
+    await auditCategoryDeleted(
+      id,
+      user.id,
+      user.storeId,
+      { name: category.name, slug: category.slug, description: category.description, parentId: category.parentId },
+      getIPAddress(request)
+    );
+
     return NextResponse.json({ success: true, message: 'Category deleted' });
   } catch (error) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { getIPAddress } from '@/lib/ip';
+import { auditLedgerCreated, auditLedgerDeleted } from '@/services/auditService';
 
 export async function GET(request: Request) {
   try {
@@ -97,6 +99,16 @@ export async function POST(request: Request) {
       },
     });
     
+    await auditLedgerCreated(
+      ledger.id,
+      user.id,
+      user.storeId,
+      ledger.type,
+      ledger.amount,
+      ledger.description,
+      getIPAddress(request)
+    );
+
     return NextResponse.json({ success: true, ledger });
   } catch (error) {
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
@@ -121,6 +133,21 @@ export async function DELETE(request: Request) {
     if (ledger.storeId !== user.storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     
     await prisma.ledger.delete({ where: { id } });
+
+    // The row is gone, so this snapshot is the only record of what it was.
+    await auditLedgerDeleted(
+      ledger.id,
+      user.id,
+      user.storeId,
+      {
+        type: ledger.type,
+        amount: ledger.amount,
+        description: ledger.description,
+        category: ledger.category,
+      },
+      getIPAddress(request)
+    );
+
     return NextResponse.json({ success: true, message: 'Deleted successfully' });
   } catch (error) {
     return NextResponse.json({ error: 'Delete failed' }, { status: 500 });

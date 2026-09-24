@@ -3,10 +3,46 @@ import { prisma } from '@/lib/prisma';
 import { generateProductSEO, generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/seo';
 import { Metadata } from 'next';
 import Image from 'next/image';
+import DOMPurify from 'isomorphic-dompurify';
 import AddToCartButton from '@/components/AddToCartButton';
+import StoreHeader from '@/components/StoreHeader';
+import ProductImageGallery from './ProductImageGallery';
 
 interface ProductPageProps {
   params: { storeDomain: string; slug: string };
+}
+
+/**
+ * Safety net only — metadata edits purge this page immediately via
+ * lib/revalidate.ts. The window is what covers a change made outside the app
+ * (direct DB edit, import script).
+ */
+export const revalidate = 300;
+
+/** Slugs outside the prerendered set still render on demand. */
+export const dynamicParams = true;
+
+/**
+ * Prerender published products so crawlers and AI answer engines receive
+ * complete HTML with its metadata, not a client-rendered shell.
+ */
+export async function generateStaticParams() {
+  try {
+    const products = await prisma.product.findMany({
+      where: { isPublished: true },
+      select: { slug: true, store: { select: { domain: true } } },
+      orderBy: { updatedAt: 'desc' },
+      take: 500,
+    });
+
+    return products.map((product) => ({
+      storeDomain: product.store.domain,
+      slug: product.slug,
+    }));
+  } catch {
+    // A build-time DB hiccup must not fail the build; pages render on demand.
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
@@ -51,48 +87,68 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
   }
 }
 
+async function loadProductPage(params: ProductPageProps['params']) {
+  const store = await prisma.store.findUnique({ where: { domain: params.storeDomain }, include: { settings: true } });
+  if (!store) return null;
+
+  const product = await prisma.product.findUnique({
+    where: { storeId_slug: { storeId: store.id, slug: params.slug } },
+    include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
+  });
+  if (!product || !product.isPublished) return null;
+
+  const relatedProducts = await prisma.product.findMany({
+    where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
+    take: 4,
+    select: { id: true, name: true, slug: true, sellingPrice: true, images: { where: { isPrimary: true }, take: 1 } },
+  });
+
+  const productStructuredData = generateProductStructuredData({
+    ...product,
+    store: { name: store.name, domain: store.domain },
+  });
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData(
+    store.name,
+    product.category?.name,
+    product.name
+  );
+
+  const formattedPrice = new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+  }).format(product.sellingPrice);
+
+  const formattedDiscountPrice = product.discountPrice
+    ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.discountPrice)
+    : null;
+
+  return { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice };
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
+  let data;
   try {
-    const store = await prisma.store.findUnique({ where: { domain: params.storeDomain }, include: { settings: true } });
-    if (!store) return notFound();
-    
-    const product = await prisma.product.findUnique({
-      where: { storeId_slug: { storeId: store.id, slug: params.slug } },
-      include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
-    });
-    if (!product || !product.isPublished) return notFound();
-    
-    const relatedProducts = await prisma.product.findMany({
-      where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
-      take: 4,
-      select: { id: true, name: true, slug: true, sellingPrice: true, images: { where: { isPrimary: true }, take: 1 } },
-    });
-    
-    const productStructuredData = generateProductStructuredData({
-      ...product,
-      store: { name: store.name, domain: store.domain },
-    });
-    const breadcrumbStructuredData = generateBreadcrumbStructuredData(
-      store.name,
-      product.category?.name,
-      product.name
-    );
-    
-    const formattedPrice = new Intl.NumberFormat('id-ID', {
-      style: 'currency',
-      currency: 'IDR',
-      minimumFractionDigits: 0,
-    }).format(product.sellingPrice);
-    
-    const formattedDiscountPrice = product.discountPrice
-      ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.discountPrice)
-      : null;
-    
+    data = await loadProductPage(params);
+  } catch {
+    return notFound();
+  }
+  if (!data) return notFound();
+
+  const { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice } = data;
+
     return (
       <div className="min-h-screen bg-gray-50">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productStructuredData }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbStructuredData }} />
-        
+
+        <StoreHeader
+          storeDomain={params.storeDomain}
+          storeName={store.name}
+          storeLogo={store.logo}
+          storeAddress={store.address}
+        />
+
         <div className="bg-white border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
@@ -118,28 +174,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="lg:grid lg:grid-cols-2 lg:gap-x-8 lg:items-start">
             <div className="flex flex-col-reverse">
-              <div className="hidden mt-6 w-full max-w-2xl mx-auto sm:block lg:max-w-none">
-                <div className="grid grid-cols-4 gap-6">
-                  {product.images.map((image, index) => (
-                    <button key={image.id} className="relative h-24 bg-white rounded-md flex items-center justify-center text-sm font-medium uppercase text-gray-900 cursor-pointer hover:bg-gray-50">
-                      <span className="absolute -inset-0.5 rounded-md overflow-hidden">
-                        <Image src={image.url} alt={image.altText || `Product image ${index + 1}`} width={200} height={200} className="w-full h-full object-cover object-center" />
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="w-full aspect-w-1 aspect-h-1">
-                <div className="bg-white rounded-lg overflow-hidden">
-                  {product.images.length > 0 ? (
-                    <Image src={product.images[0].url} alt={product.images[0].altText || product.name} width={800} height={800} className="w-full h-full object-cover object-center" priority />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">No image available</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ProductImageGallery images={product.images} name={product.name} />
             </div>
             
             <div className="mt-10 px-4 sm:px-0 sm:mt-16 lg:mt-0">
@@ -169,7 +204,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 <h3 className="sr-only">Description</h3>
                 <div className="text-base text-gray-700 space-y-6">
                   {product.shortDescription && <p className="font-medium">{product.shortDescription}</p>}
-                  {product.description && <div dangerouslySetInnerHTML={{ __html: product.description }} />}
+                  {product.description && <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.description) }} />}
                 </div>
               </div>
               
@@ -180,7 +215,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     {product.stock > 0 && <span className="ml-1">{product.stock} available</span>}
                   </span>
                 </div>
-                <AddToCartButton productId={product.id} storeId={store.id} price={product.sellingPrice} name={product.name} stock={product.stock} />
+                <AddToCartButton productId={product.id} storeDomain={params.storeDomain} price={product.sellingPrice} name={product.name} stock={product.stock} />
               </div>
               
               <section className="mt-10 border-t border-gray-200 pt-10">
@@ -222,7 +257,4 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
       </div>
     );
-  } catch {
-    return notFound();
-  }
 }
