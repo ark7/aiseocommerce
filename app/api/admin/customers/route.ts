@@ -37,6 +37,12 @@ export interface CustomerSummary {
   lastOrderAt: Date | null;
 }
 
+// Reads the Authorization header via requireUser, so it can never be served
+// statically. Without this Next attempts a static pass at build time, the
+// handler's own try/catch swallows Next's bail-out error, and the route logs a
+// "Dynamic server usage" error during every build.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
