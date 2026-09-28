@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import type { OrderStatus } from '@prisma/client';
+import { REVENUE_STATUSES, STATUS_LABELS } from '@/lib/orderStatus';
 
 interface OrderRow {
   id: string;
@@ -16,6 +18,8 @@ interface OrderRow {
 
 const STATUS_FILTERS = [
   { value: '', label: 'Semua' },
+  { value: 'PENDING', label: 'Menunggu Pembayaran' },
+  { value: 'PAID', label: 'Dibayar' },
   { value: 'MANUAL_VERIFICATION', label: 'Menunggu Konfirmasi' },
   { value: 'PROCESSING', label: 'Diproses' },
   { value: 'SHIPPED', label: 'Dikirim' },
@@ -43,9 +47,15 @@ function formatIDR(amount: number) {
   }).format(amount);
 }
 
+const PAGE_SIZES = [5, 10, 25, 50, 100];
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [status, setStatus] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,7 +70,7 @@ export default function AdminOrdersPage() {
         return;
       }
 
-      const params = new URLSearchParams({ limit: '100' });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (status) params.set('status', status);
 
       const response = await fetch(`/api/orders?${params.toString()}`, {
@@ -73,21 +83,45 @@ export default function AdminOrdersPage() {
 
       const data = await response.json();
       setOrders(data.orders || []);
+      setTotalPages(data.pagination?.totalPages ?? 1);
+      setTotal(data.pagination?.total ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat pesanan');
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, page, limit]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
+  /** A new filter or page size changes which rows exist, so start over at page 1. */
+  const changeStatus = (value: string) => {
+    setStatus(value);
+    setPage(1);
+  };
+
+  const changeLimit = (value: number) => {
+    setLimit(value);
+    setPage(1);
+  };
+
+  // Derived during render, not stored. Only the rows on screen are summed, so
+  // the label says "halaman ini" instead of claiming the whole store's revenue.
+  const revenue = orders
+    .filter((order) => REVENUE_STATUSES.includes(order.status as OrderStatus))
+    .reduce((sum, order) => sum + order.totalAmount, 0);
+
   return (
     <div className="container mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pesanan</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Pesanan</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {total} pesanan · penjualan di halaman ini: {formatIDR(revenue)}
+          </p>
+        </div>
         <button
           onClick={fetchOrders}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -97,11 +131,11 @@ export default function AdminOrdersPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <div className="px-4 py-3 border-b flex flex-wrap gap-2">
+        <div className="px-4 py-3 border-b flex flex-wrap items-center gap-2">
           {STATUS_FILTERS.map((filter) => (
             <button
               key={filter.value}
-              onClick={() => setStatus(filter.value)}
+              onClick={() => changeStatus(filter.value)}
               className={`px-3 py-1 rounded-full text-sm transition-colors ${
                 status === filter.value
                   ? 'bg-indigo-600 text-white'
@@ -111,6 +145,20 @@ export default function AdminOrdersPage() {
               {filter.label}
             </button>
           ))}
+
+          <label className="ml-auto flex items-center gap-2 text-sm text-gray-600">
+            Baris
+            <select
+              value={limit}
+              onChange={(event) => changeLimit(Number(event.target.value))}
+              className="px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              aria-label="Jumlah baris per halaman"
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {error && (
@@ -162,7 +210,7 @@ export default function AdminOrdersPage() {
                           STATUS_STYLE[order.status] || 'bg-gray-100 text-gray-700'
                         }`}
                       >
-                        {order.status}
+                        {STATUS_LABELS[order.status as OrderStatus] ?? order.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -180,6 +228,28 @@ export default function AdminOrdersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div className="px-4 py-3 border-t flex items-center justify-between">
+            <button
+              onClick={() => setPage((current) => Math.max(current - 1, 1))}
+              disabled={page <= 1}
+              className="px-3 py-1 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Sebelumnya
+            </button>
+            <span className="text-sm text-gray-500">
+              Halaman {page} dari {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
+              disabled={page >= totalPages}
+              className="px-3 py-1 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent"
+            >
+              Berikutnya
+            </button>
           </div>
         )}
       </div>

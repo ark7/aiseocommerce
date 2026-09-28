@@ -33,23 +33,32 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = Math.min(Number(searchParams.get('limit')) || 50, 100)
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 50, 1), 100)
+    const page = Math.max(Number(searchParams.get('page')) || 1, 1)
 
     const where: { storeId: string; status?: OrderStatus; userId?: string } = { storeId: user.storeId }
     if (status) where.status = status as OrderStatus
     if (user.role === 'CUSTOMER') where.userId = user.id
 
-    const orders = await prisma.order.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        orderItems: { include: { product: { select: { id: true, name: true, slug: true } } } },
-        payments: { select: { id: true, method: true, status: true, amount: true } },
-      },
-    })
+    const [orders, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          orderItems: { include: { product: { select: { id: true, name: true, slug: true } } } },
+          payments: { select: { id: true, method: true, status: true, amount: true } },
+        },
+      }),
+      prisma.order.count({ where }),
+    ])
 
-    return NextResponse.json({ success: true, orders })
+    return NextResponse.json({
+      success: true,
+      orders,
+      pagination: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
+    })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 })
   }
