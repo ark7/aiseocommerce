@@ -28,6 +28,8 @@ model Store {
   settings    StoreSettings?
   categories  Category[]
   pettyCashes PettyCash[]
+  productEvents ProductEvent[]
+  ledgerCategories LedgerCategory[]
 
   @@map("stores")
 }
@@ -113,6 +115,7 @@ model Product {
 
   stockLogs  StockLog[]
   orderItems OrderItem[]
+  productEvents ProductEvent[]
 
   @@unique([storeId, slug])
   @@map("products")
@@ -296,6 +299,23 @@ enum LedgerType {
   REFUND
 }
 
+/// The allowed `Ledger.category` names per store and type. The ledger keeps the
+/// name as a plain string (see recordOrderIncome), so this table is a picklist
+/// and a rename cascade, not a foreign key.
+model LedgerCategory {
+  id        String     @id @default(cuid())
+  storeId   String
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  type      LedgerType
+  name      String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([storeId, type, name])
+  @@map("ledger_categories")
+}
+
 model PettyCash {
   id           String        @id @default(cuid())
   storeId      String
@@ -345,4 +365,35 @@ model LoginAttempt {
 
   @@index([ipAddress, createdAt])
   @@map("login_attempts")
+}
+
+/// The upper half of the product funnel. Orders record the conversion end and
+/// carry attribution; nothing recorded what happened before a purchase, so
+/// "this listing converts well" was previously unfalsifiable.
+///
+/// One row per (product, step, session). Storing a step per product rather than
+/// one cart-level row keeps the funnel a single GROUP BY over
+/// (storeId, productId, type) with no join and no array unnesting.
+enum ProductEventType {
+  VIEW
+  ADD_TO_CART
+  CHECKOUT_START
+}
+
+model ProductEvent {
+  id          String           @id @default(cuid())
+  storeId     String
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type        ProductEventType
+  /// Anonymous, client-generated, stable per browser. Never a user id.
+  sessionId   String
+  /// Same shape as Order.attribution, so a funnel row and a sale join on campaign.
+  attribution Json?
+  createdAt   DateTime         @default(now())
+
+  @@index([storeId, productId, type, createdAt])
+  @@index([storeId, type, createdAt])
+  @@map("product_events")
 }
