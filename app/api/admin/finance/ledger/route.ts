@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     // A category is optional, but a named one has to be on the configured list
     // for this type — otherwise the per-category report is back to free text.
     if (typeof category === 'string' && category.trim() !== '') {
-      const configured = await isConfiguredCategory(user.storeId, type, category);
+      const configured = await isConfiguredCategory(prisma, user.storeId, type, category);
       if (!configured) {
         return NextResponse.json({ error: 'Kategori tidak terdaftar' }, { status: 400 });
       }

@@ -133,6 +133,24 @@ async function main() {
   });
   console.log(`✅ Store created: ${store.name} (${store.domain})\n`);
 
+  // The demo store's picklist. Written out here rather than imported from
+  // lib/ledgerCategory because ts-node runs this file as ESM, where an
+  // extensionless relative import of a .ts file does not resolve. SALES has to
+  // appear either way: the ledger rows below are filed under that name, and a
+  // category outside the master list is the split the master list exists to stop.
+  await prisma.ledgerCategory.createMany({
+    data: [
+      { storeId: store.id, type: LedgerType.INCOME, name: 'SALES' },
+      { storeId: store.id, type: LedgerType.INCOME, name: 'Pendapatan Lain' },
+      { storeId: store.id, type: LedgerType.EXPENSE, name: 'Pembelian' },
+      { storeId: store.id, type: LedgerType.EXPENSE, name: 'Operasional' },
+      { storeId: store.id, type: LedgerType.REFUND, name: 'REFUND' },
+      { storeId: store.id, type: LedgerType.PETTY_CASH, name: 'PETTY_CASH' },
+    ],
+    skipDuplicates: true,
+  });
+  console.log(`✅ Ledger categories seeded\n`);
+
   // Create Categories
   console.log('📁 Creating categories...');
   const categories = [];

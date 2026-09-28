@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     // Same rule as the ledger route: this is a second write path to the same
     // column, so the invariant has to be enforced here too.
     if (typeof category === 'string' && category.trim() !== '') {
-      const configured = await isConfiguredCategory(user.storeId, type, category);
+      const configured = await isConfiguredCategory(prisma, user.storeId, type, category);
       if (!configured) {
         return NextResponse.json({ error: 'Kategori tidak terdaftar' }, { status: 400 });
       }

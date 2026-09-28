@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { seedDefaultCategories } from '@/lib/ledgerCategory';
 
 export async function GET(request: Request) {
   try {
@@ -85,6 +86,11 @@ export async function POST(request: Request) {
       },
     });
     
+    // The finance picklist, so a brand-new store can label a transaction on day
+    // one. Nothing else creates these rows, and an empty picklist disables the
+    // category field rather than failing loudly.
+    await seedDefaultCategories(prisma, store.id);
+
     // Create admin user
     const hashedPassword = await import('bcryptjs').then(bcrypt => bcrypt.hash(userPassword, 12));
     const user = await prisma.user.create({
