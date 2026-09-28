@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getFinanceSummary } from '@/services/transactionService';
+import { isConfiguredCategory } from '@/lib/ledgerCategory';
 
 export async function GET(request: Request) {
   try {
@@ -88,7 +89,16 @@ export async function POST(request: Request) {
     
     const validTypes = ['INCOME', 'EXPENSE', 'PETTY_CASH', 'CAPITAL', 'LOAN', 'REFUND'];
     if (!validTypes.includes(type)) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-    
+
+    // Same rule as the ledger route: this is a second write path to the same
+    // column, so the invariant has to be enforced here too.
+    if (typeof category === 'string' && category.trim() !== '') {
+      const configured = await isConfiguredCategory(user.storeId, type, category);
+      if (!configured) {
+        return NextResponse.json({ error: 'Kategori tidak terdaftar' }, { status: 400 });
+      }
+    }
+
     const ledger = await prisma.ledger.create({
       data: {
         storeId: user.storeId,

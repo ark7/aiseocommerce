@@ -57,6 +57,15 @@ const EMPTY_SUMMARY: Summary = {
 
 const EMPTY_FORM = { type: 'INCOME' as LedgerType, amount: '', description: '', category: '' };
 
+interface LedgerCategory {
+  id: string;
+  type: LedgerType;
+  name: string;
+  isActive: boolean;
+}
+
+const EMPTY_CATEGORY_DRAFT = { type: 'INCOME' as LedgerType, name: '' };
+
 export default function FinancePage() {
   const [period, setPeriod] = useState('month');
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
@@ -74,6 +83,11 @@ export default function FinancePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const [categories, setCategories] = useState<LedgerCategory[]>([]);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [categoryDraft, setCategoryDraft] = useState(EMPTY_CATEGORY_DRAFT);
+  const [categoryBusy, setCategoryBusy] = useState(false);
 
   const authHeaders = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -96,6 +110,22 @@ export default function FinancePage() {
       setError(err instanceof Error ? err.message : 'Gagal memuat ringkasan');
     }
   }, [period, authHeaders]);
+
+  /** Inactive rows come along too: the panel has to show what was switched off. */
+  const loadCategories = useCallback(async () => {
+    const headers = authHeaders();
+    if (!headers) return;
+
+    try {
+      const response = await fetch('/api/admin/finance/categories?includeInactive=true', { headers });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Gagal memuat kategori');
+
+      setCategories(data.categories ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memuat kategori');
+    }
+  }, [authHeaders]);
 
   const loadEntries = useCallback(async () => {
     const headers = authHeaders();
@@ -127,6 +157,10 @@ export default function FinancePage() {
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   /** Both halves move together: a new entry changes the totals as well as the list. */
   const reload = async () => {
@@ -192,6 +226,78 @@ export default function FinancePage() {
       setError(err instanceof Error ? err.message : 'Gagal menghapus transaksi');
     }
   };
+
+  /** One place for the panel's four verbs: same headers, same error surface. */
+  const categoryRequest = async (method: string, body: Record<string, unknown>) => {
+    const headers = authHeaders();
+    if (!headers) {
+      setError('Anda harus login terlebih dahulu');
+      return false;
+    }
+
+    setCategoryBusy(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch('/api/admin/finance/categories', {
+        method,
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      // The server's reason is the useful one: "masih dipakai transaksi",
+      // "kategori sudah ada". Surfacing a generic message would hide it.
+      if (!response.ok) throw new Error(data.error || 'Gagal menyimpan kategori');
+
+      await loadCategories();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal menyimpan kategori');
+      return false;
+    } finally {
+      setCategoryBusy(false);
+    }
+  };
+
+  const handleCreateCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const created = await categoryRequest('POST', categoryDraft);
+    if (created) {
+      setCategoryDraft(EMPTY_CATEGORY_DRAFT);
+      setNotice('Kategori ditambahkan.');
+    }
+  };
+
+  const handleRenameCategory = async (category: LedgerCategory) => {
+    const name = prompt('Nama kategori baru', category.name)?.trim();
+    if (!name || name === category.name) return;
+
+    if (await categoryRequest('PATCH', { id: category.id, name })) {
+      setNotice('Kategori diganti nama; transaksi lama ikut diperbarui.');
+    }
+  };
+
+  const handleToggleCategory = async (category: LedgerCategory) => {
+    if (await categoryRequest('PATCH', { id: category.id, isActive: !category.isActive })) {
+      setNotice(category.isActive ? 'Kategori dinonaktifkan.' : 'Kategori diaktifkan.');
+    }
+  };
+
+  const handleDeleteCategory = async (category: LedgerCategory) => {
+    if (!confirm(`Hapus kategori "${category.name}"?`)) return;
+
+    if (await categoryRequest('DELETE', { id: category.id })) {
+      setNotice('Kategori dihapus.');
+    }
+  };
+
+  /** Only active categories of the chosen type are pickable, and a type change
+   *  has to drop the selection: an INCOME category is not valid for EXPENSE. */
+  const selectableCategories = categories.filter(
+    (category) => category.isActive && category.type === form.type
+  );
 
   const cards: Array<{ label: string; value: number; tone?: 'good' | 'bad' }> = [
     { label: 'Pemasukan', value: summary.totalIncome, tone: 'good' },
@@ -266,7 +372,100 @@ export default function FinancePage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow border space-y-4">
+      <div className="bg-white rounded-lg shadow border">
+        <button
+          type="button"
+          onClick={() => setPanelOpen((open) => !open)}
+          className="w-full flex items-center justify-between px-6 py-4 text-left"
+          aria-expanded={panelOpen}
+        >
+          <span>
+            <span className="text-lg font-semibold text-gray-900">Kategori</span>
+            <span className="block text-sm text-gray-500">
+              Daftar pilihan kategori per jenis transaksi
+            </span>
+          </span>
+          <span className="text-gray-400">{panelOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {panelOpen && (
+          <div className="px-6 pb-6 space-y-4 border-t pt-4">
+            <form onSubmit={handleCreateCategory} className="flex flex-col sm:flex-row gap-3">
+              <select
+                value={categoryDraft.type}
+                onChange={(event) =>
+                  setCategoryDraft((prev) => ({ ...prev, type: event.target.value as LedgerType }))
+                }
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                aria-label="Jenis transaksi kategori"
+              >
+                {LEDGER_TYPES.map((type) => (
+                  <option key={type} value={type}>{TYPE_LABEL[type]}</option>
+                ))}
+              </select>
+              <input
+                type="text"
+                value={categoryDraft.name}
+                onChange={(event) =>
+                  setCategoryDraft((prev) => ({ ...prev, name: event.target.value }))
+                }
+                required
+                maxLength={80}
+                placeholder="Nama kategori, mis. Operasional"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                aria-label="Nama kategori baru"
+              />
+              <button
+                type="submit"
+                disabled={categoryBusy}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              >
+                Tambah
+              </button>
+            </form>
+
+            {categories.length === 0 ? (
+              <p className="text-sm text-gray-500">Belum ada kategori.</p>
+            ) : (
+              <ul className="divide-y">
+                {categories.map((category) => (
+                  <li key={category.id} className="flex items-center gap-3 py-2">
+                    <span className="text-xs text-gray-500 w-32 shrink-0">
+                      {TYPE_LABEL[category.type]}
+                    </span>
+                    <span className={`flex-1 text-sm ${category.isActive ? 'text-gray-900' : 'text-gray-400 line-through'}`}>
+                      {category.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRenameCategory(category)}
+                      className="text-sm text-indigo-600 hover:text-indigo-900"
+                    >
+                      Ganti nama
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleCategory(category)}
+                      className="text-sm text-gray-600 hover:text-gray-900"
+                    >
+                      {category.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(category)}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Hapus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4 border">
         <h2 className="text-lg font-semibold text-gray-900">Catat Transaksi</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -277,7 +476,13 @@ export default function FinancePage() {
             <select
               id="type"
               value={form.type}
-              onChange={(event) => setForm((prev) => ({ ...prev, type: event.target.value as LedgerType }))}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  type: event.target.value as LedgerType,
+                  category: '',
+                }))
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               {LEDGER_TYPES.map((type) => (
@@ -304,14 +509,23 @@ export default function FinancePage() {
             <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="category">
               Kategori
             </label>
-            <input
+            <select
               id="category"
-              type="text"
               value={form.category}
               onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              placeholder="Operasional"
-            />
+              disabled={selectableCategories.length === 0}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+            >
+              <option value="">— Tanpa kategori —</option>
+              {selectableCategories.map((category) => (
+                <option key={category.id} value={category.name}>{category.name}</option>
+              ))}
+            </select>
+            {selectableCategories.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                Belum ada kategori {TYPE_LABEL[form.type]}. Tambahkan di panel Kategori.
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="description">
