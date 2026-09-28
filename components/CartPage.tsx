@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import StoreHeader from '@/components/StoreHeader'
 import { readStoredAttribution } from '@/lib/attribution'
+import { trackFunnelEvent } from '@/lib/funnelEvents'
 import { z } from 'zod'
 
 interface CartItem {
@@ -74,6 +75,13 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
 
   const handleCheckout = async () => {
     if (!storeId || !cartItems.length) return
+
+    // Every line gets its own row, so a product that is carried to checkout and
+    // then abandoned is distinguishable from one that never got that far. An
+    // order that follows also counts here; the report subtracts nothing.
+    for (const item of cartItems) {
+      trackFunnelEvent('CHECKOUT_START', { productId: item.productId, storeDomain })
+    }
 
     setIsLoading(true)
     setError(null)

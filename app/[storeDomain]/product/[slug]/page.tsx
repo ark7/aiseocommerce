@@ -5,6 +5,7 @@ import { Metadata } from 'next';
 import Image from 'next/image';
 import DOMPurify from 'isomorphic-dompurify';
 import AddToCartButton from '@/components/AddToCartButton';
+import ProductViewTracker from '@/components/ProductViewTracker';
 import StoreHeader from '@/components/StoreHeader';
 import ProductImageGallery from './ProductImageGallery';
 
@@ -141,6 +142,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
       <div className="min-h-screen bg-gray-50">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productStructuredData }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: breadcrumbStructuredData }} />
+
+        <ProductViewTracker productId={product.id} storeDomain={params.storeDomain} />
 
         <StoreHeader
           storeDomain={params.storeDomain}

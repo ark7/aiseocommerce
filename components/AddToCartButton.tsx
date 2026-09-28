@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { buildAddToCartCalls, getTrackingConfig, sendTrackingCalls } from '@/lib/tracking';
+import { trackFunnelEvent } from '@/lib/funnelEvents';
 
 interface AddToCartButtonProps {
   productId: string;
@@ -46,6 +47,10 @@ export default function AddToCartButton({ productId, storeDomain, price, name, s
           item: { id: productId, name, price, quantity },
         })
       );
+
+      // Our own funnel, next to the ad platforms'. Quantity is deliberately not
+      // sent: the funnel counts visitors who reached a step, not units.
+      trackFunnelEvent('ADD_TO_CART', { productId, storeDomain });
 
       router.push(`/${storeDomain}/cart`);
     } catch {
