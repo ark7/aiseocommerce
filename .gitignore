@@ -53,3 +53,6 @@ public/uploads/*
 # Logs
 logs
 *.log
+
+# Claude Code: local permission grants are per machine, plans are shared
+.claude/settings.local.json
