@@ -1,5 +1,40 @@
 import { prisma } from '@/lib/prisma';
-import { LedgerType, StockType } from '@prisma/client';
+import { LedgerType, StockType, Prisma } from '@prisma/client';
+
+type Db = typeof prisma | Prisma.TransactionClient;
+
+/**
+ * Write the INCOME ledger row that puts a paid order's money into the books,
+ * once per order. Every path that marks an order paid (admin status change,
+ * manual payment approval, gateway webhook) funnels through here, so finance
+ * shows the sale and a retry or a second path cannot count it twice.
+ *
+ * ponytail: the existence check is not atomic — two callers racing on the same
+ * order can both miss it. Add a unique index on (referenceType, referenceId)
+ * when double-counted sales actually show up.
+ */
+export async function recordOrderIncome(
+  db: Db,
+  order: { id: string; storeId: string; orderNumber: string; totalAmount: number }
+) {
+  const existing = await db.ledger.findFirst({
+    where: { referenceId: order.id, referenceType: 'ORDER', type: LedgerType.INCOME },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  return db.ledger.create({
+    data: {
+      storeId: order.storeId,
+      type: LedgerType.INCOME,
+      amount: order.totalAmount,
+      description: `Order ${order.orderNumber}`,
+      referenceId: order.id,
+      referenceType: 'ORDER',
+      category: 'SALES',
+    },
+  });
+}
 
 export interface ProcessOrderResult {
   success: boolean;
@@ -183,17 +218,7 @@ export async function processOrderPayment(
       // Stock was already decremented and logged as a RESERVATION when the order
       // was created. Moving it again here deducted it twice, and the stock check
       // below would fail because the reserved units are already gone from stock.
-      const ledgerEntry = await tx.ledger.create({
-        data: {
-          storeId: order.storeId,
-          type: LedgerType.INCOME,
-          amount: order.totalAmount,
-          description: `Order ${order.orderNumber} - ${order.orderItems.length} items`,
-          referenceId: order.id,
-          referenceType: 'ORDER',
-          category: 'SALES',
-        },
-      });
+      const ledgerEntry = await recordOrderIncome(tx, order);
 
       await tx.order.update({
         where: { id: orderId },

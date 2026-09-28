@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
-export type AuditEntityType = 
-  | 'ORDER' | 'PAYMENT' | 'PRODUCT' | 'USER' | 'STORE' 
-  | 'CATEGORY' | 'LEDGER' | 'STOCK' | 'PETTY_CASH' | 'SETTING';
+export type AuditEntityType =
+  | 'ORDER' | 'PAYMENT' | 'PRODUCT' | 'USER' | 'STORE'
+  | 'CATEGORY' | 'LEDGER' | 'STOCK' | 'PETTY_CASH' | 'SETTING'
+  // Finance ledger picklist, distinct from the product `CATEGORY` above.
+  | 'LEDGER_CATEGORY';
 
 export interface AuditAction {
   action: string;

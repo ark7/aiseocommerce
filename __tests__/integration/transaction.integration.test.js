@@ -201,7 +201,11 @@ describe('Transaction Flow Integration Tests', () => {
         // Stock is no longer touched here - it was reserved when the order was
         // created, so approval only writes the ledger entry and moves the status.
         const tx = {
-          ledger: { create: jest.fn().mockResolvedValue(mockLedger) },
+          ledger: {
+            // No sale booked yet for this order, so the approval writes one.
+            findFirst: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockResolvedValue(mockLedger),
+          },
           order: { update: jest.fn().mockResolvedValue({}) },
         };
         return callback(tx);

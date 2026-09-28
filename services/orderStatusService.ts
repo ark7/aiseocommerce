@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { OrderStatus, LedgerType, StockType } from '@prisma/client';
 import { auditOrderStatusChanged } from '@/services/auditService';
 import { canTransition } from '@/lib/orderStatus';
+import { recordOrderIncome } from '@/services/transactionService';
 
 /** Statuses that put the order's reserved stock back on the shelf. */
 const RESTOCKING_STATUSES: OrderStatus[] = ['CANCELLED', 'REFUNDED'];
@@ -71,6 +72,17 @@ export async function updateOrderStatus(
 
       if (moved.count === 0) return false;
 
+      // Money in. The order menu writes it here so a sale shows up in finance
+      // without waiting on a gateway webhook.
+      if (newStatus === 'PAID') {
+        await recordOrderIncome(tx, {
+          id: orderId,
+          storeId,
+          orderNumber: existing.orderNumber,
+          totalAmount: existing.totalAmount,
+        });
+      }
+
       if (isRestocking) {
         const items = await tx.orderItem.findMany({
           where: { orderId },
@@ -108,12 +120,15 @@ export async function updateOrderStatus(
       }
 
       if (isReversing) {
-        const paidPayment = await tx.payment.findFirst({
-          where: { orderId, status: 'PAID' },
+        // Reverse what actually reached the books, not what a payment row says:
+        // an order marked PAID straight from the order menu has income but no
+        // payment record, and its refund still has to come back out.
+        const income = await tx.ledger.findFirst({
+          where: { referenceId: orderId, referenceType: 'ORDER', type: LedgerType.INCOME },
           select: { id: true },
         });
 
-        if (paidPayment) {
+        if (income) {
           await tx.ledger.create({
             data: {
               storeId,

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { recordOrderIncome } from '@/services/transactionService';
 import crypto from 'crypto';
 
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || '';
@@ -130,7 +131,13 @@ export async function POST(request: Request) {
         data: { status: result.status === 'PAID' ? 'PAID' : 'PENDING' },
       }),
     ]);
-    
+
+    // A settled gateway payment has to reach the books, or finance shows the
+    // order as paid and the money nowhere. Idempotent per order.
+    if (result.status === 'PAID') {
+      await recordOrderIncome(prisma, order);
+    }
+
     return NextResponse.json({
       success: true,
       orderId: result.orderId,
