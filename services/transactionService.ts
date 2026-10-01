@@ -188,9 +188,8 @@ export async function createOrder(
         },
       });
 
-      // Reserved inside this same transaction. Calling reserveStock() here
-      // would open a nested transaction and commit the reservation
-      // independently of the order.
+      // Reserved inside this same transaction: a nested $transaction would
+      // commit the reservation independently of the order.
       await tx.stockLog.create({
         data: {
           productId: product.id,
@@ -261,52 +260,6 @@ export async function createOrder(
       data: { subtotal, discount, totalAmount: subtotal - discount },
     });
   });
-}
-
-/**
- * Reserve stock for items before order creation.
- * Returns true on success, throws on failure.
- */
-export async function reserveStock(
-  storeId: string,
-  items: { productId: string; quantity: number }[],
-  userId?: string
-): Promise<boolean> {
-  try {
-    await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`)
-        }
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`)
-        }
-        // create reservation log
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            type: 'RESERVATION' as any,
-            quantity: item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock - item.quantity,
-            reason: `Reservation for order creation`,
-            referenceId: null,
-            userId,
-          },
-        })
-        // decrement stock atomically
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { decrement: item.quantity } },
-        })
-      }
-    })
-    return true
-  } catch (e) {
-    // let caller handle
-    throw e
-  }
 }
 
 export async function processOrderPayment(
@@ -619,7 +572,7 @@ export async function getLowStockProducts(storeId: string, threshold: number = 5
   }
 }
 
-export default { createOrder, processOrderPayment, reserveStock, releaseStock,
+export default { createOrder, processOrderPayment, releaseStock,
   addStock,
   adjustStock,
   recordExpense,

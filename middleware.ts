@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
+// One implementation of "which address is this really": the copy that used to
+// live here read the caller-supplied end of x-forwarded-for.
+import { getIPAddress } from '@/lib/ip';
 
 // Lazy load jose for JWT verification (Node.js only)
 let jwtVerifyCache: any = null;
@@ -46,13 +49,6 @@ const GENERAL_RATE_LIMIT = 100;
 
 const rateLimitMemory = new Map<string, { count: number; resetTime: number }>();
 
-function getIPAddress(request: NextRequest): string {
-  const xForwardedFor = request.headers.get('x-forwarded-for');
-  const xRealIP = request.headers.get('x-real-ip');
-  if (xForwardedFor) return xForwardedFor.split(',')[0].trim();
-  if (xRealIP) return xRealIP;
-  return request.ip || 'unknown';
-}
 
 async function checkRateLimit(ip: string, path: string): Promise<boolean> {
   if (EXCLUDED_FROM_RATE_LIMIT.some(regex => regex.test(path))) return true;

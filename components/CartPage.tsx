@@ -167,7 +167,10 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       // First create order
       const orderResponse = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The token travels with the order. A voucher is redeemed as the account
+        // that claimed it, so the server has to know who is asking — without
+        // this the whole checkout is refused 401 the moment a voucher is used.
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           storeId,
           customerId,

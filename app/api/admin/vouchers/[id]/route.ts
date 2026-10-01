@@ -3,9 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
 import { logger } from '@/lib/logger';
-import { VoucherInputSchema } from '../route';
-
-const UNIQUE_VIOLATION = 'P2002';
+import { UNIQUE_VIOLATION, VoucherInputSchema } from '../schema';
 
 /** Change a voucher. The admin form always sends the whole row, so no partial patch. */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {

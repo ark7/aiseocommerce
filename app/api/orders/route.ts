@@ -5,6 +5,16 @@ import { prisma } from '@/lib/prisma'
 import { OrderStatus } from '@prisma/client'
 import { z } from 'zod'
 import { AttributionSchema } from '@/lib/attribution'
+import { getIPAddress } from '@/lib/ip'
+import { allow } from '@/lib/rateLimit'
+
+/**
+ * Order creation reserves stock and sale quota while the order is still
+ * PENDING, and guest checkout is deliberately open, so without a ceiling an
+ * anonymous caller can empty a sale by starting orders it never pays for.
+ * Well above what a real shopper does; well below what a script wants.
+ */
+const ORDERS_PER_WINDOW = 20
 
 // Define schema for order creation
 // Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
@@ -71,6 +81,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    if (!allow(`orders:${getIPAddress(request)}`, ORDERS_PER_WINDOW)) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan. Coba lagi sebentar lagi.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const validatedData = OrderSchema.parse(body)
 
@@ -88,6 +105,19 @@ export async function POST(request: Request) {
         )
       }
       customerId = user.id
+    }
+
+    // A body-supplied customerId must name someone who actually belongs to this
+    // store. Otherwise an order lands in a stranger's history — and the id is
+    // enough to find out that they exist.
+    if (customerId) {
+      const customer = await prisma.user.findFirst({
+        where: { id: customerId, storeId: validatedData.storeId },
+        select: { id: true },
+      })
+      if (!customer) {
+        return NextResponse.json({ error: 'Pelanggan tidak ditemukan' }, { status: 400 })
+      }
     }
 
     // Create order

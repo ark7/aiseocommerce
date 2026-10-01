@@ -205,10 +205,21 @@ Dua reviewer independen (code + security) menemukan tiga HIGH yang sama.
 
 Dihapus: `isSaleExpired` (tidak pernah dipakai, hanya dipakai tesnya sendiri).
 
-Belum diperbaiki, diserahkan ke Anda: `reserveStock` (`services/transactionService.ts:254`)
-tidak punya pemanggil sejak `createOrder` menulis reservasi inline — masih diekspor.
-Dan `POST /api/orders` secara keseluruhan masih menerima `storeId`/`customerId` dari
-body untuk checkout tamu; hanya jalur voucher yang sekarang terautentikasi.
+### Diperbaiki setelah verifikasi browser
+
+| Temuan | Perbaikan |
+|---|---|
+| `x-forwarded-for` dibaca dari ujung kiri — klien memilih keranjang rate limitnya sendiri | Dibaca dari kanan, dihitung mundur `TRUSTED_PROXY_HOPS` (default 1). Salinan duplikat di `middleware.ts` dihapus; `lib/ip.ts` jadi satu implementasi |
+| `POST /api/orders` anonim bisa mengosongkan kuota coret dengan order yang tak pernah dibayar | Batas 20 order/menit per alamat |
+| `customerId` dari body tidak diverifikasi | Harus benar-benar pelanggan toko itu |
+| `reserveStock` diekspor tanpa pemanggil | Dihapus |
+| **Checkout putus 401 setiap kali pakai voucher** | `CartPage` mengirim header Authorization ke `/api/orders` |
+| `VoucherInputSchema` diekspor dari `route.ts` | Dipindah ke `app/api/admin/vouchers/schema.ts` — Next menolak ekspor non-handler di file rute |
+
+Lubang yang **masih** ada dan butuh keputusan produk, bukan kode: `POST /api/orders`
+tetap menerima `storeId`/`customerId` dari body untuk checkout tamu, dan tidak ada
+mekanisme kedaluwarsa untuk order `PENDING` — jadi reservasi stok/kuota masih bisa
+ditahan tanpa pembayaran. Batas 20/menit memperlambatnya, tidak menutupnya.
 
 ### Ditambahkan setelah rencana
 - `__tests__/unit/createOrder.test.ts` (17 tes) — `prisma.$transaction` di-mock
