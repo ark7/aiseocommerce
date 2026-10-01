@@ -104,6 +104,7 @@ export default function StoreHeader({
             <Link href={`/${storeDomain}`} className="text-gray-600 hover:text-indigo-600">Beranda</Link>
             <Link href={`/${storeDomain}/products`} className="text-gray-600 hover:text-indigo-600">Produk</Link>
             <Link href={`/${storeDomain}/categories`} className="text-gray-600 hover:text-indigo-600">Kategori</Link>
+            <Link href={`/${storeDomain}/penawaran`} className="font-medium text-orange-600 hover:text-orange-700">Penawaran</Link>
             <Link href={`/${storeDomain}/contact`} className="text-gray-600 hover:text-indigo-600">Kontak</Link>
             <Link href={`/${storeDomain}/orders`} className="text-gray-600 hover:text-indigo-600">Pesanan Saya</Link>
           </nav>

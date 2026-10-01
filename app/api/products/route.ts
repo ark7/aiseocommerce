@@ -69,6 +69,24 @@ const formBoolean = z
   .optional()
   .transform((value) => (value === undefined ? undefined : value === 'true'));
 
+/**
+ * Kuota harga coret: bilangan bulat, dan `''` berarti "tanpa kuota" (`null`),
+ * bukan nol. Nol akan mematikan harga coret sejak detik pertama dipasang.
+ */
+const nullableInt = z
+  .union([z.literal(''), z.coerce.number().int().min(0)])
+  .optional()
+  .transform((value) => (value === '' ? null : value));
+
+/**
+ * Tanggal datang sebagai string dari FormData. `''` mengosongkan jendela,
+ * absen membiarkannya apa adanya — sama seperti nullableNumber.
+ */
+const nullableDate = z
+  .union([z.literal(''), z.coerce.date()])
+  .optional()
+  .transform((value) => (value === '' ? null : value));
+
 const productFields = {
   name: z.string().min(1),
   slug: z.string().min(1),
@@ -77,6 +95,9 @@ const productFields = {
   basePrice: z.coerce.number().min(0),
   sellingPrice: z.coerce.number().min(0),
   discountPrice: nullableNumber,
+  saleStartsAt: nullableDate,
+  saleEndsAt: nullableDate,
+  saleQuota: nullableInt,
   sku: nullableText,
   categoryId: nullableText,
   stock: optionalNumber,

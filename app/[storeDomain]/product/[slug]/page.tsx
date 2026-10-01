@@ -7,6 +7,7 @@ import DOMPurify from 'isomorphic-dompurify';
 import AddToCartButton from '@/components/AddToCartButton';
 import ProductViewTracker from '@/components/ProductViewTracker';
 import StoreHeader from '@/components/StoreHeader';
+import { isSaleActive, resolveUnitPrice, saleRemaining } from '@/lib/pricing';
 import ProductImageGallery from './ProductImageGallery';
 
 interface ProductPageProps {
@@ -114,17 +115,35 @@ async function loadProductPage(params: ProductPageProps['params']) {
     product.name
   );
 
-  const formattedPrice = new Intl.NumberFormat('id-ID', {
-    style: 'currency',
-    currency: 'IDR',
-    minimumFractionDigits: 0,
-  }).format(product.sellingPrice);
+  // `discountPrice` only counts while its window is open and its quota lasts.
+  // Reading it directly — as this page used to — advertised a price the
+  // checkout would not honour once the quota ran out or the clock passed.
+  const now = new Date();
+  const onSale = isSaleActive(product, now);
+  const unitPrice = resolveUnitPrice(product, now);
+  const saleLeft = saleRemaining(product);
 
-  const formattedDiscountPrice = product.discountPrice
-    ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(product.discountPrice)
-    : null;
+  const formatIDR = (amount: number) =>
+    new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(amount);
 
-  return { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice };
+  const formattedPrice = formatIDR(product.sellingPrice);
+  const formattedDiscountPrice = onSale ? formatIDR(unitPrice) : null;
+
+  return {
+    store,
+    product,
+    relatedProducts,
+    productStructuredData,
+    breadcrumbStructuredData,
+    formattedPrice,
+    formattedDiscountPrice,
+    unitPrice,
+    saleLeft,
+  };
 }
 
 export default async function ProductPage({ params }: ProductPageProps) {
@@ -136,7 +155,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
   if (!data) return notFound();
 
-  const { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice } = data;
+  const { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice, unitPrice, saleLeft } = data;
 
     return (
       <div className="min-h-screen bg-gray-50">
@@ -188,6 +207,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     <><span className="line-through text-gray-500">{formattedPrice}</span><span className="ml-2">{formattedDiscountPrice}</span></>
                   ) : formattedPrice}
                 </p>
+                {formattedDiscountPrice && saleLeft != null && (
+                  <p className="mt-1 text-sm text-orange-600">
+                    Sisa {saleLeft} unit di harga ini
+                  </p>
+                )}
               </div>
               
               <div className="mt-3">
@@ -218,7 +242,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                     {product.stock > 0 && <span className="ml-1">{product.stock} available</span>}
                   </span>
                 </div>
-                <AddToCartButton productId={product.id} storeDomain={params.storeDomain} price={product.sellingPrice} name={product.name} stock={product.stock} />
+                <AddToCartButton productId={product.id} storeDomain={params.storeDomain} price={unitPrice} name={product.name} stock={product.stock} />
               </div>
               
               <section className="mt-10 border-t border-gray-200 pt-10">

@@ -1,7 +1,37 @@
 import { prisma } from '@/lib/prisma';
 import { LedgerType, StockType, Prisma } from '@prisma/client';
+import { resolveUnitPrice } from '@/lib/pricing';
+import {
+  VOUCHER_REJECTION_LABELS,
+  checkVoucherUsable,
+  resolveVoucherDiscount,
+} from '@/lib/voucher';
+import type { VoucherRejection } from '@/lib/voucher';
 
 type Db = typeof prisma | Prisma.TransactionClient;
+
+/**
+ * The cart's prices no longer match the shelf. Thrown before any money is
+ * recorded so the customer can look at the new total and confirm again —
+ * silently charging more than the page showed is the one thing checkout
+ * must never do.
+ */
+export class PriceChangedError extends Error {
+  constructor(
+    public readonly changes: { productId: string; name: string; shown: number; actual: number }[]
+  ) {
+    super('Harga produk berubah sejak terakhir dilihat');
+    this.name = 'PriceChangedError';
+  }
+}
+
+/** The voucher cannot be used on this order, with a reason the buyer may read. */
+export class VoucherError extends Error {
+  constructor(public readonly reason: VoucherRejection) {
+    super(VOUCHER_REJECTION_LABELS[reason]);
+    this.name = 'VoucherError';
+  }
+}
 
 /**
  * Write the INCOME ledger row that puts a paid order's money into the books,
@@ -53,104 +83,184 @@ export interface FinanceSummary {
   totalLoans: number;
 }
 
+/**
+ * Price the lines, reserve stock and sale quota, apply the voucher, and write
+ * the totals — all in one transaction.
+ *
+ * `expectedUnitPrices` is what the cart showed the customer. When the result
+ * differs, the whole order is rolled back and `PriceChangedError` names every
+ * difference at once, so the buyer confirms the new total instead of finding
+ * it on the receipt.
+ */
 export async function createOrder(
   storeId: string,
   items: { productId: string; quantity: number }[],
   customerId?: string,
-  attribution?: Record<string, unknown>
+  attribution?: Record<string, unknown>,
+  voucherCode?: string,
+  expectedUnitPrices?: Record<string, number>
 ) {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      // 1. Create order record
-      // Generate a simple order number (you might want to improve this)
-      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const order = await tx.order.create({
-        data: {
-          storeId,
-          userId: customerId, // assuming customerId is the userId for now
-          orderNumber,
-          totalAmount: 0, // we'll calculate below
-          subtotal: 0,
-          taxAmount: 0,
-          shippingCost: 0,
-          discount: 0,
-          status: 'PENDING', // initial status before payment
-          // Campaign source for paid traffic; omitted when the order arrived
-          // with no attribution at all (direct or organic).
-          ...(attribution && Object.keys(attribution).length > 0
-            ? { attribution: attribution as object }
-            : {}),
-        },
-      });
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
 
-      // 2. Create order items and calculate total
-      let totalAmount = 0;
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
-        // Ensure we have enough stock (should have been reserved, but double-check)
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`);
-        }
-        const itemTotal = product.sellingPrice * item.quantity;
-        totalAmount += itemTotal;
-
-        await tx.orderItem.create({
-          data: {
-            orderId: order.id,
-            productId: product.id,
-            quantity: item.quantity,
-            unitPrice: product.sellingPrice,
-            totalPrice: itemTotal,
-          },
-        });
-      }
-
-      // 3. Update order with calculated totals
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          totalAmount,
-          subtotal: totalAmount, // assuming no tax/shipping/discount for now
-        },
-      });
-
-      // 4. Reserve stock inside this same transaction. Calling reserveStock()
-      //    here would open a nested transaction and commit the reservation
-      //    independently of the order.
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`)
-        }
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`)
-        }
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            type: StockType.RESERVATION,
-            quantity: item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock - item.quantity,
-            reason: `Reservation for order ${order.orderNumber}`,
-            referenceId: order.id,
-            userId: customerId,
-          },
-        })
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { decrement: item.quantity } },
-        })
-      }
-
-      return order;
+    // Scoped by storeId: an id from another tenant must not be orderable, and
+    // the previous unscoped lookup let one store sell another store's catalogue.
+    const products = await tx.product.findMany({
+      where: { id: { in: items.map((item) => item.productId) }, storeId },
     });
-  } catch (error) {
-    throw error;
-  }
+    const byId = new Map(products.map((product) => [product.id, product]));
+
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = await tx.order.create({
+      data: {
+        storeId,
+        userId: customerId,
+        orderNumber,
+        totalAmount: 0, // filled in at the end, once every line is priced
+        subtotal: 0,
+        taxAmount: 0,
+        shippingCost: 0,
+        discount: 0,
+        status: 'PENDING', // initial status before payment
+        // Campaign source for paid traffic; omitted when the order arrived
+        // with no attribution at all (direct or organic).
+        ...(attribution && Object.keys(attribution).length > 0
+          ? { attribution: attribution as object }
+          : {}),
+      },
+    });
+
+    let subtotal = 0;
+    const priceChanges: { productId: string; name: string; shown: number; actual: number }[] = [];
+
+    for (const item of items) {
+      const product = byId.get(item.productId);
+      if (!product) {
+        throw new Error(`Product ${item.productId} not found`);
+      }
+      // Ensure we have enough stock (should have been reserved, but double-check)
+      if (product.stock < item.quantity) {
+        throw new Error(`Insufficient stock for product ${product.name}`);
+      }
+
+      let unitPrice = resolveUnitPrice(product, now);
+      let saleQuotaUsed = false;
+
+      if (unitPrice < product.sellingPrice) {
+        // The quota check lives in the WHERE clause so it happens at write
+        // time: two buyers racing for the last discounted unit cannot both
+        // read "1 left" and both get it. Losing the race is not an error —
+        // it only means the discount is gone.
+        const reserved = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            storeId,
+            OR: [
+              { saleQuota: null },
+              { saleSold: { lte: (product.saleQuota ?? 0) - item.quantity } },
+            ],
+          },
+          data: { saleSold: { increment: item.quantity } },
+        });
+
+        if (reserved.count === 0) unitPrice = product.sellingPrice;
+        else saleQuotaUsed = true;
+      }
+
+      const shown = expectedUnitPrices?.[product.id];
+      if (shown !== undefined && shown !== unitPrice) {
+        priceChanges.push({ productId: product.id, name: product.name, shown, actual: unitPrice });
+      }
+
+      const itemTotal = unitPrice * item.quantity;
+      subtotal += itemTotal;
+
+      await tx.orderItem.create({
+        data: {
+          orderId: order.id,
+          productId: product.id,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice: itemTotal,
+          // Which lines actually took quota. A cancelled order returns exactly
+          // these, instead of guessing from prices that may have moved since.
+          saleQuotaUsed,
+        },
+      });
+
+      // Reserved inside this same transaction. Calling reserveStock() here
+      // would open a nested transaction and commit the reservation
+      // independently of the order.
+      await tx.stockLog.create({
+        data: {
+          productId: product.id,
+          type: StockType.RESERVATION,
+          quantity: item.quantity,
+          previousStock: product.stock,
+          newStock: product.stock - item.quantity,
+          reason: `Reservation for order ${order.orderNumber}`,
+          referenceId: order.id,
+          userId: customerId,
+        },
+      });
+
+      // Conditional for the same reason as the quota above: the stock check at
+      // the top of the loop read a snapshot, and two orders for the last unit
+      // would both pass it and both decrement, leaving stock negative.
+      const stockTaken = await tx.product.updateMany({
+        where: { id: product.id, storeId, stock: { gte: item.quantity } },
+        data: { stock: { decrement: item.quantity } },
+      });
+      if (stockTaken.count === 0) {
+        throw new Error(`Insufficient stock for product ${product.name}`);
+      }
+    }
+
+    // Checked after every line is priced, so the customer sees the whole
+    // difference at once rather than one product per round trip.
+    if (priceChanges.length > 0) throw new PriceChangedError(priceChanges);
+
+    let discount = 0;
+    if (voucherCode) {
+      // A voucher is a claimed right, and a claim belongs to a customer.
+      if (!customerId) throw new VoucherError('NOT_CLAIMED');
+
+      const voucher = await tx.voucher.findUnique({
+        where: { storeId_code: { storeId, code: voucherCode.trim().toUpperCase() } },
+      });
+      if (!voucher) throw new VoucherError('NOT_FOUND');
+
+      const claim = await tx.voucherClaim.findUnique({
+        where: { voucherId_userId: { voucherId: voucher.id, userId: customerId } },
+      });
+      if (!claim) throw new VoucherError('NOT_CLAIMED');
+
+      const eligibility = checkVoucherUsable(voucher, claim, subtotal, now);
+      if (!eligibility.ok) throw new VoucherError(eligibility.reason);
+
+      discount = resolveVoucherDiscount(voucher, subtotal);
+
+      // Spent in the same transaction as the order, and conditioned on the
+      // claim still being unused. `checkVoucherUsable` above only saw a
+      // snapshot: two checkouts of one claim both read `usedAt: null` and both
+      // pass it. The predicate is what actually decides who gets it.
+      const spent = await tx.voucherClaim.updateMany({
+        where: { id: claim.id, usedAt: null },
+        data: { usedAt: now, orderId: order.id },
+      });
+      if (spent.count === 0) throw new VoucherError('ALREADY_USED');
+
+      await tx.voucher.update({
+        where: { id: voucher.id },
+        data: { used: { increment: 1 } },
+      });
+    }
+
+    return tx.order.update({
+      where: { id: order.id },
+      data: { subtotal, discount, totalAmount: subtotal - discount },
+    });
+  });
 }
 
 /**
@@ -235,8 +345,10 @@ export async function processOrderPayment(
 }
 
 /**
- * Return reserved stock for an order and mark it cancelled.
- * Used when a manual payment is rejected, so the units go back on sale.
+ * Return everything an order reserved — stock, sale quota, and the voucher —
+ * and mark it cancelled. Used when a manual payment is rejected, so a transfer
+ * that never arrived does not permanently consume the last discounted unit or
+ * burn a voucher the customer only gets to claim once.
  */
 export async function releaseStock(
   orderId: string,
@@ -245,7 +357,7 @@ export async function releaseStock(
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { orderItems: true },
+      include: { orderItems: true, voucherClaim: true },
     });
     if (!order) return { success: false, error: 'Order not found' };
     if (order.status === 'CANCELLED') {
@@ -274,7 +386,29 @@ export async function releaseStock(
           where: { id: product.id },
           data: { stock: { increment: item.quantity } },
         });
+
+        // Only the lines that actually took quota give it back; decrementing
+        // every line would invent quota that was never spent.
+        if (item.saleQuotaUsed) {
+          await tx.product.updateMany({
+            where: { id: product.id, saleSold: { gte: item.quantity } },
+            data: { saleSold: { decrement: item.quantity } },
+          });
+        }
+
         released += item.quantity;
+      }
+
+      // An unpaid order should not leave the customer's one-shot voucher spent.
+      if (order.voucherClaim) {
+        await tx.voucherClaim.updateMany({
+          where: { id: order.voucherClaim.id, orderId: order.id },
+          data: { usedAt: null, orderId: null },
+        });
+        await tx.voucher.updateMany({
+          where: { id: order.voucherClaim.voucherId, used: { gt: 0 } },
+          data: { used: { decrement: 1 } },
+        });
       }
 
       await tx.order.update({

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { notFound, usePathname } from 'next/navigation';
 import StoreHeader from '@/components/StoreHeader';
+import { resolveUnitPrice } from '@/lib/pricing';
 
 export default function StoreHome() {
   const pathname = usePathname();
@@ -230,7 +231,7 @@ export default function StoreHome() {
                       <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="text-lg font-bold text-indigo-600">
-                          Rp {product.sellingPrice.toLocaleString('id-ID')}
+                          Rp {resolveUnitPrice(product).toLocaleString('id-ID')}
                         </div>
                         {product.stock <= 0 && (
                           <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Habis</span>
@@ -245,7 +246,7 @@ export default function StoreHome() {
                     <AddToCartButton
                       productId={product.id}
                       storeId={store?.id || ''}
-                      price={product.sellingPrice}
+                      price={resolveUnitPrice(product)}
                       name={product.name}
                       stock={product.stock}
                       storeDomain={storeDomain}
@@ -338,7 +339,7 @@ export default function StoreHome() {
                       <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
                       <div className="mt-2 flex justify-between items-center">
                         <div className="text-lg font-bold text-indigo-600">
-                          Rp {product.sellingPrice.toLocaleString('id-ID')}
+                          Rp {resolveUnitPrice(product).toLocaleString('id-ID')}
                         </div>
                         {product.stock <= 0 && (
                           <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Habis</span>
@@ -353,7 +354,7 @@ export default function StoreHome() {
                     <AddToCartButton
                       productId={product.id}
                       storeId={store?.id || ''}
-                      price={product.sellingPrice}
+                      price={resolveUnitPrice(product)}
                       name={product.name}
                       stock={product.stock}
                       storeDomain={storeDomain}

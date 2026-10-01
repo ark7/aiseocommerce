@@ -36,6 +36,10 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'MANUAL' | 'MIDTRANS'>('MANUAL')
+  const [voucherInput, setVoucherInput] = useState('')
+  const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null)
+  const [voucherMessage, setVoucherMessage] = useState<string | null>(null)
+  const [isCheckingVoucher, setIsCheckingVoucher] = useState(false)
 
   useEffect(() => {
     if (storeDomain) {
@@ -52,6 +56,19 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     }
   }, [storeDomain])
 
+  /**
+   * The discount is a number the server computed for one specific subtotal.
+   * Once the subtotal moves that number is stale, and showing it would promise
+   * a price the checkout will not honour. Clearing it costs one click; keeping
+   * it costs the customer the difference.
+   */
+  const forgetVoucher = () => {
+    if (!appliedVoucher) return
+
+    setAppliedVoucher(null)
+    setVoucherMessage('Keranjang berubah — pakai ulang voucher untuk melihat potongan barunya.')
+  }
+
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return
 
@@ -61,16 +78,71 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
 
     setCartItems(updatedItems)
     localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
+    forgetVoucher()
   }
 
   const removeItem = (productId: string) => {
     const updatedItems = cartItems.filter(item => item.productId !== productId)
     setCartItems(updatedItems)
     localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
+    forgetVoucher()
   }
 
   const calculateTotal = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+  }
+
+  const calculatePayable = () => Math.max(0, calculateTotal() - (appliedVoucher?.discount ?? 0))
+
+  /**
+   * The voucher rules are per-customer (a claim belongs to a person), so the
+   * check has to be made as the signed-in user or every code would come back
+   * "klaim dulu" even for the customer who already claimed it.
+   */
+  const authHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+
+  /**
+   * Asks the server what the code is worth on this cart. The rules live in
+   * `lib/voucher` and are enforced again at order time — this call only decides
+   * what number to show, never what to charge.
+   */
+  const applyVoucher = async () => {
+    const code = voucherInput.trim()
+    if (!code) return
+
+    setIsCheckingVoucher(true)
+    setVoucherMessage(null)
+
+    try {
+      const response = await fetch('/api/vouchers/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ storeId, code, subtotal: calculateTotal() }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setAppliedVoucher(null)
+        setVoucherMessage(data.error || 'Voucher tidak bisa dipakai')
+        return
+      }
+
+      setAppliedVoucher({ code: data.voucher.code, discount: data.discount })
+    } catch {
+      setAppliedVoucher(null)
+      setVoucherMessage('Gagal memeriksa voucher')
+    } finally {
+      setIsCheckingVoucher(false)
+    }
+  }
+
+  const removeVoucher = () => {
+    setAppliedVoucher(null)
+    setVoucherInput('')
+    setVoucherMessage(null)
   }
 
   const handleCheckout = async () => {
@@ -106,11 +178,40 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           // First-touch campaign, so an order can be traced back to the ad that
           // paid for the click.
           attribution: readStoredAttribution() ?? undefined,
+          voucherCode: appliedVoucher?.code,
+          // The prices this cart is showing. The server refuses the order when
+          // they no longer match the shelf, instead of charging the difference
+          // without telling anyone.
+          expectedUnitPrices: Object.fromEntries(
+            cartItems.map(item => [item.productId, item.price])
+          ),
         }),
       })
 
       if (!orderResponse.ok) {
-        throw new Error('Failed to create order')
+        const data = await orderResponse.json().catch(() => ({}))
+
+        if (data.code === 'PRICE_CHANGED') {
+          const changes: { productId: string; actual: number }[] = data.changes ?? []
+          const repriced = cartItems.map(item => {
+            const change = changes.find(entry => entry.productId === item.productId)
+            return change ? { ...item, price: change.actual } : item
+          })
+
+          setCartItems(repriced)
+          localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(repriced))
+          // The subtotal just moved, so whatever the voucher was worth before
+          // is no longer what it is worth now.
+          setAppliedVoucher(null)
+          throw new Error('Harga beberapa produk berubah. Periksa keranjang, lalu lanjutkan lagi.')
+        }
+
+        if (data.code === 'VOUCHER_REJECTED') {
+          setAppliedVoucher(null)
+          throw new Error(data.error || 'Voucher tidak bisa dipakai')
+        }
+
+        throw new Error(data.error || 'Failed to create order')
       }
 
       const orderData = await orderResponse.json()
@@ -215,9 +316,66 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
             ))}
 
             <div className="bg-white rounded-lg shadow border p-4">
-              <div className="flex justify-between font-bold text-lg text-gray-900">
+              <div className="flex justify-between text-gray-700">
+                <span>Subtotal</span>
+                <span>Rp {calculateTotal().toLocaleString('id-ID')}</span>
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
+                <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="voucherCode">
+                  Kode Voucher
+                </label>
+
+                {appliedVoucher ? (
+                  <div className="flex items-center justify-between gap-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                    <span className="text-sm text-green-800">
+                      <span className="font-semibold">{appliedVoucher.code}</span> — potongan Rp{' '}
+                      {appliedVoucher.discount.toLocaleString('id-ID')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={removeVoucher}
+                      className="text-sm text-green-700 hover:underline shrink-0"
+                    >
+                      Batalkan
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      id="voucherCode"
+                      value={voucherInput}
+                      onChange={(event) => setVoucherInput(event.target.value)}
+                      placeholder="Contoh: HEMAT10"
+                      autoComplete="off"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyVoucher}
+                      disabled={isCheckingVoucher || !voucherInput.trim()}
+                      className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+                    >
+                      {isCheckingVoucher ? 'Memeriksa...' : 'Pakai'}
+                    </button>
+                  </div>
+                )}
+
+                {voucherMessage && <p className="mt-2 text-sm text-red-600">{voucherMessage}</p>}
+              </div>
+
+              {appliedVoucher && (
+                <div className="mt-4 flex justify-between text-gray-700">
+                  <span>Potongan voucher</span>
+                  <span className="text-green-700">
+                    - Rp {appliedVoucher.discount.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              )}
+
+              <div className="mt-4 pt-4 border-t flex justify-between font-bold text-lg text-gray-900">
                 <span>Total</span>
-                <span>Rp {calculateTotal().toLocaleString()}</span>
+                <span>Rp {calculatePayable().toLocaleString('id-ID')}</span>
               </div>
 
               <fieldset className="mt-4 pt-4 border-t">

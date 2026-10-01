@@ -21,15 +21,17 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  products    Product[]
-  orders      Order[]
-  ledgers     Ledger[]
-  settings    StoreSettings?
-  categories  Category[]
-  pettyCashes PettyCash[]
-  productEvents ProductEvent[]
+  users            User[]
+  products         Product[]
+  orders           Order[]
+  ledgers          Ledger[]
+  settings         StoreSettings?
+  categories       Category[]
+  pettyCashes      PettyCash[]
+  productEvents    ProductEvent[]
   ledgerCategories LedgerCategory[]
+  vouchers         Voucher[]
+  voucherClaims    VoucherClaim[]
 
   @@map("stores")
 }
@@ -77,6 +79,7 @@ model User {
   stockLogs         StockLog[]
   approvedPettyCash PettyCash[]
   auditLogs         AuditLog[]
+  voucherClaims     VoucherClaim[]
 
   @@unique([storeId, email])
   @@map("users")
@@ -99,7 +102,15 @@ model Product {
   shortDescription String?
   basePrice        Float
   sellingPrice     Float
+  /// Harga coret. Dipakai storefront sejak dulu, tapi jendela dan kuota di
+  /// bawah ini yang membuatnya berbatas waktu dan berkuota. `null` pada
+  /// keduanya berarti tanpa batas, supaya baris lama tetap tayang.
   discountPrice    Float?
+  saleStartsAt     DateTime?
+  saleEndsAt       DateTime?
+  saleQuota        Int?
+  /// Unit yang sudah terjual di harga coret. Dipotong atomik saat checkout.
+  saleSold         Int            @default(0)
   seoTitle         String?
   seoDescription   String?
   seoKeywords      String?
@@ -113,8 +124,8 @@ model Product {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  stockLogs  StockLog[]
-  orderItems OrderItem[]
+  stockLogs     StockLog[]
+  orderItems    OrderItem[]
   productEvents ProductEvent[]
 
   @@unique([storeId, slug])
@@ -204,8 +215,9 @@ model Order {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  orderItems OrderItem[]
-  payments   Payment[]
+  orderItems   OrderItem[]
+  payments     Payment[]
+  voucherClaim VoucherClaim?
 
   @@map("orders")
 }
@@ -232,6 +244,10 @@ model OrderItem {
   unitPrice  Float
   totalPrice Float
   variation  String?
+  /// Baris ini memakai jatah kuota harga coret. Dicatat saat checkout supaya
+  /// pembatalan bisa mengembalikan tepat baris yang memakainya, bukan menebak
+  /// dari perbandingan harga yang bisa berubah setelahnya.
+  saleQuotaUsed Boolean @default(false)
   createdAt  DateTime @default(now())
 
   @@map("order_items")
@@ -396,4 +412,65 @@ model ProductEvent {
   @@index([storeId, productId, type, createdAt])
   @@index([storeId, type, createdAt])
   @@map("product_events")
+}
+
+/// Diskon yang diklaim pelanggan, bukan yang dipasang langsung di keranjang.
+/// `code` tetap di baris voucher dan baru ditampilkan setelah klaim — yang
+/// diklaim adalah hak pakai, bukan rahasia.
+enum VoucherType {
+  /// `value` adalah rupiah.
+  FIXED
+  /// `value` adalah persen penuh (10 berarti 10%), bukan pecahan.
+  PERCENT
+}
+
+model Voucher {
+  id          String      @id @default(cuid())
+  storeId     String
+  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  description String?
+  type        VoucherType
+  value       Float
+  /// Batas nilai potongan. Hanya bermakna untuk PERCENT; null = tanpa batas.
+  maxDiscount Float?
+  /// Belanja minimum sebelum voucher boleh dipakai. null = tanpa minimum.
+  minPurchase Float?
+  /// Jendela berlaku. null di kedua ujung = tanpa batas waktu.
+  startsAt    DateTime?
+  endsAt      DateTime?
+  /// Berapa kali voucher boleh diklaim. null = tanpa batas.
+  quota       Int?
+  claimed     Int         @default(0)
+  /// Berapa kali sudah benar-benar dipakai di pesanan.
+  used        Int         @default(0)
+  /// Tombol on/off admin, terpisah dari jendela waktu.
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  claims VoucherClaim[]
+
+  @@unique([storeId, code])
+  @@map("vouchers")
+}
+
+model VoucherClaim {
+  id        String    @id @default(cuid())
+  voucherId String
+  voucher   Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claimedAt DateTime  @default(now())
+  usedAt    DateTime?
+  orderId   String?   @unique
+  order     Order?    @relation(fields: [orderId], references: [id])
+  Store     Store?    @relation(fields: [storeId], references: [id])
+  storeId   String?
+
+  /// Satu klaim per orang per voucher. Inilah yang membuat klaim ganda saat
+  /// tombol diklik dua kali berakhir sebagai baris yang sama, bukan dua baris.
+  @@unique([voucherId, userId])
+  @@map("voucher_claims")
 }

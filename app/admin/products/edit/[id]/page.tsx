@@ -24,6 +24,9 @@ const EMPTY_FORM = {
   basePrice: '',
   sellingPrice: '',
   discountPrice: '',
+  saleStartsAt: '',
+  saleEndsAt: '',
+  saleQuota: '',
   sku: '',
   categoryId: '',
   stock: '',
@@ -38,6 +41,24 @@ const EMPTY_FORM = {
 /** null and undefined both mean "not set" in the API payload; the form only knows strings. */
 function asText(value: unknown): string {
   return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * `<input type="datetime-local">` hanya menerima `YYYY-MM-DDTHH:mm` waktu
+ * lokal. API mengirim ISO penuh dengan `Z`, dan menempelkannya apa adanya
+ * membuat kolomnya kosong — jendela diskon jadi terlihat hilang padahal ada.
+ */
+function toDateTimeInput(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
 
 export default function EditProduct() {
@@ -88,6 +109,9 @@ export default function EditProduct() {
         basePrice: asText(product.basePrice),
         sellingPrice: asText(product.sellingPrice),
         discountPrice: asText(product.discountPrice),
+        saleStartsAt: toDateTimeInput(product.saleStartsAt),
+        saleEndsAt: toDateTimeInput(product.saleEndsAt),
+        saleQuota: asText(product.saleQuota),
         sku: asText(product.sku),
         categoryId: asText(product.categoryId),
         stock: asText(product.stock),
@@ -363,6 +387,57 @@ export default function EditProduct() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="0"
               />
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs text-gray-500">
+            Harga diskon tanpa jadwal dan tanpa kuota akan tayang terus. Isi salah satu di bawah
+            untuk menjadikannya penawaran berbatas waktu.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleStartsAt">
+                Mulai Berlaku
+              </label>
+              <input
+                type="datetime-local"
+                id="saleStartsAt"
+                name="saleStartsAt"
+                value={formData.saleStartsAt}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleEndsAt">
+                Berakhir Pada
+              </label>
+              <input
+                type="datetime-local"
+                id="saleEndsAt"
+                name="saleEndsAt"
+                value={formData.saleEndsAt}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleQuota">
+                Kuota Harga Diskon
+              </label>
+              <input
+                type="number"
+                id="saleQuota"
+                name="saleQuota"
+                value={formData.saleQuota}
+                onChange={handleChange}
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Tanpa batas"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Kosongkan untuk tanpa batas kuota.
+              </p>
             </div>
           </div>
         </div>

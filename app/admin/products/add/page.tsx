@@ -15,6 +15,9 @@ export default function AddProduct() {
     basePrice: '',
     sellingPrice: '',
     discountPrice: '',
+    saleStartsAt: '',
+    saleEndsAt: '',
+    saleQuota: '',
     sku: '',
     categoryId: '',
     stock: '',
@@ -148,6 +151,9 @@ export default function AddProduct() {
           basePrice: '',
           sellingPrice: '',
           discountPrice: '',
+          saleStartsAt: '',
+          saleEndsAt: '',
+          saleQuota: '',
           sku: '',
           categoryId: '',
           stock: '',
@@ -334,6 +340,55 @@ export default function AddProduct() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 placeholder="0"
               />
+            </div>
+          </div>
+
+          <p className="mt-4 text-xs text-gray-500">
+            Harga diskon tanpa jadwal dan tanpa kuota akan tayang terus. Isi salah satu di bawah
+            untuk menjadikannya penawaran berbatas waktu.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleStartsAt">
+                Mulai Berlaku
+              </label>
+              <input
+                type="datetime-local"
+                id="saleStartsAt"
+                name="saleStartsAt"
+                value={formData.saleStartsAt}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleEndsAt">
+                Berakhir Pada
+              </label>
+              <input
+                type="datetime-local"
+                id="saleEndsAt"
+                name="saleEndsAt"
+                value={formData.saleEndsAt}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleQuota">
+                Kuota Harga Diskon
+              </label>
+              <input
+                type="number"
+                id="saleQuota"
+                name="saleQuota"
+                value={formData.saleQuota}
+                onChange={handleChange}
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Tanpa batas"
+              />
+              <p className="mt-1 text-xs text-gray-500">Kosongkan untuk tanpa batas kuota.</p>
             </div>
           </div>
         </div>

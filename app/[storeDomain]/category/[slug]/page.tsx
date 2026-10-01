@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { prisma } from '@/lib/prisma';
+import { resolveUnitPrice } from '@/lib/pricing';
 import { generateCategorySEO } from '@/lib/seo';
 import StoreHeader from '@/components/StoreHeader';
 
@@ -39,6 +40,11 @@ async function loadCategory(params: CategoryPageProps['params']) {
           slug: true,
           sellingPrice: true,
           discountPrice: true,
+          // Without these the listing cannot tell an expired sale from a live one.
+          saleStartsAt: true,
+          saleEndsAt: true,
+          saleQuota: true,
+          saleSold: true,
           images: { where: { isPrimary: true }, take: 1 },
         },
       },
@@ -157,7 +163,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 <div className="mt-4 flex justify-between">
                   <h2 className="text-sm text-gray-700">{product.name}</h2>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatIDR(product.discountPrice ?? product.sellingPrice)}
+                    {formatIDR(resolveUnitPrice(product))}
                   </p>
                 </div>
               </Link>

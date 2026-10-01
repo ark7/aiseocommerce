@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { isSaleActive, resolveUnitPrice } from '@/lib/pricing';
 import StoreHeader from '@/components/StoreHeader';
 
 const PAGE_SIZE = 12;
@@ -53,6 +54,11 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
         slug: true,
         sellingPrice: true,
         discountPrice: true,
+        // Without these the listing cannot tell an expired sale from a live one.
+        saleStartsAt: true,
+        saleEndsAt: true,
+        saleQuota: true,
+        saleSold: true,
         stock: true,
         images: { orderBy: { order: 'asc' }, take: 1, select: { url: true, altText: true } },
       },
@@ -147,7 +153,10 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.map((product) => {
-                const price = product.discountPrice ?? product.sellingPrice;
+                // A coret price only counts while its window is open and its
+                // quota lasts; past that the shelf price is the honest number.
+                const onSale = isSaleActive(product);
+                const price = resolveUnitPrice(product);
                 const image = product.images[0];
 
                 return (
@@ -173,7 +182,7 @@ export default async function ProductsPage({ params, searchParams }: ProductsPag
                     <div className="p-4">
                       <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
                       <p className="font-semibold text-gray-900">{formatIDR(price)}</p>
-                      {product.discountPrice && (
+                      {onSale && (
                         <p className="text-sm text-gray-400 line-through">
                           {formatIDR(product.sellingPrice)}
                         </p>
