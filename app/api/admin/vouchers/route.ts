@@ -14,10 +14,13 @@ const UNIQUE_VIOLATION = 'P2002';
  */
 export const VoucherInputSchema = z
   .object({
+    // Six, not three: the code is the only secret a voucher has, and the
+    // validate endpoint answers whether a code exists. Three characters is
+    // about 46.000 possibilities — a minute of guessing, not a secret.
     code: z
       .string()
       .trim()
-      .min(3, 'Kode minimal 3 karakter')
+      .min(6, 'Kode minimal 6 karakter')
       .max(32, 'Kode maksimal 32 karakter')
       .regex(/^[A-Za-z0-9_-]+$/, 'Kode hanya boleh huruf, angka, - dan _')
       .transform((code) => code.toUpperCase()),

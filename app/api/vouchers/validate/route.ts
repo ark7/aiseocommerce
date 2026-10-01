@@ -20,6 +20,14 @@ const ValidateSchema = z.object({
 const ATTEMPTS_PER_WINDOW = 20;
 
 /**
+ * The per-IP window keys on `x-forwarded-for`, which the caller supplies — an
+ * attacker sends a fresh value per request and the window never fills. This
+ * per-store window is the one that actually bounds guessing a given store's
+ * codes, so it is deliberately the wider of the two.
+ */
+const ATTEMPTS_PER_STORE = 120;
+
+/**
  * Check a code against a cart total and report what it would take off.
  *
  * Nothing is written here — the discount is only real once `createOrder`
@@ -28,15 +36,18 @@ const ATTEMPTS_PER_WINDOW = 20;
  */
 export async function POST(request: Request) {
   try {
+    const { storeId, code, subtotal } = ValidateSchema.parse(await request.json());
+
     const ip = getIPAddress(request);
-    if (!allow(`voucher-validate:${ip}`, ATTEMPTS_PER_WINDOW)) {
+    const withinIpWindow = allow(`voucher-validate:${ip}`, ATTEMPTS_PER_WINDOW);
+    const withinStoreWindow = allow(`voucher-validate:store:${storeId}`, ATTEMPTS_PER_STORE);
+
+    if (!withinIpWindow || !withinStoreWindow) {
       return NextResponse.json(
         { error: 'Terlalu banyak percobaan. Coba lagi sebentar lagi.' },
         { status: 429 }
       );
     }
-
-    const { storeId, code, subtotal } = ValidateSchema.parse(await request.json());
 
     // A guest may type a code; they just cannot have a claim, and the answer
     // says so rather than pretending the code is wrong.
