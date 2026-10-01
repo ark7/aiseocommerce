@@ -148,6 +148,15 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const handleCheckout = async () => {
     if (!storeId || !cartItems.length) return
 
+    // An order needs an owner, so checkout is for signed-in customers. Send the
+    // visitor to sign in and back to this cart; the cart is in localStorage, so
+    // it survives the round trip. The funnel event is deliberately not sent for
+    // a visitor who never reaches the form.
+    if (!localStorage.getItem('token')) {
+      window.location.href = `/login?from=${encodeURIComponent(`/${storeDomain}/cart`)}`
+      return
+    }
+
     // Every line gets its own row, so a product that is carried to checkout and
     // then abandoned is distinguishable from one that never got that far. An
     // order that follows also counts here; the report subtracts nothing.
@@ -159,21 +168,13 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     setError(null)
 
     try {
-      // Link the order to the signed-in customer so it shows up in their order
-      // history and they can confirm receipt later.
-      const storedUser = localStorage.getItem('user')
-      const customerId = storedUser ? JSON.parse(storedUser).id : undefined
-
-      // First create order
+      // First create order. The store and the customer are taken from the token
+      // server-side, so neither is sent from here.
       const orderResponse = await fetch('/api/orders', {
         method: 'POST',
-        // The token travels with the order. A voucher is redeemed as the account
-        // that claimed it, so the server has to know who is asking — without
-        // this the whole checkout is refused 401 the moment a voucher is used.
+        // The token travels with the order: it is what says who is checking out.
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          storeId,
-          customerId,
           items: cartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,

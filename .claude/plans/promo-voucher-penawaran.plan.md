@@ -216,10 +216,23 @@ Dihapus: `isSaleExpired` (tidak pernah dipakai, hanya dipakai tesnya sendiri).
 | **Checkout putus 401 setiap kali pakai voucher** | `CartPage` mengirim header Authorization ke `/api/orders` |
 | `VoucherInputSchema` diekspor dari `route.ts` | Dipindah ke `app/api/admin/vouchers/schema.ts` — Next menolak ekspor non-handler di file rute |
 
-Lubang yang **masih** ada dan butuh keputusan produk, bukan kode: `POST /api/orders`
-tetap menerima `storeId`/`customerId` dari body untuk checkout tamu, dan tidak ada
-mekanisme kedaluwarsa untuk order `PENDING` — jadi reservasi stok/kuota masih bisa
-ditahan tanpa pembayaran. Batas 20/menit memperlambatnya, tidak menutupnya.
+### Checkout tamu ditutup (keputusan produk, 2026-10-01)
+
+`POST /api/orders` sekarang mewajibkan token. `storeId` dan `customerId` diambil dari
+token, dan keduanya dihapus dari `OrderSchema` — tidak ada lagi yang bisa dibohongi
+dari body. `CartPage` mengalihkan tamu ke `/login?from=<cart>`; `app/login/page.tsx`
+kini menghormati `from` (hanya path searah, `//evil.com` ditolak karena itu open
+redirect) sehingga pelanggan kembali ke keranjang setelah masuk.
+
+Terverifikasi di browser: tamu di keranjang → `/login?from=%2Fdemo-store.local%2Fcart`
+→ masuk → kembali ke keranjang → order `Rp 1.080.000` tembus.
+
+Yang **masih** terbuka: tidak ada kedaluwarsa untuk order `PENDING`, jadi stok dan
+kuota coret masih bisa ditahan tanpa pembayaran walau sudah terautentikasi. Butuh job
+pembersih atau reserve-saat-bayar.
+
+Halaman `/register` belum ada walau `app/api/auth/register/route.ts` sudah ada, dan
+tautan "Daftar sekarang" di halaman login menuju 404. Pre-existing, di luar diff ini.
 
 ### Ditambahkan setelah rencana
 - `__tests__/unit/createOrder.test.ts` (17 tes) — `prisma.$transaction` di-mock

@@ -20,14 +20,14 @@ const ORDERS_PER_WINDOW = 20
 // Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
 // so uuid() rejected every real id.
 const OrderSchema = z.object({
-  storeId: z.string().min(1),
+  // No `storeId` and no `customerId`: both come from the token now. Accepting
+  // them here let a caller order as anyone.
   items: z.array(
     z.object({
       productId: z.string().min(1),
       quantity: z.number().int().positive(),
     })
   ).min(1),
-  customerId: z.string().min(1).optional(),
   // Campaign source captured on the storefront; validated and length-capped
   // before it reaches the Order.attribution JSON column.
   attribution: AttributionSchema.optional(),
@@ -88,43 +88,23 @@ export async function POST(request: Request) {
       )
     }
 
+    // An order needs an owner. Letting the caller name one let a guest write
+    // into a stranger's order history and spend the voucher that stranger had
+    // claimed; the storefront now sends guests to sign in first.
+    const user = await requireUser(request)
+    if (!user) {
+      return NextResponse.json({ error: 'Masuk dulu untuk melanjutkan' }, { status: 401 })
+    }
+
     const body = await request.json()
     const validatedData = OrderSchema.parse(body)
 
-    // A voucher is a right that belongs to an account, so redeeming one has to
-    // happen as that account. Guest checkout stays open, but a caller that
-    // names someone else's customerId must not be able to spend their voucher:
-    // without this, knowing a customer id plus a code is enough to burn it.
-    let customerId = validatedData.customerId
-    if (validatedData.voucherCode) {
-      const user = await requireUser(request)
-      if (!user) {
-        return NextResponse.json(
-          { error: 'Masuk dulu untuk memakai voucher', code: 'VOUCHER_REJECTED', reason: 'NOT_CLAIMED' },
-          { status: 401 }
-        )
-      }
-      customerId = user.id
-    }
-
-    // A body-supplied customerId must name someone who actually belongs to this
-    // store. Otherwise an order lands in a stranger's history — and the id is
-    // enough to find out that they exist.
-    if (customerId) {
-      const customer = await prisma.user.findFirst({
-        where: { id: customerId, storeId: validatedData.storeId },
-        select: { id: true },
-      })
-      if (!customer) {
-        return NextResponse.json({ error: 'Pelanggan tidak ditemukan' }, { status: 400 })
-      }
-    }
-
-    // Create order
+    // Create order. Both the store and the customer come from the token, so
+    // there is nothing in the body left for a caller to lie about.
     const order = await createOrder(
-      validatedData.storeId,
+      user.storeId,
       validatedData.items,
-      customerId,
+      user.id,
       validatedData.attribution,
       validatedData.voucherCode,
       validatedData.expectedUnitPrices

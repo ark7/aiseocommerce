@@ -4,6 +4,22 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+/**
+ * `from` arrives in the URL, so it is attacker-controlled. Only a same-site
+ * path is accepted — `//evil.com` is protocol-relative and would navigate off
+ * the site, which is exactly what an open redirect is for.
+ */
+function safeRedirectPath(from: string | null): string | null {
+  if (!from) return null;
+  if (!from.startsWith('/') || from.startsWith('//')) return null;
+  return from;
+}
+
+function redirectPathFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  return safeRedirectPath(new URLSearchParams(window.location.search).get('from'));
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -19,9 +35,10 @@ export default function LoginPage() {
     // Check if already logged in
     const token = localStorage.getItem('token');
     if (token) {
-      router.push('/admin');
+      router.push(redirectPathFromUrl() ?? '/admin');
+      return;
     }
-    
+
     // Fetch available stores for demo
     fetchStores();
   }, [router]);
@@ -66,8 +83,12 @@ export default function LoginPage() {
         localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Redirect based on role
-        if (data.user.role === 'ADMIN') {
+        // Sent here from somewhere that needs a signed-in visitor: go back
+        // there instead of the role's landing page, or the trip was pointless.
+        const from = redirectPathFromUrl();
+        if (from) {
+          router.push(from);
+        } else if (data.user.role === 'ADMIN') {
           router.push('/admin');
         } else {
           // For non-admin, redirect to store
