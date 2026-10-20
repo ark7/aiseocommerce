@@ -73,7 +73,7 @@ export default function AdminArticlesPage() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Articles CMS & Editor's Pick</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Articles CMS &amp; Editor&apos;s Pick</h1>
           <p className="text-sm text-gray-500 mt-0.5">Kelola artikel edukasi, ulasan produk, dan panduan belanja pembeli.</p>
         </div>
         {!isEditing && (
@@ -147,7 +147,7 @@ export default function AdminArticlesPage() {
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <p className="text-base font-medium text-gray-700">Belum ada artikel yang dibuat.</p>
-                    <p className="text-sm text-gray-400 mt-1">Klik tombol "+ Tulis Artikel Baru" di atas untuk mulai membuat artikel.</p>
+                    <p className="text-sm text-gray-400 mt-1">Klik tombol &ldquo;+ Tulis Artikel Baru&rdquo; di atas untuk mulai membuat artikel.</p>
                   </td>
                 </tr>
               ) : (
