@@ -226,12 +226,20 @@ export default async function LandingPage() {
                         No Image
                       </div>
                     )}
-                    <span
-                      style={{ backgroundColor: primaryColor }}
-                      className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow"
-                    >
-                      PILIHAN
-                    </span>
+                    {product.isPreOrder ? (
+                      <span
+                        className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow bg-amber-500"
+                      >
+                        PRE-ORDER
+                      </span>
+                    ) : (
+                      <span
+                        style={{ backgroundColor: primaryColor }}
+                        className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow"
+                      >
+                        PILIHAN
+                      </span>
+                    )}
                   </div>
                   <div className="mt-3.5 space-y-1.5">
                     <h3 className="text-sm font-medium text-gray-900 line-clamp-1 group-hover:text-indigo-600 transition-colors">
@@ -240,6 +248,11 @@ export default async function LandingPage() {
                     <p style={{ color: primaryColor }} className="text-base font-bold">
                       Rp {product.sellingPrice.toLocaleString('id-ID')}
                     </p>
+                    {product.isPreOrder && (
+                      <p className="text-[11px] text-amber-700 font-medium">
+                        ⏳ Pre-Order {product.preOrderDays ? `(${product.preOrderDays} hari)` : ''}
+                      </p>
+                    )}
                   </div>
                 </GatedLink>
               ))}

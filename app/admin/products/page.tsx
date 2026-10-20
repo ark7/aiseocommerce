@@ -274,6 +274,11 @@ export default function ProductsList() {
                 )}
                 
                 <div className="absolute top-2 right-2 flex space-x-1">
+                  {product.isPreOrder && (
+                    <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded shadow-xs">
+                      PO {product.preOrderDays ? `${product.preOrderDays}H` : ''}
+                    </span>
+                  )}
                   {product.isFeatured && (
                     <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">FEATURED</span>
                   )}
@@ -302,10 +307,19 @@ export default function ProductsList() {
                 </div>
                 
                 <div className="mt-3 flex justify-between items-center">
-                  <div className="flex space-x-2">
-                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                      Stock: {product.stock}
-                    </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {product.isPreOrder ? (
+                      <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
+                        <span>⏳ Pre-Order</span>
+                        {product.preOrderDays && <span>({product.preOrderDays} hari)</span>}
+                      </span>
+                    ) : (
+                      <span className={`text-xs px-2 py-1 rounded font-medium ${
+                        product.stock > 0 ? 'bg-gray-100 text-gray-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        Stok: {product.stock}
+                      </span>
+                    )}
                     {product.category && (
                       <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">
                         {product.category.name}

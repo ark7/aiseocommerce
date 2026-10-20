@@ -20,6 +20,8 @@ interface OfferProduct {
   saleQuota: number | null;
   saleSold: number;
   stock: number;
+  isPreOrder?: boolean;
+  preOrderDays?: number | null;
   images?: { url: string }[];
 }
 
@@ -327,6 +329,11 @@ export default function OffersPage() {
                         <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
                           -{percentOff}%
                         </span>
+                        {product.isPreOrder && (
+                          <span className="absolute top-2 right-2 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded shadow">
+                            PO
+                          </span>
+                        )}
                       </div>
 
                       <div className="p-4">
@@ -337,6 +344,11 @@ export default function OffersPage() {
                             {formatIDR(product.sellingPrice)}
                           </span>
                         </div>
+                        {product.isPreOrder && (
+                          <p className="mt-1 text-xs text-amber-700 font-medium">
+                            ⏳ Pre-Order {product.preOrderDays ? `(${product.preOrderDays} hari)` : ''}
+                          </p>
+                        )}
                         <div className="mt-2 flex items-center justify-between">
                           <SaleCountdown endsAt={product.saleEndsAt} />
                           {remaining != null && (
@@ -353,6 +365,8 @@ export default function OffersPage() {
                         name={product.name}
                         stock={product.stock}
                         storeDomain={storeDomain}
+                        isPreOrder={product.isPreOrder}
+                        preOrderDays={product.preOrderDays}
                       />
                     </div>
                   </div>

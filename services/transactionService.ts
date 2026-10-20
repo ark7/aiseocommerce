@@ -155,7 +155,7 @@ export async function createOrder(
         throw new Error(`Product ${item.productId} not found`);
       }
       // Ensure we have enough stock (should have been reserved, but double-check)
-      if (product.stock < item.quantity) {
+      if (!product.isPreOrder && product.stock < item.quantity) {
         throw new Error(`Insufficient stock for product ${product.name}`);
       }
 
@@ -206,28 +206,30 @@ export async function createOrder(
 
       // Reserved inside this same transaction: a nested $transaction would
       // commit the reservation independently of the order.
-      await tx.stockLog.create({
-        data: {
-          productId: product.id,
-          type: StockType.RESERVATION,
-          quantity: item.quantity,
-          previousStock: product.stock,
-          newStock: product.stock - item.quantity,
-          reason: `Reservation for order ${order.orderNumber}`,
-          referenceId: order.id,
-          userId: customerId,
-        },
-      });
+      if (!product.isPreOrder) {
+        await tx.stockLog.create({
+          data: {
+            productId: product.id,
+            type: StockType.RESERVATION,
+            quantity: item.quantity,
+            previousStock: product.stock,
+            newStock: product.stock - item.quantity,
+            reason: `Reservation for order ${order.orderNumber}`,
+            referenceId: order.id,
+            userId: customerId,
+          },
+        });
 
-      // Conditional for the same reason as the quota above: the stock check at
-      // the top of the loop read a snapshot, and two orders for the last unit
-      // would both pass it and both decrement, leaving stock negative.
-      const stockTaken = await tx.product.updateMany({
-        where: { id: product.id, storeId, stock: { gte: item.quantity } },
-        data: { stock: { decrement: item.quantity } },
-      });
-      if (stockTaken.count === 0) {
-        throw new Error(`Insufficient stock for product ${product.name}`);
+        // Conditional for the same reason as the quota above: the stock check at
+        // the top of the loop read a snapshot, and two orders for the last unit
+        // would both pass it and both decrement, leaving stock negative.
+        const stockTaken = await tx.product.updateMany({
+          where: { id: product.id, storeId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (stockTaken.count === 0) {
+          throw new Error(`Insufficient stock for product ${product.name}`);
+        }
       }
     }
 
@@ -339,22 +341,24 @@ export async function releaseStock(
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product) continue;
 
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            type: StockType.RETURN,
-            quantity: item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock + item.quantity,
-            reason: `Release for cancelled order ${order.orderNumber}`,
-            referenceId: order.id,
-            userId,
-          },
-        });
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { increment: item.quantity } },
-        });
+        if (!product.isPreOrder) {
+          await tx.stockLog.create({
+            data: {
+              productId: product.id,
+              type: StockType.RETURN,
+              quantity: item.quantity,
+              previousStock: product.stock,
+              newStock: product.stock + item.quantity,
+              reason: `Release for cancelled order ${order.orderNumber}`,
+              referenceId: order.id,
+              userId,
+            },
+          });
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
 
         // Only the lines that actually took quota give it back; decrementing
         // every line would invent quota that was never spent.

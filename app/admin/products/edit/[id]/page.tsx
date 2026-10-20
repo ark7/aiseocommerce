@@ -31,6 +31,9 @@ const EMPTY_FORM = {
   categoryId: '',
   stock: '',
   minStock: '',
+  isPreOrder: false,
+  preOrderDays: '7',
+  preOrderMessage: '',
   isPublished: true,
   isFeatured: false,
   seoTitle: '',
@@ -116,6 +119,9 @@ export default function EditProduct() {
         categoryId: asText(product.categoryId),
         stock: asText(product.stock),
         minStock: asText(product.minStock),
+        isPreOrder: Boolean(product.isPreOrder),
+        preOrderDays: asText(product.preOrderDays || '7'),
+        preOrderMessage: asText(product.preOrderMessage),
         isPublished: Boolean(product.isPublished),
         isFeatured: Boolean(product.isFeatured),
         seoTitle: asText(product.seoTitle),
@@ -442,42 +448,150 @@ export default function EditProduct() {
           </div>
         </div>
 
-        {/* Inventory */}
+        {/* Inventory & Availability */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Persediaan</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="stock">
-                Stok Tersedia *
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Persediaan &amp; Tipe Ketersediaan</h2>
+
+          {/* Tipe Ketersediaan: Ready Stock vs Pre-Order */}
+          <div className="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Status Ketersediaan Produk *
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                  !formData.isPreOrder
+                    ? 'border-indigo-600 bg-white ring-2 ring-indigo-500/20'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="isPreOrder"
+                  checked={!formData.isPreOrder}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPreOrder: false }))}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-sm font-bold text-gray-900">🟢 Ready Stock</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Barang fisik siap kirim. Jumlah stok akan ditampilkan ke pelanggan.
+                  </span>
+                </div>
               </label>
-              <input
-                id="stock"
-                type="number"
-                name="stock"
-                value={formData.stock}
-                onChange={handleChange}
-                required
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minStock">
-                Stok Minimum
+
+              <label
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                  formData.isPreOrder
+                    ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="isPreOrder"
+                  checked={formData.isPreOrder}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPreOrder: true }))}
+                  className="mt-1 text-amber-600 focus:ring-amber-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-sm font-bold text-amber-900">⏳ Pre-Order (PO)</span>
+                  <span className="block text-xs text-amber-700 mt-0.5">
+                    Produk diproduksi/dipesan terlebih dahulu. Jumlah stok disembunyikan dari pembeli.
+                  </span>
+                </div>
               </label>
-              <input
-                id="minStock"
-                type="number"
-                name="minStock"
-                value={formData.minStock}
-                onChange={handleChange}
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
-              />
             </div>
           </div>
+
+          {!formData.isPreOrder ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="stock">
+                  Stok Tersedia *
+                </label>
+                <input
+                  id="stock"
+                  type="number"
+                  name="stock"
+                  value={formData.stock}
+                  onChange={handleChange}
+                  required
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minStock">
+                  Stok Minimum (Peringatan Habis)
+                </label>
+                <input
+                  id="minStock"
+                  type="number"
+                  name="minStock"
+                  value={formData.minStock}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="preOrderDays">
+                    Estimasi Pengerjaan / Pengiriman (Hari) *
+                  </label>
+                  <input
+                    id="preOrderDays"
+                    type="number"
+                    name="preOrderDays"
+                    value={formData.preOrderDays}
+                    onChange={handleChange}
+                    required
+                    min="1"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                    placeholder="7"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Contoh: 7 hari kerja atau 14 hari.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="stock">
+                    Batas Kuota Pemesanan PO (Opsional)
+                  </label>
+                  <input
+                    id="stock"
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                    placeholder="Tanpa batas"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Kosongkan jika kapasitas PO tidak dibatasi.</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="preOrderMessage">
+                  Catatan Tambahan PO (Opsional)
+                </label>
+                <input
+                  id="preOrderMessage"
+                  type="text"
+                  name="preOrderMessage"
+                  value={formData.preOrderMessage}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                  placeholder="Contoh: Estimasi pengiriman mulai tanggal 25 atau 7-10 hari kerja"
+                />
+              </div>
+            </div>
+          )}
           <p className="text-sm text-gray-400 mt-2">
             Perubahan stok di sini tidak tercatat di riwayat stok. Pakai menu stok untuk penyesuaian yang perlu tercatat.
           </p>

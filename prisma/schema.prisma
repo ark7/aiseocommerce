@@ -135,6 +135,9 @@ model Product {
   seoKeywords      String?
   stock            Int            @default(0)
   minStock         Int            @default(0)
+  isPreOrder       Boolean        @default(false)
+  preOrderDays     Int?
+  preOrderMessage  String?
   images           ProductImage[]
   categoryId       String?
   category         Category?      @relation(fields: [categoryId], references: [id])

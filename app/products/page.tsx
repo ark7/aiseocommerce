@@ -57,6 +57,8 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         saleQuota: true,
         saleSold: true,
         stock: true,
+        isPreOrder: true,
+        preOrderDays: true,
         images: { orderBy: { order: 'asc' }, take: 1, select: { url: true, altText: true } },
       },
     }),
@@ -159,19 +161,26 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                     href={`/product/${product.slug}`}
                     className="block bg-white rounded-lg shadow border overflow-hidden hover:shadow-md transition-shadow"
                   >
-                    {image?.url ? (
-                      <Image
-                        src={image.url}
-                        alt={image.altText || product.name}
-                        width={400}
-                        height={400}
-                        className="w-full h-48 object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
-                        <span className="text-sm text-gray-400">Tanpa gambar</span>
-                      </div>
-                    )}
+                    <div className="relative">
+                      {image?.url ? (
+                        <Image
+                          src={image.url}
+                          alt={image.altText || product.name}
+                          width={400}
+                          height={400}
+                          className="w-full h-48 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+                          <span className="text-sm text-gray-400">Tanpa gambar</span>
+                        </div>
+                      )}
+                      {product.isPreOrder && (
+                        <span className="absolute top-2 left-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
+                          PRE-ORDER
+                        </span>
+                      )}
+                    </div>
 
                     <div className="p-4">
                       <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
@@ -181,9 +190,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           {formatIDR(product.sellingPrice)}
                         </p>
                       )}
-                      {product.stock <= 0 && (
+                      {product.isPreOrder ? (
+                        <p className="mt-1 text-xs text-amber-700 font-medium">
+                          ⏳ Pre-Order {product.preOrderDays ? `(${product.preOrderDays} hari)` : ''}
+                        </p>
+                      ) : product.stock <= 0 ? (
                         <p className="mt-1 text-xs text-red-600">Stok habis</p>
-                      )}
+                      ) : null}
                     </div>
                   </Link>
                 );

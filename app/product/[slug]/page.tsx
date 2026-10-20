@@ -75,7 +75,7 @@ async function loadProductPage(slug: string) {
   const relatedProducts = await prisma.product.findMany({
     where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
     take: 4,
-    select: { id: true, name: true, slug: true, sellingPrice: true, images: { where: { isPrimary: true }, take: 1 } },
+    select: { id: true, name: true, slug: true, sellingPrice: true, isPreOrder: true, images: { where: { isPrimary: true }, take: 1 } },
   });
 
   const productStructuredData = generateProductStructuredData({
@@ -194,12 +194,38 @@ export default async function ProductPage({ params }: ProductPageProps) {
             
             <div className="mt-6">
               <div className="mb-4">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${product.stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                  {product.stock > 0 ? 'Tersedia' : 'Stok Habis'}
-                  {product.stock > 0 && <span className="ml-1">({product.stock} stok)</span>}
-                </span>
+                {product.isPreOrder ? (
+                  <div className="space-y-1.5">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                      ⏳ Pre-Order (PO)
+                    </span>
+                    {product.preOrderDays ? (
+                      <p className="text-xs text-amber-800 font-medium">
+                        Estimasi pengiriman: <strong>{product.preOrderDays} hari kerja</strong>
+                        {product.preOrderMessage ? ` • ${product.preOrderMessage}` : ''}
+                      </p>
+                    ) : product.preOrderMessage ? (
+                      <p className="text-xs text-amber-800 font-medium">
+                        {product.preOrderMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${product.stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {product.stock > 0 ? 'Tersedia' : 'Stok Habis'}
+                    {product.stock > 0 && <span className="ml-1">({product.stock} stok)</span>}
+                  </span>
+                )}
               </div>
-              <AddToCartButton productId={product.id} storeDomain={store.domain} price={unitPrice} name={product.name} stock={product.stock} />
+              <AddToCartButton 
+                productId={product.id} 
+                storeDomain={store.domain} 
+                price={unitPrice} 
+                name={product.name} 
+                stock={product.stock} 
+                isPreOrder={product.isPreOrder}
+                preOrderDays={product.preOrderDays}
+              />
             </div>
             
             <section className="mt-10 border-t border-gray-200 pt-10">
@@ -218,13 +244,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
             <div className="mt-6 grid grid-cols-2 gap-y-10 gap-x-6 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
               {relatedProducts.map(relatedProduct => (
                 <Link key={relatedProduct.id} href={`/product/${relatedProduct.slug}`} className="group relative block bg-white border rounded-xl overflow-hidden hover:shadow-md transition">
-                  <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                  <div className="relative w-full h-48 bg-gray-100 overflow-hidden">
                     {relatedProduct.images?.[0]?.url ? (
                       <Image src={relatedProduct.images[0].url} alt={relatedProduct.name} width={300} height={300} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
                         No image
                       </div>
+                    )}
+                    {relatedProduct.isPreOrder && (
+                      <span className="absolute top-2 left-2 z-10 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
+                        PO
+                      </span>
                     )}
                   </div>
                   <div className="p-4">

@@ -92,9 +92,9 @@ export async function updateOrderStatus(
         for (const item of items) {
           const product = await tx.product.findUnique({
             where: { id: item.productId },
-            select: { id: true },
+            select: { id: true, isPreOrder: true },
           });
-          if (!product) continue;
+          if (!product || product.isPreOrder) continue;
 
           // `update` returns the post-increment row, so the log records the real
           // before/after even when another order moves the same product at once.

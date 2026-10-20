@@ -103,6 +103,38 @@ describe('POST /api/products', () => {
       expect.objectContaining({ data: expect.objectContaining({ stock: 0, isPublished: true }) })
     );
   });
+
+  it('supports Pre-Order (PO) flags and estimated days', async () => {
+    (verifyToken as jest.Mock).mockResolvedValue(ADMIN);
+    (prisma.product.findFirst as jest.Mock).mockResolvedValue(null);
+    (prisma.product.create as jest.Mock).mockResolvedValue({ id: 'product-1', slug: 'custom-mug', images: [] });
+
+    const response = await POST(
+      formRequest(
+        {
+          name: 'Custom Mug PO',
+          slug: 'custom-mug-po',
+          basePrice: '50000',
+          sellingPrice: '75000',
+          isPreOrder: 'true',
+          preOrderDays: '14',
+          preOrderMessage: 'Estimasi pengerjaan 14 hari',
+        },
+        'POST'
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isPreOrder: true,
+          preOrderDays: 14,
+          preOrderMessage: 'Estimasi pengerjaan 14 hari',
+        }),
+      })
+    );
+  });
 });
 
 describe('PATCH /api/products', () => {
@@ -123,6 +155,14 @@ describe('PATCH /api/products', () => {
 
     expect(response.status).toBe(200);
     expect(patchedData().isPublished).toBe(false);
+  });
+
+  it('updates pre-order flag and days correctly on PATCH', async () => {
+    const response = await PATCH(formRequest({ id: EXISTING.id, isPreOrder: 'true', preOrderDays: '7' }, 'PATCH'));
+
+    expect(response.status).toBe(200);
+    expect(patchedData().isPreOrder).toBe(true);
+    expect(patchedData().preOrderDays).toBe(7);
   });
 
   it('writes only the fields it was sent, so toggling publish cannot zero the stock', async () => {

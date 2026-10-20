@@ -15,6 +15,7 @@ interface CartItem {
   price: number
   quantity: number
   imageUrl?: string
+  isPreOrder?: boolean
 }
 
 // Prisma ids are cuids, and seeded rows use plain strings like demo-prod-001.
@@ -25,6 +26,8 @@ const CartItemSchema = z.object({
   price: z.number().positive(),
   quantity: z.number().int().positive(),
   imageUrl: z.string().url().optional(),
+  isPreOrder: z.boolean().optional(),
+  storeDomain: z.string().optional(),
 })
 
 interface CartPageProps {
@@ -292,7 +295,14 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                   />
                 )}
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">{item.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-gray-900">{item.name}</h3>
+                    {item.isPreOrder && (
+                      <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-300">
+                        PO
+                      </span>
+                    )}
+                  </div>
                   <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
                 </div>
                 <div className="flex items-center">
