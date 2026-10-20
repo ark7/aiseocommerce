@@ -19,8 +19,11 @@ export async function GET(
 ) {
   try {
     const user = await requireUser(request);
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const articles = await prisma.article.findMany({
@@ -52,8 +55,11 @@ export async function GET(
 export async function POST(request: Request) {
   try {
     const user = await requireUser(request);
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const body = await request.json();

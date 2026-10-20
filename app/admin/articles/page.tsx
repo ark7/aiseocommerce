@@ -34,7 +34,10 @@ export default function AdminArticlesPage() {
     try {
       setLoading(true);
       const res = await fetch('/api/articles', { headers: authHeaders() });
-      if (!res.ok) throw new Error('Failed to fetch articles');
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || 'Gagal memuat artikel');
+      }
       const data = await res.json();
       setArticles(data.articles || []);
     } catch (err: any) {
@@ -60,14 +63,34 @@ export default function AdminArticlesPage() {
 
     try {
       const res = await fetch(`/api/articles/${id}`, { method: 'DELETE', headers: authHeaders() });
-      if (!res.ok) throw new Error('Failed to delete article');
+      if (!res.ok) {
+        const json = await res.json().catch(() => null);
+        throw new Error(json?.error || 'Gagal menghapus artikel');
+      }
       fetchArticles();
     } catch (err: any) {
       alert(err.message);
     }
   };
 
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
+  if (error) {
+    return (
+      <div className="p-6 space-y-4">
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <span>{error}</span>
+          </div>
+          <Link
+            href="/login?from=/admin/articles"
+            className="px-3.5 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition shadow-xs"
+          >
+            Login Ulang
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

@@ -70,7 +70,16 @@ export async function verifyToken(token: string): Promise<UserPayload | null> {
  */
 export async function requireUser(request: NextRequest | Request): Promise<UserPayload | null> {
   const header = request.headers.get('authorization');
-  const token = header?.replace('Bearer ', '');
+  let token = header?.replace('Bearer ', '');
+  if (!token) {
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const match = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/);
+      if (match) {
+        token = decodeURIComponent(match[1]);
+      }
+    }
+  }
   if (!token) return null;
   return verifyToken(token);
 }

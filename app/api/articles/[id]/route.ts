@@ -22,8 +22,11 @@ export async function GET(
     const { id } = await params;
     const user = await requireUser(request);
 
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const article = await prisma.article.findFirst({
@@ -63,8 +66,11 @@ export async function PUT(
     const { id } = await params;
     const user = await requireUser(request);
 
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -111,8 +117,11 @@ export async function DELETE(
     const { id } = await params;
     const user = await requireUser(request);
 
-    if (!user || user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const article = await prisma.article.findFirst({
