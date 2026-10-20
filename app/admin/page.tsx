@@ -29,9 +29,18 @@ export default function AdminDashboard() {
           headers: { Authorization: `Bearer ${token}` },
         });
         
+        if (statsResponse.status === 401) {
+          localStorage.removeItem('token');
+          setError('Sesi login telah berakhir, silakan login kembali.');
+          setLoading(false);
+          return;
+        }
+
         if (statsResponse.ok) {
           const data = await statsResponse.json();
-          setStats(data.stats);
+          if (data.stats) {
+            setStats(data.stats);
+          }
         }
 
         // Fetch recent orders
@@ -46,7 +55,7 @@ export default function AdminDashboard() {
 
         setLoading(false);
       } catch (err) {
-        setError('Gagal memuat data dashboard');
+        setError('Gagal memuat data dashboard. Silakan refresh halaman.');
         setLoading(false);
       }
     };
@@ -278,12 +287,14 @@ export default function AdminDashboard() {
                 {recentOrders.map((order: any) => (
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-900">#{order.id.substring(0, 8)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.customerName || 'Anonymous'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {order.customerName || (order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() : null) || 'Pelanggan'}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(order.createdAt).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      Rp {order.total?.toLocaleString('id-ID') || '0'}
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                      Rp {(order.totalAmount ?? order.total ?? 0).toLocaleString('id-ID')}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${

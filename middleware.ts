@@ -179,7 +179,11 @@ export async function middleware(request: NextRequest) {
     '_next', 'static'
   ];
 
-  if (segments.length >= 2 && ['products', 'product', 'categories', 'category', 'articles', 'penawaran', 'cart', 'orders', 'lp'].includes(segments[1])) {
+  if (
+    segments.length >= 2 &&
+    !standaloneFirstSegments.includes(segments[0]) &&
+    ['products', 'product', 'categories', 'category', 'articles', 'penawaran', 'cart', 'orders', 'lp'].includes(segments[1])
+  ) {
     const targetPath = '/' + segments.slice(1).join('/');
     const redirectUrl = new URL(targetPath, request.url);
     redirectUrl.search = request.nextUrl.search;

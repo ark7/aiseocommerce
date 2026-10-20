@@ -41,10 +41,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }
         
         const data = await response.json();
-        if (data.user && data.user.role === 'ADMIN') {
+        if (data.user && (data.user.role === 'ADMIN' || data.user.role === 'STAFF')) {
           setUser(data.user);
         } else {
-          router.push('/');
+          router.push('/login');
         }
       } catch (error) {
         router.push('/login');
