@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { OrderStatus } from '@prisma/client';
 import { REVENUE_STATUSES, STATUS_LABELS } from '@/lib/orderStatus';
@@ -49,15 +50,24 @@ function formatIDR(amount: number) {
 
 const PAGE_SIZES = [5, 10, 25, 50, 100];
 
-export default function AdminOrdersPage() {
+function AdminOrdersContent() {
+  const searchParams = useSearchParams();
+  const urlStatus = searchParams.get('status') || '';
+
   const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(urlStatus);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = searchParams.get('status') ?? '';
+    setStatus(s);
+    setPage(1);
+  }, [searchParams]);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -254,5 +264,19 @@ export default function AdminOrdersPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto p-6 text-center text-gray-500">
+          Memuat pesanan...
+        </div>
+      }
+    >
+      <AdminOrdersContent />
+    </Suspense>
   );
 }

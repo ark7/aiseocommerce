@@ -48,10 +48,6 @@ export default async function RegisterPage({
             fromPath={fromPath || null}
             siteKey={siteKey}
           />
-            storeDomain={store.domain}
-            fromPath={fromPath || null}
-            siteKey={siteKey}
-          />
 
           <p className="text-center text-sm text-gray-600 mt-6">
             Sudah punya akun?{' '}
