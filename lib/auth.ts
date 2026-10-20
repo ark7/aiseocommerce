@@ -17,7 +17,7 @@ export interface UserPayload {
   id: string;
   storeId: string;
   email: string;
-  role: string;
+  role: string; // can be 'GUEST' | 'CUSTOMER' | 'STAFF' | 'ADMIN'
 }
 
 export interface AuthResult {

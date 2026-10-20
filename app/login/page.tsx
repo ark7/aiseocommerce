@@ -1,114 +1,32 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
+import { LoginForm } from '@/components/LoginForm';
+import { redirectPathFromUrl } from '@/lib/redirect';
 import Link from 'next/link';
 
-/**
- * `from` arrives in the URL, so it is attacker-controlled. Only a same-site
- * path is accepted — `//evil.com` is protocol-relative and would navigate off
- * the site, which is exactly what an open redirect is for.
- */
-function safeRedirectPath(from: string | null): string | null {
-  if (!from) return null;
-  if (!from.startsWith('/') || from.startsWith('//')) return null;
-  return from;
-}
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const fromPath = params.from as string | undefined;
 
-function redirectPathFromUrl(): string | null {
-  if (typeof window === 'undefined') return null;
-  return safeRedirectPath(new URLSearchParams(window.location.search).get('from'));
-}
-
-export default function LoginPage() {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    domain: '',
-    email: '',
-    password: '',
+  // In a real scenario, we might resolve the store from the 'from' path or a default
+  // For now, we fetch the first store to get the Turnstile site key.
+  const store = await prisma.store.findFirst({
+    include: { settings: true },
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stores, setStores] = useState([]);
 
-  useEffect(() => {
-    // Check if already logged in
-    const token = localStorage.getItem('token');
-    if (token) {
-      router.push(redirectPathFromUrl() ?? '/admin');
-      return;
-    }
-
-    // Fetch available stores for demo
-    fetchStores();
-  }, [router]);
-
-  const fetchStores = async () => {
-    try {
-      const response = await fetch('/api/stores');
-      if (response.ok) {
-        const data = await response.json();
-        setStores(data.stores || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch stores:', err);
-    }
-  };
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Store token and user info
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('refreshToken', data.refreshToken);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // Sent here from somewhere that needs a signed-in visitor: go back
-        // there instead of the role's landing page, or the trip was pointless.
-        const from = redirectPathFromUrl();
-        if (from) {
-          router.push(from);
-        } else if (data.user.role === 'ADMIN') {
-          router.push('/admin');
-        } else {
-          // For non-admin, redirect to store
-          const storeResponse = await fetch(`/api/stores/${formData.domain}`);
-          if (storeResponse.ok) {
-            const storeData = await storeResponse.json();
-            router.push(`/${storeData.store?.domain || data.user.storeId}`);
-          } else {
-            router.push('/');
-          }
-        }
-      } else {
-        setError(data.error || 'Login gagal. Silahkan coba lagi.');
-      }
-    } catch (err) {
-      setError('Terjadi kesalahan. Silahkan coba lagi.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!store) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <h1 className="text-xl font-bold">Store configuration missing</h1>
+          <p className="text-gray-500">Please contact administrator.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -119,101 +37,25 @@ export default function LoginPage() {
               <span className="text-white font-bold text-2xl">A</span>
             </div>
             <h1 className="text-2xl font-bold text-gray-900">AI SEO E-Commerce</h1>
-            <p className="text-gray-500 mt-2">Masuk untuk mengakses panel admin</p>
+            <p className="text-gray-500 mt-2">
+              {fromPath?.startsWith('/admin') ? 'Masuk ke panel admin toko' : 'Masuk ke akun Anda'}
+            </p>
           </div>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
-              <p className="text-red-600">{error}</p>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Domain Toko
-              </label>
-              <select
-                name="domain"
-                value={formData.domain}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="">Pilih domain toko</option>
-                {stores.map((store: any) => (
-                  <option key={store.domain} value={store.domain}>{store.name} ({store.domain})</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="admin@toko.com"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                minLength={6}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Masukkan password"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                />
-                <span className="text-sm text-gray-600">Ingat saya</span>
-              </label>
-              <Link href="/forgot-password" className="text-sm text-indigo-600 hover:underline">
-                Lupa password?
-              </Link>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Masuk...</span>
-                </>
-              ) : (
-                <span>Masuk</span>
-              )}
-            </button>
-          </form>
+          <LoginForm
+            storeId={store.id}
+            storeDomain={store.domain}
+            fromPath={fromPath || null}
+            siteKey={store.settings?.turnstileEnabled ? (store.settings?.turnstileSiteKey ?? undefined) : undefined}
+          />
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               Belum punya akun?{' '}
-              <Link href="/register" className="text-indigo-600 font-medium hover:underline">
+              <Link
+                href={`/register?from=${fromPath || ''}`}
+                className="text-indigo-600 font-medium hover:underline"
+              >
                 Daftar sekarang
               </Link>
             </p>

@@ -32,6 +32,8 @@ model Store {
   ledgerCategories LedgerCategory[]
   vouchers         Voucher[]
   voucherClaims    VoucherClaim[]
+  articles         Article[]
+  landingPages     LandingPage[]
 
   @@map("stores")
 }
@@ -51,6 +53,27 @@ model StoreSettings {
   businessName          String?
   businessAddress       String?
   businessPhone         String?
+  turnstileSiteKey      String?
+  turnstileSecretKey    String?
+  turnstileEnabled      Boolean  @default(false)
+  tagline               String?
+  favicon               String?
+  heroBadge             String?
+  heroTitle             String?
+  heroSubtitle          String?
+  heroCtaText           String?
+  heroCtaLink           String?
+  heroCtaSecondaryText  String?
+  heroCtaSecondaryLink  String?
+  heroImageUrl          String?
+  primaryColor          String?  @default("#4F46E5")
+  fontFamily            String?  @default("inter")
+  socialLinks           Json?
+  termsContent          String?  @db.Text
+  privacyContent        String?  @db.Text
+  cookieConsentEnabled  Boolean  @default(true)
+  cookieConsentTitle    String?  @default("Pemberitahuan & Izin Cookie")
+  cookieConsentText     String?  @db.Text
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -102,14 +125,10 @@ model Product {
   shortDescription String?
   basePrice        Float
   sellingPrice     Float
-  /// Harga coret. Dipakai storefront sejak dulu, tapi jendela dan kuota di
-  /// bawah ini yang membuatnya berbatas waktu dan berkuota. `null` pada
-  /// keduanya berarti tanpa batas, supaya baris lama tetap tayang.
   discountPrice    Float?
   saleStartsAt     DateTime?
   saleEndsAt       DateTime?
   saleQuota        Int?
-  /// Unit yang sudah terjual di harga coret. Dipotong atomik saat checkout.
   saleSold         Int            @default(0)
   seoTitle         String?
   seoDescription   String?
@@ -127,6 +146,8 @@ model Product {
   stockLogs     StockLog[]
   orderItems    OrderItem[]
   productEvents ProductEvent[]
+  articles      ArticleProduct[]
+  landingPages  LandingPage[]
 
   @@unique([storeId, slug])
   @@map("products")
@@ -208,12 +229,13 @@ model Order {
   attribution     Json?
   notes           String?     @db.Text
   shippingAddress String?     @db.Text
+  reservationExpiresAt DateTime?
   trackingUrl     String?
   shippedAt       DateTime?
   deliveredAt     DateTime?
   completedAt     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   orderItems   OrderItem[]
   payments     Payment[]
@@ -244,9 +266,6 @@ model OrderItem {
   unitPrice  Float
   totalPrice Float
   variation  String?
-  /// Baris ini memakai jatah kuota harga coret. Dicatat saat checkout supaya
-  /// pembatalan bisa mengembalikan tepat baris yang memakainya, bukan menebak
-  /// dari perbandingan harga yang bisa berubah setelahnya.
   saleQuotaUsed Boolean @default(false)
   createdAt  DateTime @default(now())
 
@@ -385,11 +404,7 @@ model LoginAttempt {
 
 /// The upper half of the product funnel. Orders record the conversion end and
 /// carry attribution; nothing recorded what happened before a purchase, so
-/// "this listing converts well" was previously unfalsifiable.
-///
-/// One row per (product, step, session). Storing a step per product rather than
-/// one cart-level row keeps the funnel a single GROUP BY over
-/// (storeId, productId, type) with no join and no array unnesting.
+/// "this..." was previously unfalsifiable.
 enum ProductEventType {
   VIEW
   ADD_TO_CART
@@ -401,7 +416,7 @@ model ProductEvent {
   storeId     String
   store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
   productId   String
-  product     Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id])
   type        ProductEventType
   /// Anonymous, client-generated, stable per browser. Never a user id.
   sessionId   String
@@ -414,16 +429,6 @@ model ProductEvent {
   @@map("product_events")
 }
 
-/// Diskon yang diklaim pelanggan, bukan yang dipasang langsung di keranjang.
-/// `code` tetap di baris voucher dan baru ditampilkan setelah klaim — yang
-/// diklaim adalah hak pakai, bukan rahasia.
-enum VoucherType {
-  /// `value` adalah rupiah.
-  FIXED
-  /// `value` adalah persen penuh (10 berarti 10%), bukan pecahan.
-  PERCENT
-}
-
 model Voucher {
   id          String      @id @default(cuid())
   storeId     String
@@ -433,19 +438,13 @@ model Voucher {
   description String?
   type        VoucherType
   value       Float
-  /// Batas nilai potongan. Hanya bermakna untuk PERCENT; null = tanpa batas.
   maxDiscount Float?
-  /// Belanja minimum sebelum voucher boleh dipakai. null = tanpa minimum.
   minPurchase Float?
-  /// Jendela berlaku. null di kedua ujung = tanpa batas waktu.
   startsAt    DateTime?
   endsAt      DateTime?
-  /// Berapa kali voucher boleh diklaim. null = tanpa batas.
   quota       Int?
   claimed     Int         @default(0)
-  /// Berapa kali sudah benar-benar dipakai di pesanan.
   used        Int         @default(0)
-  /// Tombol on/off admin, terpisah dari jendela waktu.
   isActive    Boolean     @default(true)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -454,6 +453,11 @@ model Voucher {
 
   @@unique([storeId, code])
   @@map("vouchers")
+}
+
+enum VoucherType {
+  FIXED
+  PERCENT
 }
 
 model VoucherClaim {
@@ -473,4 +477,58 @@ model VoucherClaim {
   /// tombol diklik dua kali berakhir sebagai baris yang sama, bukan dua baris.
   @@unique([voucherId, userId])
   @@map("voucher_claims")
+}
+
+// ---------- CMS ARTICLE MODELS ----------
+model Article {
+  id               String   @id @default(cuid())
+  storeId          String
+  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title            String
+  slug             String
+  content          String   @db.Text
+  seoTitle         String?
+  seoDescription   String?
+  imageUrl         String?
+  isFeatured       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  products         ArticleProduct[]
+
+  @@unique([storeId, slug])
+  @@map("articles")
+}
+
+model ArticleProduct {
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, productId])
+  @@map("article_products")
+}
+
+// ---------- CMS LANDING PAGE BUILDER ----------
+model LandingPage {
+  id             String    @id @default(cuid())
+  storeId        String
+  store          Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String
+  customPath     String?
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  ogImage        String?
+  isPublished    Boolean   @default(true)
+  productId      String?
+  product        Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sections       Json      @default("[]")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([storeId, slug])
+  @@map("landing_pages")
 }

@@ -105,7 +105,7 @@ export function trackFunnelEvent(
     const parsed = FunnelEventSchema.safeParse({
       ...target,
       step,
-      sessionId: sessionId(),
+      sessionId: 'SERVER_RESOLVED', // Placeholder; the API route now handles identity
       attribution: readStoredAttribution() ?? undefined,
     });
     if (!parsed.success) return;

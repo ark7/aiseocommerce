@@ -2,6 +2,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import {
   revalidateCategory,
+  revalidateLandingPage,
   revalidateProduct,
   revalidateStoreSettings,
   storefrontPaths,
@@ -35,6 +36,7 @@ describe('storefrontPaths', () => {
     expect(paths.sitemap).toBe(`/${DOMAIN}/sitemap.xml`);
     expect(paths.product('kopi-arabika')).toBe(`/${DOMAIN}/product/kopi-arabika`);
     expect(paths.category('minuman')).toBe(`/${DOMAIN}/category/minuman`);
+    expect(paths.landingPage('promo-ramadhan')).toBe(`/${DOMAIN}/lp/promo-ramadhan`);
   });
 });
 
@@ -79,6 +81,17 @@ describe('revalidation', () => {
       `/${DOMAIN}/products`,
       `/${DOMAIN}/sitemap.xml`,
     ]);
+  });
+
+  it('purges the landing page, renamed slug, and sitemap on landing page mutation', async () => {
+    await revalidateLandingPage(STORE_ID, 'promo-baru', 'promo-lama');
+
+    expect(purged()).toContain(`/${DOMAIN}/lp/promo-baru`);
+    expect(purged()).toContain(`/${DOMAIN}/lp/promo-lama`);
+    expect(purged()).toContain(`/${DOMAIN}/sitemap.xml`);
+    expect(purged()).toContain('/lp/promo-baru');
+    expect(purged()).toContain('/lp/promo-lama');
+    expect(purged()).toContain('/sitemap.xml');
   });
 
   it('purges the storefront shell when settings change', async () => {

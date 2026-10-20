@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import StoreHeader from '@/components/StoreHeader'
+import StoreFooter from '@/components/StoreFooter'
 import { readStoredAttribution } from '@/lib/attribution'
 import { trackFunnelEvent } from '@/lib/funnelEvents'
 import { z } from 'zod'
@@ -153,7 +154,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     // it survives the round trip. The funnel event is deliberately not sent for
     // a visitor who never reaches the form.
     if (!localStorage.getItem('token')) {
-      window.location.href = `/login?from=${encodeURIComponent(`/${storeDomain}/cart`)}`
+      window.location.href = `/login?from=${encodeURIComponent('/cart')}`
       return
     }
 
@@ -243,7 +244,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       // A manual transfer has no gateway to visit - the customer uploads the
       // proof from the order page instead.
       if (paymentMethod === 'MANUAL') {
-        window.location.href = `/${storeDomain}/orders/${orderId}`
+        window.location.href = `/orders/${orderId}`
         return
       }
 
@@ -257,10 +258,10 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <StoreHeader storeDomain={storeDomain} />
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Keranjang</h1>
 
         {error && (
@@ -271,7 +272,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           <div className="bg-white rounded-lg shadow border px-4 py-16 text-center">
             <p className="text-gray-500 mb-4">Keranjang Anda masih kosong.</p>
             <Link
-              href={`/${storeDomain}`}
+              href="/"
               className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
             >
               Mulai Belanja
@@ -431,6 +432,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           </div>
         )}
       </main>
+
+      <StoreFooter />
     </div>
   )
 }

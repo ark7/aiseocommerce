@@ -3,8 +3,9 @@ import {
   checkVoucherClaimable,
   checkVoucherUsable,
   resolveVoucherDiscount,
+  VoucherRules,
+  VoucherRejection,
 } from '@/lib/voucher';
-import type { VoucherRejection, VoucherRules } from '@/lib/voucher';
 
 const NOW = new Date('2026-10-01T12:00:00.000Z');
 const UNUSED = { usedAt: null };

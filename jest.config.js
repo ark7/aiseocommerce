@@ -3,7 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/__tests__'],
-  testMatch: ['**/__tests__/**/*.test.(ts|js)'],
+  testMatch: ['**/__tests__/**/*.test.(ts|js|tsx)'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^@lib/(.*)$': '<rootDir>/lib/$1',
@@ -12,7 +12,9 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.cjs'],
   transform: {
     '^.+\\.[tj]sx?$': ['ts-jest', {
-      tsconfig: 'tsconfig.json',
+      tsconfig: {
+        jsx: 'react-jsx',
+      },
     }],
   },
   collectCoverageFrom: [

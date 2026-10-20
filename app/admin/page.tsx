@@ -175,7 +175,7 @@ export default function AdminDashboard() {
       {/* Quick Actions */}
       <div className="bg-white p-6 rounded-lg shadow border">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Aksi Cepat</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Link
             href="/admin/products/add"
             className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Tambah Produk</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Tambah Produk</span>
           </Link>
           
           <Link
@@ -197,7 +197,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Daftar Produk</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Daftar Produk</span>
           </Link>
           
           <Link
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Kelola Pesanan</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Kelola Pesanan</span>
           </Link>
           
           <Link
@@ -221,7 +221,27 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Kelola Kategori</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Kelola Kategori</span>
+          </Link>
+
+          <Link
+            href="/admin/cms"
+            className="flex flex-col items-center p-4 bg-indigo-50/60 rounded-lg hover:bg-indigo-100/70 border border-indigo-100 transition-colors"
+          >
+            <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center mb-2 text-white">
+              <span className="text-xl">📝</span>
+            </div>
+            <span className="text-sm font-bold text-indigo-900 text-center">CMS & Konten</span>
+          </Link>
+
+          <Link
+            href="/admin/articles"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mb-2">
+              <span className="text-xl">📰</span>
+            </div>
+            <span className="text-sm font-medium text-gray-700 text-center">Tulis Artikel</span>
           </Link>
         </div>
       </div>

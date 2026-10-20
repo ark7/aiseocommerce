@@ -1,9 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getIPAddress } from '@/lib/ip';
 import { allow } from '@/lib/rateLimit';
 import { FunnelEventSchema } from '@/lib/funnelEvents';
+import { verifyGuestToken } from '@/lib/guestSession';
+import { verifyToken } from '@/lib/auth';
 
 /** A browser legitimately emits a handful of these per product page. */
 const LIMIT_PER_MINUTE = 60;
@@ -19,15 +21,12 @@ const MAX_BODY_BYTES = 4 * 1024;
  * per address, size capped, every field schema-checked, and the store is
  * resolved from the domain rather than trusted from the body.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     if (!allow(`events:${getIPAddress(request)}`, LIMIT_PER_MINUTE)) {
       return NextResponse.json({ error: 'Too many events' }, { status: 429 });
     }
 
-    // Measured on the bytes that actually arrived rather than on a
-    // content-length header: a chunked request sends none, and the header is the
-    // caller's to lie about.
     const raw = await request.text();
     if (raw.length > MAX_BODY_BYTES) {
       return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
@@ -44,7 +43,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: 'Invalid event' }, { status: 400 });
     }
-    const { storeDomain, productId, step, sessionId, attribution } = parsed.data;
+    const { storeDomain, productId, step, attribution } = parsed.data;
 
     // One query answers both questions that matter: does this product exist, and
     // does it belong to the store the visitor was actually browsing. An event
@@ -57,12 +56,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unknown product' }, { status: 404 });
     }
 
+    // Resolve Session ID from Token
+    const token = request.cookies?.get('token')?.value;
+    let finalSessionId = 'anonymous';
+
+    if (token) {
+      const user = await verifyToken(token);
+      if (user) {
+        finalSessionId = user.id;
+      } else {
+        const guest = await verifyGuestToken(token);
+        if (guest) {
+          finalSessionId = guest.sub;
+        }
+      }
+    }
+
     await prisma.productEvent.create({
       data: {
         storeId: product.storeId,
         productId: product.id,
         type: step,
-        sessionId,
+        sessionId: finalSessionId,
         attribution: attribution ?? undefined,
       },
     });

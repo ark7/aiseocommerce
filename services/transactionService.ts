@@ -34,6 +34,18 @@ export class VoucherError extends Error {
 }
 
 /**
+ * How long an unpaid order may hold the stock and sale quota it reserved.
+ *
+ * Long enough to finish a bank transfer, short enough that an abandoned
+ * checkout puts the discounted units back the same day. Only orders that are
+ * still PENDING are ever released, so a paid order is never affected.
+ */
+function reservationTtlMs(): number {
+  const minutes = Number(process.env.ORDER_RESERVATION_MINUTES);
+  return (Number.isFinite(minutes) && minutes > 0 ? minutes : 120) * 60_000;
+}
+
+/**
  * Write the INCOME ledger row that puts a paid order's money into the books,
  * once per order. Every path that marks an order paid (admin status change,
  * manual payment approval, gateway webhook) funnels through here, so finance
@@ -122,6 +134,10 @@ export async function createOrder(
         shippingCost: 0,
         discount: 0,
         status: 'PENDING', // initial status before payment
+        // An unpaid order holds real stock and real sale quota. Without a
+        // deadline it holds them forever, and an abandoned cart can empty a
+        // promotion without anyone buying anything.
+        reservationExpiresAt: new Date(now.getTime() + reservationTtlMs()),
         // Campaign source for paid traffic; omitted when the order arrived
         // with no attribution at all (direct or organic).
         ...(attribution && Object.keys(attribution).length > 0
@@ -376,6 +392,46 @@ export async function releaseStock(
   }
 }
 
+export interface ReleaseExpiredResult {
+  released: number;
+  failed: string[];
+}
+
+/**
+ * Cancel unpaid orders whose reservation has run out, giving back their stock,
+ * their sale quota and their voucher.
+ *
+ * Nothing is corrupted while this does not run — a stale reservation only
+ * shrinks what is available. But a promotion whose quota is held by abandoned
+ * checkouts is a promotion nobody can buy, so this wants running on a schedule
+ * (see `app/api/cron/release-expired`).
+ *
+ * Bounded by `limit` on purpose: each order is unwound in its own transaction,
+ * so a large backlog drains over several runs instead of holding one long one.
+ */
+export async function releaseExpiredReservations(
+  limit: number = 50,
+  now: Date = new Date()
+): Promise<ReleaseExpiredResult> {
+  const expired = await prisma.order.findMany({
+    where: { status: 'PENDING', reservationExpiresAt: { lte: now } },
+    orderBy: { reservationExpiresAt: 'asc' },
+    take: limit,
+    select: { id: true },
+  });
+
+  let released = 0;
+  const failed: string[] = [];
+
+  for (const { id } of expired) {
+    const result = await releaseStock(id);
+    if (result.success) released += 1;
+    else failed.push(id);
+  }
+
+  return { released, failed };
+}
+
 export async function addStock(
   productId: string,
   quantity: number,
@@ -572,7 +628,7 @@ export async function getLowStockProducts(storeId: string, threshold: number = 5
   }
 }
 
-export default { createOrder, processOrderPayment, releaseStock,
+export default { createOrder, processOrderPayment, releaseStock, releaseExpiredReservations,
   addStock,
   adjustStock,
   recordExpense,

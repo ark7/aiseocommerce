@@ -18,6 +18,9 @@ jest.mock('@/lib/auth', () => ({ requireUser: jest.fn() }));
 jest.mock('@/lib/logger', () => ({
   logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
 }));
+jest.mock('@/services/auditService', () => ({
+  auditVoucherCreated: jest.fn().mockResolvedValue(undefined),
+}));
 
 const ADMIN = { id: 'user-1', storeId: 'store-1', role: 'ADMIN' };
 

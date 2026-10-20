@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/events/route';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
@@ -25,7 +26,7 @@ const VALID = {
 };
 
 function post(body: unknown, ip: string = ADDRESS) {
-  return new Request('http://localhost/api/events', {
+  return new NextRequest('http://localhost/api/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-forwarded-for': ip },
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -56,7 +57,7 @@ describe('POST /api/events', () => {
       storeId: 'store-1',
       productId: 'product-1',
       type: 'VIEW',
-      sessionId: 'session-abcdef12',
+      sessionId: 'anonymous',
       attribution: undefined,
     });
   });

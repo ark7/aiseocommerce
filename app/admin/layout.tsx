@@ -77,6 +77,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Dashboard', href: '/admin', icon: 'HomeIcon' },
     { name: 'Produk', href: '/admin/products', icon: 'PackageIcon' },
     { name: 'Kategori', href: '/admin/categories', icon: 'FolderIcon' },
+    { name: 'CMS & Konten', href: '/admin/cms', icon: 'TemplateIcon' },
+    { name: 'Artikel', href: '/admin/articles', icon: 'DocumentTextIcon' },
     { name: 'Pesanan', href: '/admin/orders', icon: 'ShoppingBagIcon' },
     { name: 'Pelanggan', href: '/admin/customers', icon: 'UsersIcon' },
     { name: 'Keuangan', href: '/admin/finance', icon: 'CreditCardIcon' },
@@ -99,6 +101,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     FolderIcon: () => (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+      </svg>
+    ),
+    TemplateIcon: () => (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    ),
+    DocumentTextIcon: () => (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     ),
     ShoppingBagIcon: () => (
@@ -163,7 +175,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <ul className="space-y-2">
             {navigation.map((item) => {
               const Icon = IconComponent[item.icon];
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href + '/'));
               return (
                 <li key={item.name}>
                   <Link

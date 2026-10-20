@@ -1,50 +1,68 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
+import { getActiveStore } from '@/lib/store';
+import CookieConsentBanner from '@/components/CookieConsentBanner';
 
-const inter = Inter({ subsets: ['latin'] });
+export async function generateMetadata(): Promise<Metadata> {
+  const store = await getActiveStore();
+  const s = store?.settings;
 
-export const metadata: Metadata = {
-  title: {
-    default: 'AI SEO E-Commerce SaaS',
-    template: '%s | %s',
-  },
-  description: 'Platform E-Commerce SaaS dengan SEO Friendly, Keamanan Tinggi, dan Fitur Lengkap',
-  keywords: 'e-commerce, saas, toko online, belanja online, platform ecommerce',
-  authors: [{ name: 'E-Commerce SaaS Team' }],
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 },
-  },
-  openGraph: {
-    title: 'AI SEO E-Commerce SaaS',
-    description: 'Platform E-Commerce SaaS dengan SEO Friendly, Keamanan Tinggi, dan Fitur Lengkap',
-    url: 'https://ecommerce-saas.example.com',
-    siteName: 'AI SEO E-Commerce SaaS',
-    images: [{ url: 'https://ecommerce-saas.example.com/og-image.png', width: 1200, height: 630 }],
-    locale: 'id_ID',
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'AI SEO E-Commerce SaaS',
-    description: 'Platform E-Commerce SaaS dengan SEO Friendly, Keamanan Tinggi, dan Fitur Lengkap',
-    images: ['https://ecommerce-saas.example.com/twitter-image.png'],
-  },
-  icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
-  },
-  manifest: '/site.webmanifest',
-};
+  const title = s?.defaultSeoTitle || store?.name || 'AI SEO E-Commerce SaaS';
+  const description = s?.defaultSeoDescription || s?.tagline || 'Platform E-Commerce SaaS dengan SEO Friendly, Keamanan Tinggi, dan Fitur Lengkap';
+  const domain = store?.domain || 'localhost:3000';
+  const siteUrl = `https://${domain}`;
+  const favicon = s?.favicon || '/favicon.ico';
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return {
+    title: {
+      default: title,
+      template: `%s | ${store?.name || 'Toko Online'}`,
+    },
+    description,
+    keywords: 'e-commerce, belanja online, toko online, produk berkualitas',
+    metadataBase: new URL(siteUrl),
+    openGraph: {
+      title,
+      description,
+      url: siteUrl,
+      siteName: store?.name || 'Toko Online',
+      locale: 'id_ID',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+    icons: {
+      icon: favicon,
+      shortcut: favicon,
+      apple: favicon,
+    },
+  };
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const store = await getActiveStore();
+  const primaryColor = store?.settings?.primaryColor || '#4F46E5';
+  const fontFamily = store?.settings?.fontFamily || 'inter';
+
   return (
     <html lang="id">
-      <body className={inter.className}>
+      <head>
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `:root { --brand-primary: ${primaryColor}; }`,
+          }}
+        />
+      </head>
+      <body className={`font-${fontFamily} antialiased`}>
         {children}
+        <CookieConsentBanner
+          enabled={store?.settings?.cookieConsentEnabled ?? true}
+          title={store?.settings?.cookieConsentTitle}
+          text={store?.settings?.cookieConsentText}
+        />
       </body>
     </html>
   );

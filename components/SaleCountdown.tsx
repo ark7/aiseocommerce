@@ -1,55 +1,52 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react';
 
 interface SaleCountdownProps {
-  /** ISO string dari API, Date dari server, atau null untuk tanpa batas waktu. */
-  endsAt: string | Date | null
+  endsAt: string | null;
 }
 
-function format(totalSeconds: number): string {
-  const pad = (part: number) => String(part).padStart(2, '0')
-
-  const days = Math.floor(totalSeconds / 86_400)
-  const hours = Math.floor((totalSeconds % 86_400) / 3_600)
-  const minutes = Math.floor((totalSeconds % 3_600) / 60)
-  const seconds = totalSeconds % 60
-
-  return days > 0
-    ? `${days} hari ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-    : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-}
-
-/**
- * Countdown for a discount window. Purely cosmetic: whether the discount
- * actually applies is decided by `lib/pricing` on the server, so a wrong or
- * deliberately changed client clock cannot buy anything at the sale price.
- *
- * Renders nothing until the first tick on the client — the server has no
- * meaningful "now" to render, and guessing one causes a hydration mismatch.
- */
-export default function SaleCountdown({ endsAt }: SaleCountdownProps) {
-  const [now, setNow] = useState<number | null>(null)
+export function SaleCountdown({ endsAt }: SaleCountdownProps) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
-    if (!endsAt) return
+    if (!endsAt) return;
 
-    setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(id)
-  }, [endsAt])
+    const endDate = new Date(endsAt);
+    const now = new Date();
 
-  if (!endsAt || now === null) return null
+    if (endDate <= now) {
+      setTimeLeft('Berakhir');
+      return;
+    }
 
-  const remaining = Math.max(0, Math.floor((new Date(endsAt).getTime() - now) / 1_000))
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = endDate.getTime() - now.getTime();
 
-  if (remaining <= 0) {
-    return <span className="text-xs font-medium text-red-600">Penawaran berakhir</span>
-  }
+      if (diff <= 0) {
+        setTimeLeft('Berakhir');
+        return;
+      }
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+    };
+
+    updateCountdown();
+    const intervalId = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [endsAt]);
+
+  if (!endsAt) return null;
 
   return (
-    <span className="text-xs font-medium text-orange-600">
-      Berakhir dalam <span className="tabular-nums">{format(remaining)}</span>
+    <span className="text-xs font-medium text-red-600">
+      {timeLeft}
     </span>
-  )
+  );
 }

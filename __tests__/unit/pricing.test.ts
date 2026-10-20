@@ -1,5 +1,4 @@
-import { isSaleActive, resolveUnitPrice, saleRemaining } from '@/lib/pricing';
-import type { SalePricing } from '@/lib/pricing';
+import { isSaleActive, resolveUnitPrice, saleRemaining, SalePricing } from '@/lib/pricing';
 
 const NOW = new Date('2026-10-01T12:00:00.000Z');
 
@@ -73,7 +72,7 @@ describe('harga coret berkuota dan berbatas waktu', () => {
     expect(isSaleActive(product({ saleStartsAt: '2026-10-02T00:00:00.000Z' }), NOW)).toBe(false);
   });
 
-  it('menagih harga jual, bukan harga coret, saat kuota baru saja habis', () => {
+  it('mengagih harga jual, bukan harga coret, saat kuota baru saja habis', () => {
     const p = product({ saleQuota: 100, saleSold: 100 });
 
     expect(resolveUnitPrice(p, NOW)).toBe(p.sellingPrice);

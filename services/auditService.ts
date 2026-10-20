@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 export type AuditEntityType =
   | 'ORDER' | 'PAYMENT' | 'PRODUCT' | 'USER' | 'STORE'
   | 'CATEGORY' | 'LEDGER' | 'STOCK' | 'PETTY_CASH' | 'SETTING'
+  | 'VOUCHER'
   // Finance ledger picklist, distinct from the product `CATEGORY` above.
   | 'LEDGER_CATEGORY';
 
@@ -188,6 +189,25 @@ export async function auditProductCreated(
     'CREATE',
     'PRODUCT',
     productId,
+    userId,
+    storeId,
+    null,
+    data,
+    ipAddress
+  );
+}
+
+export async function auditVoucherCreated(
+  voucherId: string,
+  userId: string,
+  storeId: string,
+  data: Record<string, any>,
+  ipAddress?: string
+): Promise<void> {
+  await logAuditAction(
+    'CREATE',
+    'VOUCHER',
+    voucherId,
     userId,
     storeId,
     null,

@@ -52,7 +52,7 @@ export default function AddToCartButton({ productId, storeDomain, price, name, s
       // sent: the funnel counts visitors who reached a step, not units.
       trackFunnelEvent('ADD_TO_CART', { productId, storeDomain });
 
-      router.push(`/${storeDomain}/cart`);
+      router.push('/cart');
     } catch {
       setError('Failed to add to cart');
     } finally {
