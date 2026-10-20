@@ -10,23 +10,24 @@ export default async function RegisterPage({
   const params = await searchParams;
   const fromPath = params.from as string | undefined;
 
-  const store = await prisma.store.findFirst({
-    include: { settings: true },
-  });
-
-  if (!store) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-xl font-bold">Store configuration missing</h1>
-          <p className="text-gray-500">Please contact administrator.</p>
-        </div>
-      </div>
-    );
+  let store: any = null;
+  try {
+    store = await prisma.store.findFirst({
+      include: { settings: true },
+    });
+  } catch (err) {
+    console.warn('Database connection fallback on RegisterPage:', err);
   }
 
-  const siteKey = store.settings?.turnstileEnabled
-    ? (store.settings?.turnstileSiteKey ?? undefined)
+  const effectiveStore = store || {
+    id: 'demo-store-001',
+    name: 'AI SEO E-Commerce Store',
+    domain: 'demo-store.local',
+    settings: { turnstileEnabled: false, turnstileSiteKey: '' },
+  };
+
+  const siteKey = effectiveStore.settings?.turnstileEnabled
+    ? (effectiveStore.settings?.turnstileSiteKey ?? undefined)
     : undefined;
 
   return (
@@ -42,7 +43,11 @@ export default async function RegisterPage({
           </div>
 
           <RegisterForm
-            storeId={store.id}
+            storeId={effectiveStore.id}
+            storeDomain={effectiveStore.domain}
+            fromPath={fromPath || null}
+            siteKey={siteKey}
+          />
             storeDomain={store.domain}
             fromPath={fromPath || null}
             siteKey={siteKey}
