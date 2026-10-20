@@ -43,14 +43,39 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const orderBy = searchParams.get('orderBy') || 'createdAt';
     const orderDirection = searchParams.get('orderDirection') || 'desc';
 
+    const where: any = { storeId: user.storeId };
+    if (search) {
+      where.OR = [
+        { code: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
+
     const [vouchers, total] = await Promise.all([
       prisma.voucher.findMany({
-        where: { storeId: user.storeId },
+        where,
         orderBy: { [orderBy]: orderDirection },
         skip: (page - 1) * limit,
         take: limit,
@@ -74,7 +99,7 @@ export async function GET(request: Request) {
           },
         },
       }),
-      prisma.voucher.count({ where: { storeId: user.storeId } }),
+      prisma.voucher.count({ where }),
     ]);
 
     const enrichedVouchers = (vouchers || []).map((voucher: any) => {

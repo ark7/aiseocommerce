@@ -5,6 +5,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
+import Pagination from '@/components/common/Pagination';
+
+interface CategoriesListPageProps {
+  searchParams?: {
+    page?: string;
+    search?: string;
+  };
+}
 
 export const revalidate = 300;
 
@@ -22,23 +30,57 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function CategoriesListPage() {
+export default async function CategoriesListPage({ searchParams }: CategoriesListPageProps) {
   const store = await getActiveStore();
   if (!store) notFound();
 
-  const categories = await prisma.category.findMany({
-    where: { storeId: store.id },
-    include: {
-      _count: {
-        select: {
-          products: {
-            where: { isPublished: true },
+  const search = searchParams?.search?.trim() || '';
+  const page = Math.max(1, Number(searchParams?.page) || 1);
+  const pageSize = Math.max(1, store.settings?.defaultPageSize || 10);
+  const skip = (page - 1) * pageSize;
+
+  const whereCondition: any = {
+    storeId: store.id,
+  };
+
+  if (search) {
+    whereCondition.OR = [
+      { name: { contains: search, mode: 'insensitive' } },
+      { description: { contains: search, mode: 'insensitive' } },
+    ];
+  }
+
+  const [categories, total] = await Promise.all([
+    prisma.category.findMany({
+      where: whereCondition,
+      include: {
+        _count: {
+          select: {
+            products: {
+              where: { isPublished: true },
+            },
           },
         },
       },
-    },
-    orderBy: { name: 'asc' },
-  });
+      orderBy: { name: 'asc' },
+      skip,
+      take: pageSize,
+    }),
+    prisma.category.count({ where: whereCondition }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const base = '/categories';
+
+  const queryFor = (overrides: { page?: number; search?: string }) => {
+    const sp = new URLSearchParams();
+    const nextSearch = overrides.search !== undefined ? overrides.search : search;
+    if (nextSearch) sp.set('search', nextSearch);
+    const nextPage = overrides.page !== undefined ? overrides.page : page;
+    if (nextPage > 1) sp.set('page', String(nextPage));
+    const qs = sp.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -57,14 +99,42 @@ export default async function CategoriesListPage() {
           <p className="mt-3 text-lg text-gray-500">
             Temukan produk yang Anda cari berdasarkan kategori pilihan kami.
           </p>
+
+          <form method="get" action={base} className="mt-6 flex max-w-md mx-auto gap-2">
+            <input
+              type="search"
+              name="search"
+              defaultValue={search}
+              placeholder="Cari kategori..."
+              className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm px-4 py-2"
+            />
+            <button
+              type="submit"
+              className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+            >
+              Cari
+            </button>
+            {search && (
+              <Link
+                href={base}
+                className="bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium flex items-center"
+              >
+                Reset
+              </Link>
+            )}
+          </form>
         </div>
 
         {categories.length === 0 ? (
           <div className="bg-white rounded-xl border border-dashed border-gray-300 p-12 text-center">
             <span className="text-4xl mb-3 block">📁</span>
-            <h3 className="text-lg font-medium text-gray-900">Belum ada kategori</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              {search ? `Tidak ada kategori cocok dengan "${search}"` : 'Belum ada kategori'}
+            </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Kategori produk akan segera ditambahkan oleh pengelola toko.
+              {search
+                ? 'Silakan coba kata kunci lain atau hapus filter pencarian.'
+                : 'Kategori produk akan segera ditambahkan oleh pengelola toko.'}
             </p>
             <div className="mt-6">
               <Link
@@ -76,32 +146,50 @@ export default async function CategoriesListPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                href={`/category/${category.slug}`}
-                className="group flex flex-col bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all text-center"
-              >
-                <div className="w-16 h-16 mx-auto mb-4 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 transition-colors">
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-                <h2 className="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
-                  {category.name}
-                </h2>
-                {category.description && (
-                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                    {category.description}
-                  </p>
-                )}
-                <div className="mt-4 pt-3 border-t border-gray-100 text-xs font-medium text-gray-400 group-hover:text-indigo-600">
-                  {category._count.products} produk tersedia &rarr;
-                </div>
-              </Link>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/category/${category.slug}`}
+                  className="group flex flex-col bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all text-center"
+                >
+                  <div className="w-16 h-16 mx-auto mb-4 bg-indigo-50 group-hover:bg-indigo-100 rounded-2xl flex items-center justify-center text-indigo-600 transition-colors">
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
+                    </svg>
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                    {category.name}
+                  </h2>
+                  {category.description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      {category.description}
+                    </p>
+                  )}
+                  <div className="mt-4 pt-3 border-t border-gray-100 text-xs font-medium text-gray-400 group-hover:text-indigo-600">
+                    {category._count.products} produk tersedia &rarr;
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-8">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={total}
+                limit={pageSize}
+                createPageUrl={(p) => queryFor({ page: p })}
+                showLimitSelector={false}
+              />
+            </div>
+          </>
         )}
       </main>
 
@@ -117,4 +205,3 @@ export default async function CategoriesListPage() {
     </div>
   );
 }
-

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 interface Voucher {
   id: string;
@@ -95,6 +97,34 @@ export default function AdminPromoPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Pagination & Filter state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
+
   const authHeaders = useCallback((): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -104,7 +134,15 @@ export default function AdminPromoPage() {
     try {
       setError(null);
       const headers = authHeaders();
-      const response = await fetch('/api/admin/vouchers', { headers });
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+      if (search) params.set('search', search);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+
+      const response = await fetch(`/api/admin/vouchers?${params.toString()}`, { headers });
 
       if (response.status === 401) {
         setError('Sesi telah berakhir atau Anda belum login.');
@@ -115,12 +153,14 @@ export default function AdminPromoPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Gagal memuat voucher');
       setVouchers(data.vouchers ?? []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotal(data.pagination?.total || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat voucher');
     } finally {
       setIsLoading(false);
     }
-  }, [authHeaders]);
+  }, [page, limit, search, startDate, endDate, authHeaders]);
 
   useEffect(() => {
     load();
@@ -529,11 +569,36 @@ export default function AdminPromoPage() {
       </form>
 
       <section className="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Daftar Voucher &amp; Evaluasi Performa</h2>
-          <span className="text-xs text-gray-500 font-medium">
-            {vouchers.length} voucher terdaftar
-          </span>
+        <div className="px-6 py-4 border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Daftar Voucher &amp; Evaluasi Performa</h2>
+            <span className="text-xs text-gray-500 font-medium">
+              {total > 0 ? `${total} voucher terdaftar` : `${vouchers.length} voucher terdaftar`}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="search"
+              placeholder="Cari kode/nama..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 w-full sm:w-44"
+            />
+            <DateRangeFilter
+              compact
+              startDate={startDate}
+              endDate={endDate}
+              onFilterChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
 
         {isLoading ? (
@@ -651,6 +716,20 @@ export default function AdminPromoPage() {
             ))}
           </ul>
         )}
+
+        <div className="p-4 border-t border-gray-200">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            limit={limit}
+            onPageChange={(p) => setPage(p)}
+            onLimitChange={(l) => {
+              setLimit(l);
+              setPage(1);
+            }}
+          />
+        </div>
       </section>
     </div>
   );

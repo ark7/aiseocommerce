@@ -9,6 +9,7 @@ jest.mock('@/lib/prisma', () => ({
     landingPage: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      count: jest.fn().mockResolvedValue(1),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),

@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { OrderStatus } from '@prisma/client';
 import { REVENUE_STATUSES, STATUS_LABELS } from '@/lib/orderStatus';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 interface OrderRow {
   id: string;
@@ -60,8 +62,29 @@ function AdminOrdersContent() {
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
 
   useEffect(() => {
     const s = searchParams.get('status') ?? '';
@@ -82,6 +105,8 @@ function AdminOrdersContent() {
 
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (status) params.set('status', status);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
 
       const response = await fetch(`/api/orders?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -100,7 +125,7 @@ function AdminOrdersContent() {
     } finally {
       setLoading(false);
     }
-  }, [status, page, limit]);
+  }, [status, page, limit, startDate, endDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -141,34 +166,35 @@ function AdminOrdersContent() {
       </div>
 
       <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <div className="px-4 py-3 border-b flex flex-wrap items-center gap-2">
-          {STATUS_FILTERS.map((filter) => (
-            <button
-              key={filter.value}
-              onClick={() => changeStatus(filter.value)}
-              className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                status === filter.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {filter.label}
-            </button>
-          ))}
+        <div className="px-4 py-3 border-b flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => changeStatus(filter.value)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  status === filter.value
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
 
-          <label className="ml-auto flex items-center gap-2 text-sm text-gray-600">
-            Baris
-            <select
-              value={limit}
-              onChange={(event) => changeLimit(Number(event.target.value))}
-              className="px-2 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              aria-label="Jumlah baris per halaman"
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-          </label>
+          <div className="flex items-center gap-2">
+            <DateRangeFilter
+              compact
+              startDate={startDate}
+              endDate={endDate}
+              onFilterChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
 
         {error && (
@@ -241,25 +267,19 @@ function AdminOrdersContent() {
           </div>
         )}
 
-        {!loading && totalPages > 1 && (
-          <div className="px-4 py-3 border-t flex items-center justify-between">
-            <button
-              onClick={() => setPage((current) => Math.max(current - 1, 1))}
-              disabled={page <= 1}
-              className="px-3 py-1 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              Sebelumnya
-            </button>
-            <span className="text-sm text-gray-500">
-              Halaman {page} dari {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-              disabled={page >= totalPages}
-              className="px-3 py-1 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              Berikutnya
-            </button>
+        {!loading && (
+          <div className="px-4 py-3 border-t">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={total}
+              limit={limit}
+              onPageChange={(p) => setPage(p)}
+              onLimitChange={(l) => {
+                setLimit(l);
+                setPage(1);
+              }}
+            />
           </div>
         )}
       </div>

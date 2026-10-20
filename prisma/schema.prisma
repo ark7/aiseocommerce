@@ -68,6 +68,7 @@ model StoreSettings {
   heroImageUrl          String?
   primaryColor          String?  @default("#4F46E5")
   fontFamily            String?  @default("inter")
+  defaultPageSize       Int      @default(10)
   socialLinks           Json?
   termsContent          String?  @db.Text
   privacyContent        String?  @db.Text

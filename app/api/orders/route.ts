@@ -48,12 +48,28 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 50, 1), 100)
+    const startDate = searchParams.get('startDate')
+    const endDate = searchParams.get('endDate')
+    const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 10, 1), 100)
     const page = Math.max(Number(searchParams.get('page')) || 1, 1)
 
-    const where: { storeId: string; status?: OrderStatus; userId?: string } = { storeId: user.storeId }
+    const where: { storeId: string; status?: OrderStatus; userId?: string; createdAt?: any } = { storeId: user.storeId }
     if (status) where.status = status as OrderStatus
     if (user.role === 'CUSTOMER') where.userId = user.id
+    if (startDate || endDate) {
+      where.createdAt = {}
+      if (startDate) {
+        const start = new Date(startDate)
+        if (!isNaN(start.getTime())) where.createdAt.gte = start
+      }
+      if (endDate) {
+        const end = new Date(endDate)
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999)
+          where.createdAt.lte = end
+        }
+      }
+    }
 
     const [orders, total] = await Promise.all([
       prisma.order.findMany({

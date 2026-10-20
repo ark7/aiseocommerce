@@ -35,7 +35,7 @@ describe('GET /api/orders pagination', () => {
     await list();
 
     expect(prisma.order.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 0, take: 50 })
+      expect.objectContaining({ skip: 0, take: 10 })
     );
   });
 

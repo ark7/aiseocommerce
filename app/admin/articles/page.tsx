@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ArticleForm } from '@/components/ArticleForm';
 import { ArticlePreview } from '@/components/ArticlePreview';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 interface ArticleItem {
   id: string;
@@ -26,6 +28,34 @@ export default function AdminArticlesPage() {
   const [currentArticle, setCurrentArticle] = useState<ArticleItem | undefined>(undefined);
   const [previewData, setPreviewData] = useState<any>(null);
 
+  // Pagination & filter state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
+
   const authHeaders = useCallback((): Record<string, string> => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return token ? { Authorization: `Bearer ${token}` } : {};
@@ -34,19 +64,30 @@ export default function AdminArticlesPage() {
   const fetchArticles = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/articles', { headers: authHeaders() });
+      const params = new URLSearchParams({
+        paginate: 'true',
+        page: String(page),
+        limit: String(limit),
+      });
+      if (search) params.set('search', search);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+
+      const res = await fetch(`/api/articles?${params.toString()}`, { headers: authHeaders() });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
         throw new Error(json?.error || 'Gagal memuat artikel');
       }
       const data = await res.json();
       setArticles(data.articles || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotal(data.pagination?.total || 0);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [authHeaders]);
+  }, [page, limit, search, startDate, endDate, authHeaders]);
 
   useEffect(() => {
     fetchArticles();
@@ -153,6 +194,28 @@ export default function AdminArticlesPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <input
+              type="search"
+              placeholder="Cari judul atau isi artikel..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 w-full sm:w-64"
+            />
+            <DateRangeFilter
+              compact
+              startDate={startDate}
+              endDate={endDate}
+              onFilterChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+            />
+          </div>
           <table className="w-full text-left">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -243,6 +306,20 @@ export default function AdminArticlesPage() {
               )}
             </tbody>
           </table>
+
+          <div className="p-4 border-t border-gray-200">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalItems={total}
+              limit={limit}
+              onPageChange={(p) => setPage(p)}
+              onLimitChange={(l) => {
+                setLimit(l);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

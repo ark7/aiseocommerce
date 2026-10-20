@@ -22,6 +22,7 @@ interface StoreForm {
   phone: string;
   email: string;
   socialLinks: SocialLinks;
+  defaultPageSize: number;
   defaultSeoTitle: string;
   defaultSeoDescription: string;
 }
@@ -84,6 +85,7 @@ const EMPTY_STORE_FORM: StoreForm = {
   phone: '',
   email: '',
   socialLinks: { instagram: '', facebook: '', tiktok: '', youtube: '', whatsapp: '' },
+  defaultPageSize: 10,
   defaultSeoTitle: '',
   defaultSeoDescription: '',
 };
@@ -181,6 +183,7 @@ export default function AdminSettingsPage() {
           phone: store.phone || '',
           email: store.email || '',
           socialLinks: s.socialLinks || {},
+          defaultPageSize: s.defaultPageSize ?? 10,
           defaultSeoTitle: s.defaultSeoTitle || '',
           defaultSeoDescription: s.defaultSeoDescription || '',
         });
@@ -293,6 +296,7 @@ export default function AdminSettingsPage() {
         phone: storeForm.phone,
         email: storeForm.email,
         socialLinks: storeForm.socialLinks,
+        defaultPageSize: Number(storeForm.defaultPageSize) || 10,
         defaultSeoTitle: storeForm.defaultSeoTitle,
         defaultSeoDescription: storeForm.defaultSeoDescription,
       };
@@ -680,11 +684,52 @@ export default function AdminSettingsPage() {
           </div>
 
           <div className="border-b border-gray-100 pt-4 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Pengaturan SEO Default</h2>
-            <p className="text-sm text-gray-500">Judul dan deskripsi yang dibaca Google dan dibagikan ke WhatsApp/Facebook.</p>
+            <h2 className="text-lg font-semibold text-gray-900">Pengaturan Tampilan Daftar &amp; SEO Default</h2>
+            <p className="text-sm text-gray-500">Konfigurasi pagination tabel/list serta judul dan deskripsi default toko.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Default Jumlah Item per Halaman (Pagination)
+              </label>
+              <p className="text-xs text-gray-500 mt-0.5 mb-2.5">
+                Menentukan jumlah baris data default per halaman untuk seluruh tabel dan daftar (produk, pesanan, pelanggan, artikel, dll). Default bawaan: 10.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {[10, 20, 25, 50, 100].map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setStoreForm({ ...storeForm, defaultPageSize: size })}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                      Number(storeForm.defaultPageSize) === size
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {size} item
+                  </button>
+                ))}
+                <div className="flex items-center gap-1.5 ml-2">
+                  <span className="text-xs text-gray-500">Kustom:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={storeForm.defaultPageSize || 10}
+                    onChange={(e) =>
+                      setStoreForm({
+                        ...storeForm,
+                        defaultPageSize: Math.max(1, Math.min(100, parseInt(e.target.value) || 10)),
+                      })
+                    }
+                    className="w-20 rounded-lg border border-gray-300 px-2.5 py-1 text-xs focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700">Default Meta Title</label>
               <input

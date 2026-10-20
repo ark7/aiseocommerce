@@ -2,15 +2,22 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { resolveUnitPrice } from '@/lib/pricing';
 import { generateCategorySEO } from '@/lib/seo';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
+import Pagination from '@/components/common/Pagination';
 
 interface CategoryPageProps {
   params: { slug: string };
+  searchParams?: {
+    page?: string;
+    startDate?: string;
+    endDate?: string;
+  };
 }
 
 export const revalidate = 300;
@@ -24,46 +31,28 @@ function formatIDR(amount: number) {
   }).format(amount);
 }
 
-async function loadCategory(slug: string) {
-  const store = await getActiveStore();
-  if (!store) return null;
-
-  const category = await prisma.category.findUnique({
-    where: { storeId_slug: { storeId: store.id, slug } },
-    include: {
-      products: {
-        where: { isPublished: true },
-        orderBy: { createdAt: 'desc' },
-        take: 48,
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          sellingPrice: true,
-          discountPrice: true,
-          saleStartsAt: true,
-          saleEndsAt: true,
-          saleQuota: true,
-          saleSold: true,
-          images: { where: { isPrimary: true }, take: 1 },
-        },
-      },
-    },
-  });
-  if (!category) return null;
-
-  return { store, category };
+function formatDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   try {
-    const data = await loadCategory(params.slug);
-    if (!data) return { title: 'Category Not Found' };
+    const store = await getActiveStore();
+    if (!store) return { title: 'Category Not Found' };
+
+    const category = await prisma.category.findUnique({
+      where: { storeId_slug: { storeId: store.id, slug: params.slug } },
+      select: { name: true, slug: true, description: true },
+    });
+    if (!category) return { title: 'Category Not Found' };
 
     const seo = generateCategorySEO(
-      data.category.name,
-      data.store.name,
-      data.category.description ?? undefined
+      category.name,
+      store.name,
+      category.description ?? undefined
     );
 
     return {
@@ -73,11 +62,11 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       openGraph: {
         title: seo.ogTitle || seo.title,
         description: seo.ogDescription || seo.description,
-        url: `/category/${data.category.slug}`,
+        url: `/category/${category.slug}`,
         type: 'website',
-        siteName: data.store.name,
+        siteName: store.name,
       },
-      alternates: { canonical: `/category/${data.category.slug}` },
+      alternates: { canonical: `/category/${category.slug}` },
       robots: { index: true, follow: true },
     };
   } catch {
@@ -85,11 +74,89 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   }
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-  const data = await loadCategory(params.slug);
-  if (!data) return notFound();
+export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
+  const store = await getActiveStore();
+  if (!store) return notFound();
 
-  const { store, category } = data;
+  const category = await prisma.category.findUnique({
+    where: { storeId_slug: { storeId: store.id, slug: params.slug } },
+  });
+  if (!category) return notFound();
+
+  const page = Math.max(1, Number(searchParams?.page) || 1);
+  const pageSize = Math.max(1, store.settings?.defaultPageSize || 10);
+  const skip = (page - 1) * pageSize;
+  const startDate = searchParams?.startDate;
+  const endDate = searchParams?.endDate;
+
+  const whereProduct: Prisma.ProductWhereInput = {
+    storeId: store.id,
+    categoryId: category.id,
+    isPublished: true,
+  };
+
+  if (startDate || endDate) {
+    whereProduct.createdAt = {};
+    if (startDate) {
+      const s = new Date(startDate);
+      s.setHours(0, 0, 0, 0);
+      whereProduct.createdAt.gte = s;
+    }
+    if (endDate) {
+      const e = new Date(endDate);
+      e.setHours(23, 59, 59, 999);
+      whereProduct.createdAt.lte = e;
+    }
+  }
+
+  const [products, total] = await Promise.all([
+    prisma.product.findMany({
+      where: whereProduct,
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        sellingPrice: true,
+        discountPrice: true,
+        saleStartsAt: true,
+        saleEndsAt: true,
+        saleQuota: true,
+        saleSold: true,
+        stock: true,
+        isPreOrder: true,
+        preOrderDays: true,
+        images: { where: { isPrimary: true }, take: 1 },
+      },
+    }),
+    prisma.product.count({ where: whereProduct }),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const base = `/category/${category.slug}`;
+
+  const queryFor = (overrides: { page?: number; startDate?: string; endDate?: string }) => {
+    const sp = new URLSearchParams();
+    const nextStart = overrides.startDate !== undefined ? overrides.startDate : startDate;
+    if (nextStart) sp.set('startDate', nextStart);
+    const nextEnd = overrides.endDate !== undefined ? overrides.endDate : endDate;
+    if (nextEnd) sp.set('endDate', nextEnd);
+    const nextPage = overrides.page !== undefined ? overrides.page : page;
+    if (nextPage > 1) sp.set('page', String(nextPage));
+    const qs = sp.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
+  const now = new Date();
+  const todayStr = formatDateString(now);
+  const p7 = new Date(now);
+  p7.setDate(p7.getDate() - 6);
+  const p7Str = formatDateString(p7);
+  const p30 = new Date(now);
+  p30.setDate(p30.getDate() - 29);
+  const p30Str = formatDateString(p30);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -109,49 +176,136 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           </li>
           <li className="flex items-center">
             <span className="text-gray-300 mx-2">/</span>
+            <Link href="/products" className="text-gray-400 hover:text-gray-600">
+              Produk
+            </Link>
+          </li>
+          <li className="flex items-center">
+            <span className="text-gray-300 mx-2">/</span>
             <span className="text-gray-900 font-medium">{category.name}</span>
           </li>
         </ol>
       </nav>
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900">{category.name}</h1>
-        {category.description && <p className="mt-2 text-gray-600">{category.description}</p>}
-
-        {category.products.length === 0 ? (
-          <p className="mt-8 text-gray-500">Belum ada produk di kategori ini.</p>
-        ) : (
-          <div className="mt-8 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {category.products.map((product) => (
-              <Link
-                key={product.id}
-                href={`/product/${product.slug}`}
-                className="group block bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition"
-              >
-                <div className="w-full h-48 bg-gray-100 overflow-hidden">
-                  {product.images?.[0]?.url ? (
-                    <Image
-                      src={product.images[0].url}
-                      alt={product.name}
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-sm">
-                      No image
-                    </div>
-                  )}
-                </div>
-                <div className="p-4">
-                  <h2 className="text-sm font-medium text-gray-900 line-clamp-1 group-hover:text-indigo-600">{product.name}</h2>
-                  <p className="mt-1 text-sm font-bold text-indigo-600">
-                    {formatIDR(resolveUnitPrice(product))}
-                  </p>
-                </div>
-              </Link>
-            ))}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900">{category.name}</h1>
+            {category.description && <p className="mt-1 text-gray-600">{category.description}</p>}
           </div>
+          <p className="text-sm text-gray-500 font-medium">{total} produk ditemukan</p>
+        </div>
+
+        {/* Date Filter Quick Links */}
+        <div className="mb-6 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-gray-500 font-medium mr-1">📅 Periode:</span>
+          <Link
+            href={queryFor({ startDate: '', endDate: '', page: 1 })}
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              !startDate && !endDate
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            Semua Waktu
+          </Link>
+          <Link
+            href={queryFor({ startDate: todayStr, endDate: todayStr, page: 1 })}
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              startDate === todayStr && endDate === todayStr
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            Hari Ini
+          </Link>
+          <Link
+            href={queryFor({ startDate: p7Str, endDate: todayStr, page: 1 })}
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              startDate === p7Str && endDate === todayStr
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            7 Hari Terakhir
+          </Link>
+          <Link
+            href={queryFor({ startDate: p30Str, endDate: todayStr, page: 1 })}
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              startDate === p30Str && endDate === todayStr
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
+            }`}
+          >
+            30 Hari Terakhir
+          </Link>
+        </div>
+
+        {products.length === 0 ? (
+          <div className="bg-white rounded-lg shadow border px-4 py-16 text-center">
+            <p className="text-gray-500">Belum ada produk di kategori ini untuk filter yang dipilih.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {products.map((product) => {
+                const price = resolveUnitPrice(product);
+                const image = product.images?.[0];
+
+                return (
+                  <Link
+                    key={product.id}
+                    href={`/product/${product.slug}`}
+                    className="block bg-white rounded-lg shadow border overflow-hidden hover:shadow-md transition-shadow"
+                  >
+                    <div className="relative">
+                      {image?.url ? (
+                        <Image
+                          src={image.url}
+                          alt={product.name}
+                          width={400}
+                          height={400}
+                          className="w-full h-48 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+                          <span className="text-sm text-gray-400">Tanpa gambar</span>
+                        </div>
+                      )}
+                      {product.isPreOrder && (
+                        <span className="absolute top-2 left-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
+                          PRE-ORDER
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-4">
+                      <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
+                      <p className="font-semibold text-gray-900">{formatIDR(price)}</p>
+                      {product.isPreOrder ? (
+                        <p className="mt-1 text-xs text-amber-700 font-medium">
+                          ⏳ Pre-Order {product.preOrderDays ? `(${product.preOrderDays} hari)` : ''}
+                        </p>
+                      ) : product.stock <= 0 ? (
+                        <p className="mt-1 text-xs text-red-600">Stok habis</p>
+                      ) : null}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="mt-8">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={total}
+                limit={pageSize}
+                createPageUrl={(p) => queryFor({ page: p })}
+                showLimitSelector={false}
+              />
+            </div>
+          </>
         )}
       </main>
 
@@ -167,4 +321,3 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     </div>
   );
 }
-

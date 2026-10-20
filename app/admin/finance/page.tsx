@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 const IDR = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -74,9 +76,13 @@ export default function FinancePage() {
 
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -88,6 +94,25 @@ export default function FinancePage() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [categoryDraft, setCategoryDraft] = useState(EMPTY_CATEGORY_DRAFT);
   const [categoryBusy, setCategoryBusy] = useState(false);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
 
   const authHeaders = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -133,9 +158,11 @@ export default function FinancePage() {
 
     try {
       setLoading(true);
-      const params = new URLSearchParams({ page: String(page), limit: '20' });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (typeFilter) params.append('type', typeFilter);
       if (search) params.append('search', search);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
 
       const response = await fetch(`/api/admin/finance/ledger?${params}`, { headers });
       const data = await response.json();
@@ -143,12 +170,13 @@ export default function FinancePage() {
 
       setEntries(data.entries ?? []);
       setTotalPages(data.pagination?.totalPages ?? 1);
+      setTotal(data.pagination?.total ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat buku besar');
     } finally {
       setLoading(false);
     }
-  }, [page, typeFilter, search, authHeaders]);
+  }, [page, limit, typeFilter, search, startDate, endDate, authHeaders]);
 
   useEffect(() => {
     loadSummary();
@@ -555,34 +583,52 @@ export default function FinancePage() {
       </form>
 
       <div className="bg-white rounded-lg shadow border">
-        <div className="p-4 border-b flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Buku Besar</h2>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="search"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
+        <div className="p-4 border-b flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Buku Besar{' '}
+              {total > 0 && <span className="text-gray-400 font-normal text-sm">({total} transaksi)</span>}
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Cari keterangan atau kategori..."
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                aria-label="Cari transaksi"
+              />
+              <select
+                value={typeFilter}
+                onChange={(event) => {
+                  setTypeFilter(event.target.value);
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                aria-label="Filter jenis"
+              >
+                <option value="">Semua jenis</option>
+                {LEDGER_TYPES.map((type) => (
+                  <option key={type} value={type}>{TYPE_LABEL[type]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-end">
+            <DateRangeFilter
+              compact
+              startDate={startDate}
+              endDate={endDate}
+              onFilterChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
                 setPage(1);
               }}
-              placeholder="Cari keterangan atau kategori..."
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              aria-label="Cari transaksi"
             />
-            <select
-              value={typeFilter}
-              onChange={(event) => {
-                setTypeFilter(event.target.value);
-                setPage(1);
-              }}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              aria-label="Filter jenis"
-            >
-              <option value="">Semua jenis</option>
-              {LEDGER_TYPES.map((type) => (
-                <option key={type} value={type}>{TYPE_LABEL[type]}</option>
-              ))}
-            </select>
           </div>
         </div>
 
@@ -639,24 +685,18 @@ export default function FinancePage() {
           </div>
         )}
 
-        <div className="p-4 border-t flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-            disabled={page <= 1}
-            className="px-3 py-1 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Sebelumnya
-          </button>
-          <span className="text-sm text-gray-500">Halaman {page} dari {totalPages}</span>
-          <button
-            type="button"
-            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
-            disabled={page >= totalPages}
-            className="px-3 py-1 border rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Berikutnya
-          </button>
+        <div className="p-4 border-t">
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={total}
+            limit={limit}
+            onPageChange={(p) => setPage(p)}
+            onLimitChange={(l) => {
+              setLimit(l);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
     </div>

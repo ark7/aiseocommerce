@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { getDefaultTerms, getDefaultPrivacy, DEFAULT_COOKIE_TITLE, DEFAULT_COOKIE_TEXT } from '@/lib/legalDefaults';
 import LandingPageBuilder from '@/components/LandingPageBuilder';
 import { LandingPageData } from '@/lib/landingPageTypes';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 type CmsTab = 'landing-pages' | 'hero' | 'terms' | 'privacy' | 'cookie' | 'about' | 'articles';
 
@@ -55,6 +57,15 @@ export default function AdminCmsPage() {
   const [editingLp, setEditingLp] = useState<LandingPageData | null>(null);
   const [isCreatingLp, setIsCreatingLp] = useState(false);
   const [savingLp, setSavingLp] = useState(false);
+
+  // Landing Page Pagination & Filter States
+  const [lpPage, setLpPage] = useState(1);
+  const [lpLimit, setLpLimit] = useState(10);
+  const [lpTotal, setLpTotal] = useState(0);
+  const [lpTotalPages, setLpTotalPages] = useState(1);
+  const [lpSearch, setLpSearch] = useState('');
+  const [lpStartDate, setLpStartDate] = useState('');
+  const [lpEndDate, setLpEndDate] = useState('');
 
   const [heroForm, setHeroForm] = useState<HeroData>({
     heroBadge: 'Koleksi Terbaru 2026',
@@ -145,17 +156,28 @@ export default function AdminCmsPage() {
       }
 
       // 4. Load Commercial Landing Pages
-      const resLp = await fetch('/api/admin/landing-pages', { headers });
+      const lpParams = new URLSearchParams({
+        paginate: 'true',
+        page: String(lpPage),
+        limit: String(lpLimit),
+      });
+      if (lpSearch) lpParams.set('search', lpSearch);
+      if (lpStartDate) lpParams.set('startDate', lpStartDate);
+      if (lpEndDate) lpParams.set('endDate', lpEndDate);
+
+      const resLp = await fetch(`/api/admin/landing-pages?${lpParams.toString()}`, { headers });
       if (resLp.ok) {
         const data = await resLp.json();
         setLandingPages(data.landingPages || []);
+        setLpTotalPages(data.pagination?.totalPages || 1);
+        setLpTotal(data.pagination?.total || 0);
       }
     } catch (err: any) {
       setError(err.message || 'Gagal memuat data CMS.');
     } finally {
       setLoading(false);
     }
-  }, [authHeaders]);
+  }, [authHeaders, lpPage, lpLimit, lpSearch, lpStartDate, lpEndDate]);
 
   useEffect(() => {
     loadAllCmsData();
@@ -520,6 +542,28 @@ export default function AdminCmsPage() {
             </div>
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <input
+                  type="search"
+                  placeholder="Cari judul atau slug LP..."
+                  value={lpSearch}
+                  onChange={(e) => {
+                    setLpSearch(e.target.value);
+                    setLpPage(1);
+                  }}
+                  className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 w-full sm:w-60"
+                />
+                <DateRangeFilter
+                  compact
+                  startDate={lpStartDate}
+                  endDate={lpEndDate}
+                  onFilterChange={({ startDate: s, endDate: e }) => {
+                    setLpStartDate(s);
+                    setLpEndDate(e);
+                    setLpPage(1);
+                  }}
+                />
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-gray-50 text-gray-600 font-semibold uppercase tracking-wider border-b border-gray-200">
@@ -620,6 +664,20 @@ export default function AdminCmsPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              <div className="p-4 border-t border-gray-200">
+                <Pagination
+                  page={lpPage}
+                  totalPages={lpTotalPages}
+                  totalItems={lpTotal}
+                  limit={lpLimit}
+                  onPageChange={(p) => setLpPage(p)}
+                  onLimitChange={(l) => {
+                    setLpLimit(l);
+                    setLpPage(1);
+                  }}
+                />
               </div>
             </div>
           )}

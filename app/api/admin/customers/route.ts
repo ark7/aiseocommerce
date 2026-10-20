@@ -7,7 +7,9 @@ import { logger } from '@/lib/logger';
 const QuerySchema = z.object({
   search: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 const STAFF_ROLES = ['ADMIN', 'STAFF'];
@@ -51,13 +53,15 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const { search, page, limit } = QuerySchema.parse({
+    const { search, page, limit, startDate, endDate } = QuerySchema.parse({
       search: searchParams.get('search') ?? undefined,
       page: searchParams.get('page') ?? undefined,
       limit: searchParams.get('limit') ?? undefined,
+      startDate: searchParams.get('startDate') ?? undefined,
+      endDate: searchParams.get('endDate') ?? undefined,
     });
 
-    const where = {
+    const where: any = {
       storeId: user.storeId,
       role: 'CUSTOMER' as const,
       ...(search
@@ -71,6 +75,21 @@ export async function GET(request: Request) {
           }
         : {}),
     };
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
 
     const [customers, total] = await Promise.all([
       prisma.user.findMany({

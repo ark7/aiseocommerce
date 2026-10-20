@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import DateRangeFilter, { DateFilterValue } from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 export default function ProductsList() {
   const [products, setProducts] = useState([]);
@@ -10,9 +12,32 @@ export default function ProductsList() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -26,11 +51,13 @@ export default function ProductsList() {
 
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: '12',
+        limit: limit.toString(),
       });
 
       if (searchQuery) params.append('search', searchQuery);
       if (selectedCategory) params.append('categoryId', selectedCategory);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
 
       const response = await fetch(`/api/products?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -40,6 +67,7 @@ export default function ProductsList() {
         const data = await response.json();
         setProducts(data.products || []);
         setTotalPages(data.pagination?.totalPages || 1);
+        setTotal(data.pagination?.total || 0);
       } else {
         const data = await response.json();
         setError(data.error || 'Gagal memuat produk');
@@ -49,7 +77,7 @@ export default function ProductsList() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, selectedCategory]);
+  }, [page, limit, searchQuery, selectedCategory, startDate, endDate]);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -189,7 +217,7 @@ export default function ProductsList() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow border">
+      <div className="bg-white p-4 rounded-lg shadow border space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Cari Produk</label>
@@ -201,7 +229,7 @@ export default function ProductsList() {
                 setSearchQuery(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             />
           </div>
           <div>
@@ -212,7 +240,7 @@ export default function ProductsList() {
                 setSelectedCategory(e.target.value);
                 setPage(1);
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
             >
               <option value="">Semua Kategori</option>
               {categories.map((cat: any) => (
@@ -225,13 +253,28 @@ export default function ProductsList() {
               onClick={() => {
                 setSearchQuery('');
                 setSelectedCategory('');
+                setStartDate('');
+                setEndDate('');
                 setPage(1);
               }}
-              className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
             >
-              Reset
+              Reset Filter
             </button>
           </div>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className="pt-3 border-t border-gray-100">
+          <DateRangeFilter
+            startDate={startDate}
+            endDate={endDate}
+            onFilterChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
+              setPage(1);
+            }}
+          />
         </div>
       </div>
 
@@ -360,43 +403,19 @@ export default function ProductsList() {
       )}
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              Halaman {page} dari {totalPages}
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => page > 1 && setPage(page - 1)}
-                disabled={page === 1}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Sebelumnya
-              </button>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                const pageNum = Math.max(1, page - 2) + i;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    className={`px-3 py-1 rounded ${pageNum === page ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => page < totalPages && setPage(page + 1)}
-                disabled={page === totalPages}
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Selanjutnya
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="bg-white p-4 rounded-lg shadow border mt-6">
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          totalItems={total}
+          limit={limit}
+          onPageChange={(p) => setPage(p)}
+          onLimitChange={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+        />
+      </div>
     </div>
   );
 }

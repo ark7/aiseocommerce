@@ -26,26 +26,64 @@ export async function GET(
       return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
-    const articles = await prisma.article.findMany({
-      where: { storeId: user.storeId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        products: {
-          include: {
-            product: {
-              select: { id: true, name: true },
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const hasPagination = searchParams.has('page') || searchParams.has('limit') || searchParams.get('paginate') === 'true';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    const where: any = { storeId: user.storeId };
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { content: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
+
+    const [articles, total] = await Promise.all([
+      prisma.article.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...(hasPagination ? { skip: (page - 1) * limit, take: limit } : {}),
+        include: {
+          products: {
+            include: {
+              product: {
+                select: { id: true, name: true },
+              },
             },
           },
         },
-      },
-    });
+      }),
+      prisma.article.count({ where }),
+    ]);
 
     const formattedArticles = articles.map(a => ({
       ...a,
       products: a.products.map(p => ({ id: p.product.id, name: p.product.name })),
     }));
 
-    return NextResponse.json({ success: true, articles: formattedArticles });
+    return NextResponse.json({
+      success: true,
+      articles: formattedArticles,
+      pagination: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
+    });
   } catch (error) {
     logger.error('Fetch articles failed', {}, error instanceof Error ? error : String(error));
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -38,6 +38,7 @@ const GeneralSettingsUpdateSchema = z.object({
   // Appearance
   primaryColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Format hex warna tidak valid').optional().nullable(),
   fontFamily: z.enum(['inter', 'plus-jakarta-sans', 'poppins', 'roboto', 'playfair']).optional().nullable(),
+  defaultPageSize: z.coerce.number().int().min(1).max(100).optional(),
 
   // SEO Defaults
   defaultSeoTitle: z.string().optional().nullable(),
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
         heroImageUrl: s?.heroImageUrl ?? null,
         primaryColor: s?.primaryColor ?? '#4F46E5',
         fontFamily: s?.fontFamily ?? 'inter',
+        defaultPageSize: s?.defaultPageSize ?? 10,
         socialLinks: (s?.socialLinks as Record<string, string>) ?? {},
         defaultSeoTitle: s?.defaultSeoTitle ?? null,
         defaultSeoDescription: s?.defaultSeoDescription ?? null,
@@ -152,6 +154,7 @@ export async function PUT(request: Request) {
     if (data.heroImageUrl !== undefined) settingsUpdateData.heroImageUrl = data.heroImageUrl ? data.heroImageUrl.trim() : null;
     if (data.primaryColor !== undefined) settingsUpdateData.primaryColor = data.primaryColor ? data.primaryColor.trim() : '#4F46E5';
     if (data.fontFamily !== undefined) settingsUpdateData.fontFamily = data.fontFamily || 'inter';
+    if (data.defaultPageSize !== undefined) settingsUpdateData.defaultPageSize = data.defaultPageSize;
     if (data.socialLinks !== undefined) settingsUpdateData.socialLinks = data.socialLinks || {};
     if (data.defaultSeoTitle !== undefined) settingsUpdateData.defaultSeoTitle = data.defaultSeoTitle ? data.defaultSeoTitle.trim() : null;
     if (data.defaultSeoDescription !== undefined) settingsUpdateData.defaultSeoDescription = data.defaultSeoDescription ? data.defaultSeoDescription.trim() : null;

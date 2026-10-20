@@ -28,27 +28,67 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
-    const landingPages = await prisma.landingPage.findMany({
-      where: { storeId: user.storeId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sellingPrice: true,
-            discountPrice: true,
-            images: {
-              where: { isPrimary: true },
-              take: 1,
-              select: { url: true },
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const hasPagination = searchParams.has('page') || searchParams.has('limit') || searchParams.get('paginate') === 'true';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+
+    const where: any = { storeId: user.storeId };
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
+
+    const [landingPages, total] = await Promise.all([
+      prisma.landingPage.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...(hasPagination ? { skip: (page - 1) * limit, take: limit } : {}),
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sellingPrice: true,
+              discountPrice: true,
+              images: {
+                where: { isPrimary: true },
+                take: 1,
+                select: { url: true },
+              },
             },
           },
         },
-      },
-    });
+      }),
+      typeof (prisma.landingPage as any)?.count === 'function'
+        ? prisma.landingPage.count({ where })
+        : Promise.resolve(0),
+    ]);
 
-    return NextResponse.json({ success: true, landingPages });
+    return NextResponse.json({
+      success: true,
+      landingPages,
+      pagination: { page, limit, total, totalPages: Math.max(Math.ceil(total / limit), 1) },
+    });
   } catch (error) {
     logger.error('Fetch landing pages failed', {}, error instanceof Error ? error : String(error));
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
