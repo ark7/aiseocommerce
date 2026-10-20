@@ -1,4 +1,4 @@
-import { POST as createVoucher } from '@/app/api/admin/vouchers/route';
+import { GET as getVouchers, POST as createVoucher } from '@/app/api/admin/vouchers/route';
 import { DELETE as deleteVoucher, PATCH as patchVoucher } from '@/app/api/admin/vouchers/[id]/route';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
@@ -8,6 +8,7 @@ jest.mock('@/lib/prisma', () => ({
     voucher: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -48,9 +49,81 @@ beforeEach(() => {
   jest.clearAllMocks();
   (requireUser as jest.Mock).mockResolvedValue(ADMIN);
   (prisma.voucher.findMany as jest.Mock).mockResolvedValue([]);
+  (prisma.voucher.count as jest.Mock).mockResolvedValue(0);
   (prisma.voucher.create as jest.Mock).mockImplementation(({ data }) => ({ id: 'v', ...data }));
   (prisma.voucher.update as jest.Mock).mockImplementation(({ data }) => ({ id: 'v', ...data }));
   (prisma.voucher.delete as jest.Mock).mockResolvedValue({});
+});
+
+describe('GET /api/admin/vouchers', () => {
+  test('mengizinkan role STAFF mengambil daftar voucher', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF' });
+    const response = await getVouchers(
+      new Request('http://localhost/api/admin/vouchers', {
+        headers: { authorization: 'Bearer token' },
+      })
+    );
+    expect(response.status).toBe(200);
+  });
+
+  test('menolak role CUSTOMER', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'CUSTOMER' });
+    const response = await getVouchers(
+      new Request('http://localhost/api/admin/vouchers', {
+        headers: { authorization: 'Bearer token' },
+      })
+    );
+    expect(response.status).toBe(403);
+  });
+
+  test('menghitung evaluasi performa klaim, pemakaian, dan total belanjaan', async () => {
+    const mockVouchers = [
+      {
+        id: 'v-1',
+        code: 'HEMAT10',
+        claimed: 5,
+        used: 2,
+        claims: [
+          {
+            id: 'c-1',
+            claimedAt: new Date(),
+            usedAt: new Date(),
+            orderId: 'o-1',
+            order: { id: 'o-1', totalAmount: 150000, discount: 15000, status: 'PAID' },
+          },
+          {
+            id: 'c-2',
+            claimedAt: new Date(),
+            usedAt: new Date(),
+            orderId: 'o-2',
+            order: { id: 'o-2', totalAmount: 200000, discount: 20000, status: 'COMPLETED' },
+          },
+          {
+            id: 'c-3',
+            claimedAt: new Date(),
+            usedAt: null,
+            orderId: null,
+            order: null,
+          },
+        ],
+      },
+    ];
+    (prisma.voucher.findMany as jest.Mock).mockResolvedValue(mockVouchers);
+    (prisma.voucher.count as jest.Mock).mockResolvedValue(1);
+
+    const response = await getVouchers(
+      new Request('http://localhost/api/admin/vouchers', {
+        headers: { authorization: 'Bearer token' },
+      })
+    );
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json.vouchers[0].totalSales).toBe(350000);
+    expect(json.vouchers[0].totalDiscount).toBe(35000);
+    expect(json.vouchers[0].orderCount).toBe(2);
+    expect(json.vouchers[0].claimed).toBe(5);
+    expect(json.vouchers[0].used).toBe(2);
+  });
 });
 
 describe('POST /api/admin/vouchers', () => {
@@ -106,6 +179,14 @@ describe('POST /api/admin/vouchers', () => {
     (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'CUSTOMER' });
 
     expect((await createVoucher(jsonRequest(VALID_BODY))).status).toBe(403);
+  });
+
+  test('mengizinkan role STAFF membuat voucher', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF' });
+
+    const response = await createVoucher(jsonRequest(VALID_BODY));
+    expect(response.status).toBe(200);
+    expect(prisma.voucher.create).toHaveBeenCalled();
   });
 });
 

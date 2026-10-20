@@ -38,8 +38,8 @@ export async function GET(request: Request) {
   try {
     const user = await requireUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -54,13 +54,75 @@ export async function GET(request: Request) {
         orderBy: { [orderBy]: orderDirection },
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+          claims: {
+            select: {
+              id: true,
+              claimedAt: true,
+              usedAt: true,
+              orderId: true,
+              order: {
+                select: {
+                  id: true,
+                  totalAmount: true,
+                  subtotal: true,
+                  discount: true,
+                  status: true,
+                },
+              },
+            },
+          },
+        },
       }),
       prisma.voucher.count({ where: { storeId: user.storeId } }),
     ]);
 
+    const enrichedVouchers = (vouchers || []).map((voucher: any) => {
+      const claims = voucher.claims || [];
+      const claimedCount = Math.max(voucher.claimed || 0, claims.length);
+      const usedClaims = claims.filter((c: any) => c.usedAt !== null || c.orderId !== null);
+      const usedCount = Math.max(voucher.used || 0, usedClaims.length);
+
+      // Orders that used this voucher and are valid (not cancelled)
+      const validOrders = claims
+        .map((c: any) => c.order)
+        .filter((o: any) => o && o.status !== 'CANCELLED');
+
+      const totalSales = validOrders.reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0);
+      const totalDiscount = validOrders.reduce((sum: number, o: any) => sum + (o.discount || 0), 0);
+      const orderCount = validOrders.length;
+
+      return {
+        ...voucher,
+        claimed: claimedCount,
+        used: usedCount,
+        totalSales,
+        totalDiscount,
+        orderCount,
+        stats: {
+          claimedCount,
+          usedCount,
+          totalOrders: orderCount,
+          totalSales,
+          totalDiscount,
+        },
+      };
+    });
+
+    const summary = enrichedVouchers.reduce(
+      (acc, v) => ({
+        totalClaims: acc.totalClaims + v.claimed,
+        totalUsed: acc.totalUsed + v.used,
+        totalSales: acc.totalSales + v.totalSales,
+        totalDiscount: acc.totalDiscount + v.totalDiscount,
+      }),
+      { totalClaims: 0, totalUsed: 0, totalSales: 0, totalDiscount: 0 }
+    );
+
     return NextResponse.json({
       success: true,
-      vouchers,
+      vouchers: enrichedVouchers,
+      summary,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
@@ -73,8 +135,8 @@ export async function POST(request: Request) {
   try {
     const user = await requireUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
+      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
     }
 
     const body = await request.json();

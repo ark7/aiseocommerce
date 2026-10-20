@@ -10,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   try {
     const user = await requireUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const input = VoucherInputSchema.parse(await request.json());
 
@@ -66,7 +66,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   try {
     const user = await requireUser(request);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (user.role !== 'ADMIN' && user.role !== 'STAFF') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const voucher = await prisma.voucher.findUnique({
       where: { id: params.id },
