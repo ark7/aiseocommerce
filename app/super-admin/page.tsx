@@ -839,6 +839,16 @@ export default function SuperAdminControlPlanePage() {
                           </td>
                           <td className="px-4 py-4 text-center">
                             <div className="flex items-center justify-center gap-1.5">
+                              <a
+                                href={`/api/super-admin/preview?domain=${encodeURIComponent(tenant.domain)}&redirect=/`}
+                                target="_blank"
+                                rel="noreferrer"
+                                title="Lihat Tampilan Website Toko (Preview)"
+                                className="px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <span>👁️</span>
+                                <span>Preview</span>
+                              </a>
                               <button
                                 type="button"
                                 onClick={() => openResetPasswordModal(tenant)}
@@ -913,6 +923,17 @@ export default function SuperAdminControlPlanePage() {
                       {duplicationResult.seededCounts.categories} Kategori Produk •{' '}
                       {duplicationResult.seededCounts.products} Produk Awal
                     </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`/api/super-admin/preview?domain=${encodeURIComponent(duplicationResult.store.domain)}&redirect=/`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition"
+                    >
+                      <span>👁️</span>
+                      <span>Buka & Cek Website Sekarang</span>
+                    </a>
                   </div>
                 </div>
 

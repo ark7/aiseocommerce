@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { getActiveStore } from '@/lib/store';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
+import { cookies } from 'next/headers';
+import Link from 'next/link';
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getActiveStore();
@@ -47,6 +49,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const primaryColor = store?.settings?.primaryColor || '#4F46E5';
   const fontFamily = store?.settings?.fontFamily || 'inter';
 
+  let previewDomain: string | null = null;
+  try {
+    previewDomain = cookies().get('preview_store_domain')?.value || null;
+  } catch {
+    // ignore
+  }
+
   return (
     <html lang="id">
       <head>
@@ -57,6 +66,30 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         />
       </head>
       <body className={`font-${fontFamily} antialiased`}>
+        {previewDomain && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-semibold flex items-center justify-between sticky top-0 z-50 shadow-md">
+            <div className="flex items-center gap-2">
+              <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                PREVIEW MODE
+              </span>
+              <span>
+                Sedang mempratinjau Toko: <strong>{store?.name || previewDomain}</strong> (domain:{' '}
+                {previewDomain})
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/super-admin" className="underline hover:text-slate-900">
+                Panel Super-Admin &rarr;
+              </Link>
+              <a
+                href="/api/super-admin/preview?clear=true"
+                className="bg-slate-950 text-white px-2.5 py-1 rounded hover:bg-slate-800 text-[11px]"
+              >
+                Tutup Preview &times;
+              </a>
+            </div>
+          </div>
+        )}
         {children}
         <CookieConsentBanner
           enabled={store?.settings?.cookieConsentEnabled ?? true}

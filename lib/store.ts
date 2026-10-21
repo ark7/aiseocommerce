@@ -1,9 +1,14 @@
 import { prisma } from '@/lib/prisma';
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 
 /**
  * Resolves the primary store for this standalone e-commerce deployment.
- * Supports override via DEFAULT_STORE_DOMAIN or LANDING_STORE_DOMAIN environment variables.
+ * Supports override via:
+ * 1. domainHint (direct argument)
+ * 2. preview_store_domain cookie (useful for previewing any customer's store in Super-Admin localhost)
+ * 3. DEFAULT_STORE_DOMAIN or LANDING_STORE_DOMAIN environment variables
+ * 4. Fallback to the first registered store in the database
  */
 export const getActiveStore = cache(async (domainHint?: string) => {
   try {
@@ -13,6 +18,21 @@ export const getActiveStore = cache(async (domainHint?: string) => {
         include: { settings: true },
       });
       if (store) return store;
+    }
+
+    // Check preview cookie (for Super-Admin previewing created customer stores in dev)
+    try {
+      const cookieStore = cookies();
+      const previewDomain = cookieStore.get('preview_store_domain')?.value;
+      if (previewDomain) {
+        const store = await prisma.store.findUnique({
+          where: { domain: previewDomain },
+          include: { settings: true },
+        });
+        if (store) return store;
+      }
+    } catch {
+      // cookies() might not be available in non-request contexts or unit tests
     }
 
     const defaultDomain = process.env.DEFAULT_STORE_DOMAIN || process.env.LANDING_STORE_DOMAIN;
@@ -33,4 +53,3 @@ export const getActiveStore = cache(async (domainHint?: string) => {
     return null;
   }
 });
-
