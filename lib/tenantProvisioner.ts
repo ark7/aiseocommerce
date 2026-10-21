@@ -394,7 +394,7 @@ export function generateTenantEnvConfig(params: {
 /**
  * Splits a full name into firstName and lastName
  */
-function splitFullName(fullName: string): { firstName: string; lastName: string } {
+export function splitFullName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) {
     return { firstName: parts[0], lastName: '' };
@@ -404,6 +404,69 @@ function splitFullName(fullName: string): { firstName: string; lastName: string 
     lastName: parts.slice(1).join(' '),
   };
 }
+
+export const TenantUpdateInputSchema = z.object({
+  storeName: z.string().min(2, 'Nama toko minimal 2 karakter').max(120).optional(),
+  domain: z
+    .string()
+    .min(3)
+    .max(150)
+    .transform((v) => v.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, ''))
+    .optional(),
+  tagline: z.string().max(200).optional().nullable(),
+  storeEmail: z.string().email('Format email toko tidak valid').optional(),
+  storePhone: z.string().min(6).max(40).optional(),
+  storeAddress: z.string().max(500).optional().nullable(),
+
+  adminUserId: z.string().optional().nullable(),
+  adminName: z.string().min(2).max(100).optional(),
+  adminEmail: z.string().email('Email admin tidak valid').optional(),
+  newAdminPassword: z.string().min(8, 'Password baru minimal 8 karakter').max(100).optional().nullable(),
+  isAdminActive: z.boolean().optional(),
+
+  primaryColor: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/, 'Warna harus format HEX (#RRGGBB)')
+    .optional(),
+  fontFamily: z
+    .enum([
+      'inter',
+      'poppins',
+      'plus-jakarta-sans',
+      'playfair-display',
+      'roboto',
+      'montserrat',
+      'lora',
+    ])
+    .optional(),
+  defaultPageSize: z.coerce.number().int().min(1).max(100).optional(),
+  logoUrl: z.string().optional().nullable(),
+  faviconUrl: z.string().optional().nullable(),
+  heroBadge: z.string().max(80).optional().nullable(),
+  heroTitle: z.string().max(160).optional().nullable(),
+  heroSubtitle: z.string().max(400).optional().nullable(),
+  heroCtaText: z.string().max(60).optional().nullable(),
+  heroCtaLink: z.string().max(200).optional().nullable(),
+  heroImageUrl: z.string().optional().nullable(),
+  socialLinks: z.record(z.string()).optional(),
+
+  defaultSeoTitle: z.string().max(120).optional().nullable(),
+  defaultSeoDescription: z.string().max(300).optional().nullable(),
+  ga4Id: z.string().max(60).optional().nullable(),
+  metaPixelId: z.string().max(60).optional().nullable(),
+  tiktokPixelId: z.string().max(60).optional().nullable(),
+
+  midtransMerchantId: z.string().max(100).optional().nullable(),
+  midtransClientKey: z.string().max(150).optional().nullable(),
+  midtransServerKey: z.string().max(150).optional().nullable(),
+  flipApiKey: z.string().max(150).optional().nullable(),
+  turnstileEnabled: z.boolean().optional(),
+  turnstileSiteKey: z.string().max(150).optional().nullable(),
+  turnstileSecretKey: z.string().max(150).optional().nullable(),
+  cookieConsentEnabled: z.boolean().optional(),
+});
+
+export type TenantUpdateInput = z.infer<typeof TenantUpdateInputSchema>;
 
 export interface ProvisionTenantResult {
   store: {
@@ -775,3 +838,4 @@ export async function provisionTenantStore(
     }
   }
 }
+

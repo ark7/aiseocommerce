@@ -11,6 +11,31 @@ import {
   generateTenantEnvConfig,
 } from '@/lib/tenantProvisioner';
 import { GET as listTenants, POST as createTenant } from '@/app/api/super-admin/tenants/route';
+import { GET as getTenant, PUT as updateTenant } from '@/app/api/super-admin/tenants/[id]/route';
+import { prisma } from '@/lib/prisma';
+
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    store: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+    },
+    storeSettings: {
+      upsert: jest.fn(),
+    },
+    user: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+    },
+    auditLog: {
+      create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+    },
+  },
+}));
 
 describe('Super-Admin Owner Control Plane & Website Duplication', () => {
   const ORIGINAL_ENV = process.env;
@@ -207,4 +232,101 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
       expect(cfg1.envContent).toContain('ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"');
     });
   });
+
+  describe('Tenant Editing & Password Reset (PUT /api/super-admin/tenants/[id])', () => {
+    it('rejects unauthenticated or regular store admin callers', async () => {
+      const regularAdminToken = jwt.sign(
+        { id: 'user-1', email: 'owner@berkah.com', role: 'ADMIN', storeId: 'store-1' },
+        process.env.JWT_SECRET!
+      );
+
+      const req = new Request('http://localhost/api/super-admin/tenants/store-1', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${regularAdminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ storeName: 'New Name' }),
+      });
+
+      const res = await updateTenant(req, { params: { id: 'store-1' } });
+      expect(res.status).toBe(403);
+    });
+
+    it('allows Super-Admin Owner to update store data and reset admin password', async () => {
+      const ownerToken = generateSuperAdminToken('myowner@aiseo.id');
+      const existingStore = {
+        id: 'store-1',
+        name: 'Toko Lama',
+        domain: 'tokolama.com',
+        email: 'cs@tokolama.com',
+        phone: '0812000000',
+        settings: {
+          primaryColor: '#4F46E5',
+          fontFamily: 'inter',
+          defaultPageSize: 10,
+        },
+        users: [
+          {
+            id: 'admin-1',
+            email: 'admin@tokolama.com',
+            firstName: 'Budi',
+            lastName: 'Santoso',
+            role: 'ADMIN',
+          },
+        ],
+      };
+
+      (prisma.store.findUnique as jest.Mock).mockResolvedValue(existingStore);
+      (prisma.store.update as jest.Mock).mockResolvedValue({
+        ...existingStore,
+        name: 'Toko Baru Makmur',
+        domain: 'tokobarumakmur.com',
+      });
+      (prisma.storeSettings.upsert as jest.Mock).mockResolvedValue({ id: 'settings-1' });
+      (prisma.user.update as jest.Mock).mockResolvedValue({ id: 'admin-1' });
+
+      const req = new Request('http://localhost/api/super-admin/tenants/store-1', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${ownerToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          storeName: 'Toko Baru Makmur',
+          domain: 'tokobarumakmur.com',
+          primaryColor: '#10B981',
+          defaultPageSize: 25,
+          adminName: 'Budi Hartono',
+          adminEmail: 'budi@tokobarumakmur.com',
+          newAdminPassword: 'PasswordBaru#2026',
+        }),
+      });
+
+      const res = await updateTenant(req, { params: { id: 'store-1' } });
+      expect(res.status).toBe(200);
+
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.adminUpdated).toBe(true);
+      expect(data.resetPasswordMessage).toBeDefined();
+      expect(data.resetPasswordMessage).toContain('PasswordBaru#2026');
+      expect(data.resetPasswordMessage).toContain('budi@tokobarumakmur.com');
+      expect(data.resetPasswordMessage).toContain('tokobarumakmur.com');
+
+      // Verify Prisma was called with passwordHash
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'admin-1' },
+          data: expect.objectContaining({
+            email: 'budi@tokobarumakmur.com',
+            firstName: 'Budi',
+            lastName: 'Hartono',
+            passwordHash: expect.any(String),
+          }),
+        })
+      );
+    });
+  });
 });
+

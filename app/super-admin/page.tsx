@@ -166,6 +166,46 @@ export default function SuperAdminControlPlanePage() {
   const [duplicationResult, setDuplicationResult] = useState<DuplicationSuccessResult | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
+  // Quick Password Reset Modal State
+  const [resetModalTenant, setResetModalTenant] = useState<TenantItem | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
+
+  // Edit Tenant Modal State
+  const [editModalTenant, setEditModalTenant] = useState<TenantItem | null>(null);
+  const [editLoadingDetail, setEditLoadingDetail] = useState(false);
+  const [editStoreName, setEditStoreName] = useState('');
+  const [editDomain, setEditDomain] = useState('');
+  const [editTagline, setEditTagline] = useState('');
+  const [editStoreEmail, setEditStoreEmail] = useState('');
+  const [editStorePhone, setEditStorePhone] = useState('');
+  const [editStoreAddress, setEditStoreAddress] = useState('');
+  const [editAdminName, setEditAdminName] = useState('');
+  const [editAdminEmail, setEditAdminEmail] = useState('');
+  const [editNewPassword, setEditNewPassword] = useState('');
+  const [editPrimaryColor, setEditPrimaryColor] = useState('#4F46E5');
+  const [editFontFamily, setEditFontFamily] = useState('inter');
+  const [editDefaultPageSize, setEditDefaultPageSize] = useState(10);
+  const [editLogoUrl, setEditLogoUrl] = useState('');
+  const [editHeroTitle, setEditHeroTitle] = useState('');
+  const [editHeroSubtitle, setEditHeroSubtitle] = useState('');
+  const [editHeroCtaText, setEditHeroCtaText] = useState('Belanja Sekarang');
+  const [editGa4Id, setEditGa4Id] = useState('');
+  const [editMetaPixelId, setEditMetaPixelId] = useState('');
+  const [editTiktokPixelId, setEditTiktokPixelId] = useState('');
+  const [editMidtransMerchantId, setEditMidtransMerchantId] = useState('');
+  const [editMidtransClientKey, setEditMidtransClientKey] = useState('');
+  const [editMidtransServerKey, setEditMidtransServerKey] = useState('');
+  const [editFlipApiKey, setEditFlipApiKey] = useState('');
+  const [editTurnstileEnabled, setEditTurnstileEnabled] = useState(false);
+  const [editTurnstileSiteKey, setEditTurnstileSiteKey] = useState('');
+  const [editTurnstileSecretKey, setEditTurnstileSecretKey] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSuccessNotice, setEditSuccessNotice] = useState<string | null>(null);
+
   const fetchTenants = useCallback(async (activeToken?: string | null) => {
     try {
       setLoadingTenants(true);
@@ -261,6 +301,172 @@ export default function SuperAdminControlPlanePage() {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  // Open Quick Reset Password Modal
+  const openResetPasswordModal = (tenant: TenantItem) => {
+    setResetModalTenant(tenant);
+    setResetNewPassword(generateStrongPassword());
+    setResetError(null);
+    setResetSuccessMessage(null);
+  };
+
+  // Submit Quick Password Reset
+  const handleQuickResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetModalTenant) return;
+    setResetSubmitting(true);
+    setResetError(null);
+    setResetSuccessMessage(null);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const res = await fetch(`/api/super-admin/tenants/${resetModalTenant.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          newAdminPassword: resetNewPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal mereset password pelanggan');
+      }
+
+      setResetSuccessMessage(data.resetPasswordMessage);
+      fetchTenants(token);
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : 'Terjadi kesalahan saat reset password');
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
+  // Open Edit Tenant Modal
+  const openEditTenantModal = async (tenant: TenantItem) => {
+    setEditModalTenant(tenant);
+    setEditLoadingDetail(true);
+    setEditError(null);
+    setEditSuccessNotice(null);
+    setEditNewPassword('');
+
+    // Prepopulate known basic fields
+    setEditStoreName(tenant.name);
+    setEditDomain(tenant.domain);
+    setEditTagline(tenant.tagline || '');
+    setEditStoreEmail(tenant.email || '');
+    setEditStorePhone(tenant.phone || '');
+    setEditStoreAddress(tenant.address || '');
+    setEditAdminName(
+      [tenant.adminUser?.firstName, tenant.adminUser?.lastName].filter(Boolean).join(' ') || ''
+    );
+    setEditAdminEmail(tenant.adminUser?.email || '');
+    setEditPrimaryColor(tenant.primaryColor || '#4F46E5');
+    setEditFontFamily(tenant.fontFamily || 'inter');
+    setEditDefaultPageSize(tenant.defaultPageSize || 10);
+
+    // Fetch full detail for settings and keys
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`/api/super-admin/tenants/${tenant.id}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        const s = data.store?.settings || {};
+        setEditLogoUrl(data.store?.logo || '');
+        setEditHeroTitle(s.heroTitle || '');
+        setEditHeroSubtitle(s.heroSubtitle || '');
+        setEditHeroCtaText(s.heroCtaText || 'Belanja Sekarang');
+        setEditGa4Id(s.googleTagId || s.analyticsConfig?.ga4MeasurementId || '');
+        setEditMetaPixelId(s.analyticsConfig?.metaPixelId || '');
+        setEditTiktokPixelId(s.analyticsConfig?.tiktokPixelId || '');
+        setEditMidtransMerchantId(s.midtransMerchantId || '');
+        setEditMidtransClientKey(s.midtransClientKey || '');
+        setEditMidtransServerKey(s.midtransServerKey || '');
+        setEditFlipApiKey(s.flipApiKey || '');
+        setEditTurnstileEnabled(Boolean(s.turnstileEnabled));
+        setEditTurnstileSiteKey(s.turnstileSiteKey || '');
+        setEditTurnstileSecretKey(s.turnstileSecretKey || '');
+      }
+    } catch {
+      // ignore
+    } finally {
+      setEditLoadingDetail(false);
+    }
+  };
+
+  // Submit Full Tenant Edit
+  const handleEditTenantSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editModalTenant) return;
+    setEditSubmitting(true);
+    setEditError(null);
+    setEditSuccessNotice(null);
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      const payload: any = {
+        storeName: editStoreName,
+        domain: editDomain,
+        tagline: editTagline,
+        storeEmail: editStoreEmail,
+        storePhone: editStorePhone,
+        storeAddress: editStoreAddress,
+        adminName: editAdminName,
+        adminEmail: editAdminEmail,
+        primaryColor: editPrimaryColor,
+        fontFamily: editFontFamily,
+        defaultPageSize: editDefaultPageSize,
+        logoUrl: editLogoUrl,
+        heroTitle: editHeroTitle,
+        heroSubtitle: editHeroSubtitle,
+        heroCtaText: editHeroCtaText,
+        ga4Id: editGa4Id,
+        metaPixelId: editMetaPixelId,
+        tiktokPixelId: editTiktokPixelId,
+        midtransMerchantId: editMidtransMerchantId,
+        midtransClientKey: editMidtransClientKey,
+        midtransServerKey: editMidtransServerKey,
+        flipApiKey: editFlipApiKey,
+        turnstileEnabled: editTurnstileEnabled,
+        turnstileSiteKey: editTurnstileSiteKey,
+        turnstileSecretKey: editTurnstileSecretKey,
+      };
+
+      if (editNewPassword && editNewPassword.trim()) {
+        payload.newAdminPassword = editNewPassword.trim();
+      }
+
+      const res = await fetch(`/api/super-admin/tenants/${editModalTenant.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal memperbarui data website pelanggan');
+      }
+
+      setEditSuccessNotice(
+        data.resetPasswordMessage
+          ? `Perubahan disimpan! Pesan reset password telah disiapkan di bawah.`
+          : `Perubahan data website pelanggan berhasil disimpan!`
+      );
+      if (data.resetPasswordMessage) {
+        setResetSuccessMessage(data.resetPasswordMessage);
+      }
+      fetchTenants(token);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Gagal memperbarui data pelanggan');
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   const handleDuplicateSubmit = async (e: React.FormEvent) => {
@@ -562,6 +768,7 @@ export default function SuperAdminControlPlanePage() {
                         <th className="px-4 py-3.5 text-left">Tema & Default List</th>
                         <th className="px-4 py-3.5 text-center">Statistik Data</th>
                         <th className="px-4 py-3.5 text-right">Tanggal Dibuat</th>
+                        <th className="px-4 py-3.5 text-center">Aksi / Manajemen</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -629,6 +836,28 @@ export default function SuperAdminControlPlanePage() {
                               month: 'short',
                               year: 'numeric',
                             })}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openResetPasswordModal(tenant)}
+                                title="Reset Password Admin Klien"
+                                className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <span>🔑</span>
+                                <span>Reset Pass</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditTenantModal(tenant)}
+                                title="Edit Data & Pengaturan Toko"
+                                className="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <span>✏️</span>
+                                <span>Edit Toko</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1458,6 +1687,532 @@ export default function SuperAdminControlPlanePage() {
           </div>
         )}
       </main>
+
+      {/* QUICK RESET PASSWORD MODAL */}
+      {resetModalTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <span>🔑</span>
+                  <span>Reset Password Admin Klien</span>
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Toko: <strong>{resetModalTenant.name}</strong> ({resetModalTenant.domain})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResetModalTenant(null)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            {resetError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
+                {resetError}
+              </div>
+            )}
+
+            {resetSuccessMessage ? (
+              <div className="space-y-4">
+                <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl">
+                  <span className="text-xs font-bold text-emerald-800 uppercase block mb-1">
+                    ✓ Password Berhasil Direset!
+                  </span>
+                  <p className="text-xs text-emerald-700">
+                    Password baru telah aktif di database. Anda dapat menyalin pesan berikut dan
+                    mengirimkannya langsung ke WhatsApp pelanggan:
+                  </p>
+                </div>
+
+                <div className="relative">
+                  <pre className="text-xs bg-gray-50 p-3.5 rounded-xl border text-gray-800 whitespace-pre-wrap font-sans leading-relaxed">
+                    {resetSuccessMessage}
+                  </pre>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy('reset_wa', resetSuccessMessage)}
+                    className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
+                  >
+                    <span>{copiedKey === 'reset_wa' ? '✓ Tersalin!' : '📋 Copy Pesan WhatsApp'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResetModalTenant(null)}
+                    className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleQuickResetPassword} className="space-y-4">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  <p className="font-semibold text-amber-900">
+                    Target Admin: {resetModalTenant.adminUser?.email || resetModalTenant.email}
+                  </p>
+                  <p className="mt-0.5">
+                    Gunakan password yang telah dibuat otomatis di bawah, atau ketik password baru
+                    secara manual.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Password Baru Admin *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      placeholder="Password baru minimal 8 karakter..."
+                      className="flex-1 rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setResetNewPassword(generateStrongPassword())}
+                      className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold whitespace-nowrap"
+                    >
+                      🎲 Acak Baru
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setResetModalTenant(null)}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={resetSubmitting}
+                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow disabled:opacity-50"
+                  >
+                    {resetSubmitting ? 'Memperbarui...' : 'Simpan & Siapkan Pesan WA'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* FULL EDIT TENANT MODAL */}
+      {editModalTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-gray-200 space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3 sticky top-0 bg-white z-10">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">
+                  Manajemen Toko Pelanggan
+                </span>
+                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <span>✏️</span>
+                  <span>Edit Data: {editModalTenant.name}</span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditModalTenant(null)}
+                className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {editLoadingDetail && (
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs">
+                Mengambil rincian pengaturan lengkap toko...
+              </div>
+            )}
+
+            {editError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-xs font-medium">
+                {editError}
+              </div>
+            )}
+
+            {editSuccessNotice && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-medium space-y-2">
+                <p className="font-bold">✓ {editSuccessNotice}</p>
+                {resetSuccessMessage && (
+                  <div>
+                    <pre className="text-xs bg-white p-3 rounded-lg border text-gray-800 whitespace-pre-wrap font-sans mt-2">
+                      {resetSuccessMessage}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('edit_wa', resetSuccessMessage)}
+                      className="mt-2 px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold"
+                    >
+                      {copiedKey === 'edit_wa' ? '✓ Tersalin!' : '📋 Copy Pesan WA'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handleEditTenantSubmit} className="space-y-6">
+              {/* Bagian 1: Identitas & Domain */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-sm text-gray-900 border-b pb-1.5 text-indigo-700">
+                  1. Identitas Toko & Kontak
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Nama Toko Pelanggan *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editStoreName}
+                      onChange={(e) => setEditStoreName(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Domain Toko *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editDomain}
+                      onChange={(e) => setEditDomain(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Tagline / Slogan
+                    </label>
+                    <input
+                      type="text"
+                      value={editTagline}
+                      onChange={(e) => setEditTagline(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Email Toko / CS *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editStoreEmail}
+                      onChange={(e) => setEditStoreEmail(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      No. WhatsApp / Telepon *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editStorePhone}
+                      onChange={(e) => setEditStorePhone(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      URL Logo Toko
+                    </label>
+                    <input
+                      type="url"
+                      value={editLogoUrl}
+                      onChange={(e) => setEditLogoUrl(e.target.value)}
+                      placeholder="https://.../logo.png"
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Alamat Lengkap Toko
+                    </label>
+                    <input
+                      type="text"
+                      value={editStoreAddress}
+                      onChange={(e) => setEditStoreAddress(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bagian 2: Akun Admin Klien & Reset Password */}
+              <div className="space-y-3 bg-amber-50/60 p-4 rounded-xl border border-amber-200">
+                <h4 className="font-bold text-sm text-amber-900 border-b border-amber-200 pb-1.5 flex items-center gap-1.5">
+                  <span>🔑</span>
+                  <span>2. Akun Admin Klien & Reset Password</span>
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Nama Admin / Owner *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editAdminName}
+                      onChange={(e) => setEditAdminName(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Email Login Admin *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editAdminEmail}
+                      onChange={(e) => setEditAdminEmail(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Reset Password Baru (Kosongkan jika tidak diubah)
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={editNewPassword}
+                        onChange={(e) => setEditNewPassword(e.target.value)}
+                        placeholder="Ketik password baru..."
+                        className="flex-1 rounded-lg border-gray-300 text-sm font-mono bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditNewPassword(generateStrongPassword())}
+                        className="px-2.5 py-1.5 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-lg text-xs font-bold whitespace-nowrap"
+                      >
+                        🎲 Acak
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  💡 Jika password diisi, sistem akan otomatis mengenkripsi password baru dan
+                  menghasilkan format pesan WhatsApp serah-terima untuk klien.
+                </p>
+              </div>
+
+              {/* Bagian 3: Tema, Tampilan & List Default */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-sm text-gray-900 border-b pb-1.5 text-indigo-700">
+                  3. Branding, Tema & Default Item Pagination
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Warna Utama Brand
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={editPrimaryColor}
+                        onChange={(e) => setEditPrimaryColor(e.target.value)}
+                        className="h-10 w-12 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={editPrimaryColor}
+                        onChange={(e) => setEditPrimaryColor(e.target.value)}
+                        className="flex-1 rounded-lg border-gray-300 text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Font Utama
+                    </label>
+                    <select
+                      value={editFontFamily}
+                      onChange={(e) => setEditFontFamily(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    >
+                      <option value="inter">Inter</option>
+                      <option value="poppins">Poppins</option>
+                      <option value="plus-jakarta-sans">Plus Jakarta Sans</option>
+                      <option value="playfair-display">Playfair Display</option>
+                      <option value="montserrat">Montserrat</option>
+                      <option value="roboto">Roboto</option>
+                      <option value="lora">Lora</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Default Item per Halaman
+                    </label>
+                    <select
+                      value={editDefaultPageSize}
+                      onChange={(e) => setEditDefaultPageSize(Number(e.target.value))}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    >
+                      <option value={10}>10 Item per Halaman</option>
+                      <option value={20}>20 Item per Halaman</option>
+                      <option value={25}>25 Item per Halaman</option>
+                      <option value={50}>50 Item per Halaman</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Judul Hero Banner
+                    </label>
+                    <input
+                      type="text"
+                      value={editHeroTitle}
+                      onChange={(e) => setEditHeroTitle(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Subjudul Hero Banner
+                    </label>
+                    <input
+                      type="text"
+                      value={editHeroSubtitle}
+                      onChange={(e) => setEditHeroSubtitle(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bagian 4: SEO, Tracking Pixel & Payment Gateway */}
+              <div className="space-y-3">
+                <h4 className="font-bold text-sm text-gray-900 border-b pb-1.5 text-indigo-700">
+                  4. Pixel Iklan & Payment Gateway
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Google Analytics 4 (GA4)
+                    </label>
+                    <input
+                      type="text"
+                      value={editGa4Id}
+                      onChange={(e) => setEditGa4Id(e.target.value)}
+                      placeholder="G-XXXXXXXXXX"
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Meta (Facebook) Pixel ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editMetaPixelId}
+                      onChange={(e) => setEditMetaPixelId(e.target.value)}
+                      placeholder="1234567890"
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      TikTok Pixel ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editTiktokPixelId}
+                      onChange={(e) => setEditTiktokPixelId(e.target.value)}
+                      placeholder="CXXXXXXXXXXXXXXX"
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Midtrans Merchant ID
+                    </label>
+                    <input
+                      type="text"
+                      value={editMidtransMerchantId}
+                      onChange={(e) => setEditMidtransMerchantId(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Midtrans Client Key
+                    </label>
+                    <input
+                      type="text"
+                      value={editMidtransClientKey}
+                      onChange={(e) => setEditMidtransClientKey(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Flip API Secret Key
+                    </label>
+                    <input
+                      type="password"
+                      value={editFlipApiKey}
+                      onChange={(e) => setEditFlipApiKey(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setEditModalTenant(null)}
+                  className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-7 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow transition disabled:opacity-50"
+                >
+                  {editSubmitting ? 'Menyimpan Perubahan...' : 'Simpan Semua Perubahan'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
