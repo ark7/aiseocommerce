@@ -174,7 +174,7 @@ export async function middleware(request: NextRequest) {
   const segments = path.split('/').filter(Boolean);
   const standaloneFirstSegments = [
     'products', 'product', 'categories', 'category', 'articles', 'penawaran', 'lp',
-    'cart', 'orders', 'admin', 'login', 'register', 'terms', 'privacy',
+    'cart', 'orders', 'admin', 'super-admin', 'login', 'register', 'terms', 'privacy',
     'syarat-ketentuan', 'kebijakan-privasi', 'unauthorized', 'api',
     '_next', 'static'
   ];
@@ -229,7 +229,7 @@ export async function middleware(request: NextRequest) {
     let domain = host.split(':')[0];
     if (domain === 'localhost' || domain === '127.0.0.1') {
       const segment = path.split('/')[1];
-      const standaloneRoutes = ['products', 'product', 'categories', 'category', 'articles', 'penawaran', 'cart', 'orders', 'admin', 'login', 'register', 'terms', 'privacy', 'syarat-ketentuan', 'kebijakan-privasi', 'lp'];
+      const standaloneRoutes = ['products', 'product', 'categories', 'category', 'articles', 'penawaran', 'cart', 'orders', 'admin', 'super-admin', 'login', 'register', 'terms', 'privacy', 'syarat-ketentuan', 'kebijakan-privasi', 'lp'];
       if (!segment || standaloneRoutes.includes(segment)) {
         domain = process.env.DEFAULT_STORE_DOMAIN || process.env.LANDING_STORE_DOMAIN || 'demo-store';
       } else {

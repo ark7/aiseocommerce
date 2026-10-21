@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
+    "tenant:bootstrap": "ts-node scripts/bootstrap-tenant.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
