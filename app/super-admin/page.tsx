@@ -215,6 +215,8 @@ export default function SuperAdminControlPlanePage() {
   const [editHeroTitle, setEditHeroTitle] = useState('');
   const [editHeroSubtitle, setEditHeroSubtitle] = useState('');
   const [editHeroCtaText, setEditHeroCtaText] = useState('Belanja Sekarang');
+  const [editDefaultSeoTitle, setEditDefaultSeoTitle] = useState('');
+  const [editDefaultSeoDescription, setEditDefaultSeoDescription] = useState('');
   const [editGa4Id, setEditGa4Id] = useState('');
   const [editMetaPixelId, setEditMetaPixelId] = useState('');
   const [editTiktokPixelId, setEditTiktokPixelId] = useState('');
@@ -407,6 +409,8 @@ export default function SuperAdminControlPlanePage() {
         setEditHeroTitle(s.heroTitle || '');
         setEditHeroSubtitle(s.heroSubtitle || '');
         setEditHeroCtaText(s.heroCtaText || 'Belanja Sekarang');
+        setEditDefaultSeoTitle(s.defaultSeoTitle || '');
+        setEditDefaultSeoDescription(s.defaultSeoDescription || '');
         setEditGa4Id(s.googleTagId || s.analyticsConfig?.ga4MeasurementId || '');
         setEditMetaPixelId(s.analyticsConfig?.metaPixelId || '');
         setEditTiktokPixelId(s.analyticsConfig?.tiktokPixelId || '');
@@ -453,6 +457,8 @@ export default function SuperAdminControlPlanePage() {
         heroTitle: editHeroTitle,
         heroSubtitle: editHeroSubtitle,
         heroCtaText: editHeroCtaText,
+        defaultSeoTitle: editDefaultSeoTitle,
+        defaultSeoDescription: editDefaultSeoDescription,
         ga4Id: editGa4Id,
         metaPixelId: editMetaPixelId,
         tiktokPixelId: editTiktokPixelId,
@@ -2330,6 +2336,32 @@ export default function SuperAdminControlPlanePage() {
                       type="text"
                       value={editHeroSubtitle}
                       onChange={(e) => setEditHeroSubtitle(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Judul Meta SEO Tab Browser (defaultSeoTitle)
+                    </label>
+                    <input
+                      type="text"
+                      value={editDefaultSeoTitle}
+                      onChange={(e) => setEditDefaultSeoTitle(e.target.value)}
+                      placeholder="Nama Toko - Tagline Resmi"
+                      className="w-full rounded-lg border-gray-300 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Deskripsi Meta SEO
+                    </label>
+                    <input
+                      type="text"
+                      value={editDefaultSeoDescription}
+                      onChange={(e) => setEditDefaultSeoDescription(e.target.value)}
+                      placeholder="Deskripsi singkat toko untuk Google..."
                       className="w-full rounded-lg border-gray-300 text-sm"
                     />
                   </div>

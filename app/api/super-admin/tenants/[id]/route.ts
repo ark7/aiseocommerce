@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { isControlPlaneEnabled, requireSuperAdminOwner } from '@/lib/superAdminAuth';
 import {
@@ -307,6 +308,15 @@ export async function PUT(request: Request, { params }: Context) {
           }),
         },
       }).catch(() => {});
+    }
+
+    // 5. Invalidate page cache so updates reflect immediately on the storefront
+    try {
+      revalidatePath('/', 'page');
+      revalidatePath('/products', 'page');
+      revalidatePath('/categories', 'page');
+    } catch {
+      // ignore
     }
 
     return NextResponse.json({

@@ -30,6 +30,12 @@ export default function StoreHeader({
   const [cartItemCount, setCartItemCount] = useState(0);
   const [user, setUser] = useState<{ id: string; email: string; role: string; firstName?: string; lastName?: string } | null>(null);
 
+  useEffect(() => {
+    if (storeName !== undefined) setName(storeName ?? null);
+    if (storeLogo !== undefined) setLogo(storeLogo ?? null);
+    if (storeAddress !== undefined) setAddress(storeAddress ?? null);
+  }, [storeName, storeLogo, storeAddress]);
+
   const updateCartCount = useCallback(() => {
     try {
       const stored = (storeDomain ? localStorage.getItem(`cart_${storeDomain}`) : null) || localStorage.getItem('cart');

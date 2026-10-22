@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { isControlPlaneEnabled } from '@/lib/superAdminAuth';
 
 export async function GET(request: Request) {
@@ -13,6 +14,14 @@ export async function GET(request: Request) {
   const domain = searchParams.get('domain');
   const redirectPath = searchParams.get('redirect') || '/';
   const clear = searchParams.get('clear') === 'true';
+
+  try {
+    revalidatePath('/');
+    revalidatePath('/products');
+    revalidatePath('/categories');
+  } catch {
+    // ignore outside dynamic request
+  }
 
   const redirectUrl = new URL(redirectPath, request.url);
   const response = NextResponse.redirect(redirectUrl);

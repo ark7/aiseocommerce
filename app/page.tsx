@@ -6,8 +6,10 @@ import Link from 'next/link';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import { Prisma } from '@prisma/client';
+import { getActiveStore } from '@/lib/store';
 
-export const revalidate = 300;
+// Revalidate immediately so changes made in Super-Admin or Preview Mode reflect instantly
+export const revalidate = 0;
 
 type LandingStore = Prisma.StoreGetPayload<{
   include: {
@@ -22,25 +24,26 @@ type LandingStore = Prisma.StoreGetPayload<{
 export default async function LandingPage() {
   let store: LandingStore | null = null;
   try {
-    const landingStoreDomain = process.env.LANDING_STORE_DOMAIN || process.env.DEFAULT_STORE_DOMAIN;
-    store = await prisma.store.findFirst({
-      where: landingStoreDomain ? { domain: landingStoreDomain } : {},
-      orderBy: { createdAt: 'asc' },
-      include: {
-        settings: true,
-        products: {
-          where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
-          take: 8,
-          orderBy: { createdAt: 'desc' },
-          include: { images: { where: { isPrimary: true }, take: 1 } },
+    const active = await getActiveStore();
+    if (active) {
+      store = await prisma.store.findUnique({
+        where: { id: active.id },
+        include: {
+          settings: true,
+          products: {
+            where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
+            take: 8,
+            orderBy: { createdAt: 'desc' },
+            include: { images: { where: { isPrimary: true }, take: 1 } },
+          },
+          articles: {
+            where: { isFeatured: true },
+            take: 6,
+            orderBy: { createdAt: 'desc' },
+          },
         },
-        articles: {
-          where: { isFeatured: true },
-          take: 6,
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    });
+      });
+    }
   } catch {
     store = null;
   }
