@@ -13,24 +13,26 @@ import {
   auditProductUpdated,
   auditProductDeleted,
 } from '@/services/auditService';
+import {
+  optimizeAndSaveImage,
+  validateRawImage,
+  MAX_RAW_UPLOAD_SIZE,
+} from '@/lib/imageOptimizer';
 
 const UPLOAD_DIR = './public/uploads';
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 async function ensureUploadDir() {
   await mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 }
 
-function generateFilename(originalName: string): string {
-  const ext = originalName.split('.').pop();
-  return `${randomUUID()}.${ext}`;
-}
-
-async function saveFile(file: File, filename: string): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const filePath = join(UPLOAD_DIR, filename);
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+async function saveFile(file: File, storeId?: string): Promise<string> {
+  const result = await optimizeAndSaveImage({
+    file,
+    type: 'product',
+    storeId,
+    originalFilename: file.name,
+  });
+  return result.url;
 }
 
 /**
@@ -278,9 +280,9 @@ export async function POST(request: Request) {
     
     const imageUrls: string[] = [];
     for (const image of images) {
-      if (image.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Image too large' }, { status: 400 });
-      const filename = generateFilename(image.name);
-      const url = await saveFile(image, filename);
+      const val = validateRawImage(image.size, image.type);
+      if (!val.valid) return NextResponse.json({ error: val.error }, { status: 400 });
+      const url = await saveFile(image, user.storeId);
       imageUrls.push(url);
     }
     
@@ -385,9 +387,9 @@ export async function PATCH(request: Request) {
     
     const newImageUrls: string[] = [];
     for (const image of images) {
-      if (image.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Image too large' }, { status: 400 });
-      const filename = generateFilename(image.name);
-      const url = await saveFile(image, filename);
+      const val = validateRawImage(image.size, image.type);
+      if (!val.valid) return NextResponse.json({ error: val.error }, { status: 400 });
+      const url = await saveFile(image, user.storeId);
       newImageUrls.push(url);
     }
     

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import ImageUploader from '@/components/ImageUploader';
 
 interface TenantItem {
   id: string;
@@ -1344,16 +1345,14 @@ export default function SuperAdminControlPlanePage() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      URL Logo Toko (Opsional)
-                    </label>
-                    <input
-                      type="url"
+                  <div className="md:col-span-2">
+                    <ImageUploader
+                      label="Logo Toko (Opsional)"
+                      description="Otomatis dikonversi ke WebP tajam & ringan"
+                      type="logo"
                       value={logoUrl}
-                      onChange={(e) => setLogoUrl(e.target.value)}
-                      placeholder="https://.../logo.png"
-                      className="w-full rounded-lg border-gray-300 text-sm"
+                      onChange={setLogoUrl}
+                      placeholderUrl="https://.../logo.png"
                     />
                   </div>
 
@@ -2167,16 +2166,14 @@ export default function SuperAdminControlPlanePage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">
-                      URL Logo Toko
-                    </label>
-                    <input
-                      type="url"
+                  <div className="md:col-span-2">
+                    <ImageUploader
+                      label="Logo Toko"
+                      description="Otomatis dikonversi ke WebP tajam & ringan"
+                      type="logo"
                       value={editLogoUrl}
-                      onChange={(e) => setEditLogoUrl(e.target.value)}
-                      placeholder="https://.../logo.png"
-                      className="w-full rounded-lg border-gray-300 text-sm"
+                      onChange={setEditLogoUrl}
+                      placeholderUrl="https://.../logo.png"
                     />
                   </div>
 

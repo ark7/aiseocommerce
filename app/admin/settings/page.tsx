@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import ImageUploader from '@/components/ImageUploader';
 import { getDefaultTerms, getDefaultPrivacy, DEFAULT_COOKIE_TITLE, DEFAULT_COOKIE_TEXT } from '@/lib/legalDefaults';
 
 interface SocialLinks {
@@ -629,33 +630,25 @@ export default function AdminSettingsPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">URL Logo Toko</label>
-              <input
-                type="url"
+            <div className="md:col-span-2">
+              <ImageUploader
+                label="Logo Toko"
+                description="Logo resmi yang tampil di header dan footer website toko Anda."
+                type="logo"
                 value={storeForm.logo}
-                onChange={(e) => setStoreForm({ ...storeForm, logo: e.target.value })}
-                placeholder="https://example.com/logo.png"
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                onChange={(url) => setStoreForm({ ...storeForm, logo: url })}
+                placeholderUrl="https://example.com/logo.png"
               />
-              {storeForm.logo && (
-                <div className="mt-2 flex items-center space-x-3">
-                  <span className="text-xs text-gray-500">Preview:</span>
-                  <div className="relative w-10 h-10 border rounded overflow-hidden">
-                    <Image src={storeForm.logo} alt="Preview Logo" fill className="object-contain" unoptimized />
-                  </div>
-                </div>
-              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">URL Favicon (.ico / .png)</label>
-              <input
-                type="url"
+              <ImageUploader
+                label="Favicon Toko (.ico / .png)"
+                description="Ikon kecil yang tampil pada tab browser pembeli."
+                type="favicon"
                 value={storeForm.favicon}
-                onChange={(e) => setStoreForm({ ...storeForm, favicon: e.target.value })}
-                placeholder="https://example.com/favicon.ico"
-                className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                onChange={(url) => setStoreForm({ ...storeForm, favicon: url })}
+                placeholderUrl="https://example.com/favicon.ico"
               />
             </div>
           </div>
@@ -922,13 +915,13 @@ export default function AdminSettingsPage() {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">URL Gambar Banner / Ilustrasi</label>
-                <input
-                  type="url"
+                <ImageUploader
+                  label="Gambar Banner Hero / Ilustrasi"
+                  description="Foto atau ilustrasi banner utama (maksimal 1920x1080px, otomatis dikompres ke WebP)."
+                  type="banner"
                   value={heroForm.heroImageUrl}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroImageUrl: e.target.value })}
-                  placeholder="https://images.unsplash.com/photo-... (Biarkan kosong untuk grafis default)"
-                  className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  onChange={(url) => setHeroForm({ ...heroForm, heroImageUrl: url })}
+                  placeholderUrl="https://images.unsplash.com/photo-..."
                 />
               </div>
             </div>
