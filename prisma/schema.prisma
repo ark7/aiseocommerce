@@ -116,6 +116,8 @@ model User {
   firstName     String?
   lastName      String?
   phone         String?
+  title         String?
+  permissions   Json?     @default("[]")
   role          Role      @default(CUSTOMER)
   isActive      Boolean   @default(true)
   emailVerified Boolean   @default(false)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken, getUserById } from '@/lib/auth';
+import { normalizePermissions } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     
+    const permissions = normalizePermissions((user as any).permissions);
     return NextResponse.json({
       success: true,
       user: {
@@ -29,6 +31,8 @@ export async function GET(request: Request) {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        title: (user as any).title ?? null,
+        permissions,
       },
     });
   } catch (error) {

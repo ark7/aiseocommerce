@@ -101,7 +101,16 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       success: true,
-      user: { id: result.user.id, email: result.user.email, role: result.user.role, storeId: result.user.storeId, firstName: result.user.firstName, lastName: result.user.lastName },
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        role: result.user.role,
+        storeId: result.user.storeId,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        title: result.user.title ?? null,
+        permissions: result.user.permissions ?? [],
+      },
       token: result.token,
       refreshToken: result.refreshToken,
     });

@@ -4,6 +4,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { getIPAddress, incrementLoginAttempts } from '@/middleware';
 import { NextRequest } from 'next/server';
 import { logger } from './logger';
+import { normalizePermissions } from './rbac';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -18,6 +19,8 @@ export interface UserPayload {
   storeId: string;
   email: string;
   role: string; // can be 'GUEST' | 'CUSTOMER' | 'STAFF' | 'ADMIN'
+  title?: string | null;
+  permissions?: string[];
 }
 
 export interface AuthResult {
@@ -28,6 +31,8 @@ export interface AuthResult {
     storeId: string;
     firstName?: string | null;
     lastName?: string | null;
+    title?: string | null;
+    permissions?: string[];
   };
   token: string;
   refreshToken: string;
@@ -127,15 +132,27 @@ export async function registerUser(
       data: { storeId, email, passwordHash, firstName, lastName, role: role as any },
     });
     
+    const permissions = normalizePermissions((user as any).permissions);
     const payload: UserPayload = {
       id: user.id,
       storeId: user.storeId,
       email: user.email,
       role: user.role,
+      title: (user as any).title ?? null,
+      permissions,
     };
     
     return {
-      user: { id: user.id, email: user.email, role: user.role, storeId: user.storeId, firstName: user.firstName, lastName: user.lastName },
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        storeId: user.storeId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        title: (user as any).title ?? null,
+        permissions,
+      },
       token: await generateToken(payload),
       refreshToken: await generateRefreshToken(payload),
     };
@@ -165,15 +182,27 @@ export async function loginUser(
       return null;
     }
     
+    const permissions = normalizePermissions((user as any).permissions);
     const payload: UserPayload = {
       id: user.id,
       storeId: user.storeId,
       email: user.email,
       role: user.role,
+      title: (user as any).title ?? null,
+      permissions,
     };
     
     return {
-      user: { id: user.id, email: user.email, role: user.role, storeId: user.storeId, firstName: user.firstName, lastName: user.lastName },
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        storeId: user.storeId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        title: (user as any).title ?? null,
+        permissions,
+      },
       token: await generateToken(payload),
       refreshToken: await generateRefreshToken(payload),
     };
@@ -193,6 +222,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ token:
       storeId: payload.storeId,
       email: payload.email,
       role: payload.role,
+      title: payload.title,
+      permissions: payload.permissions,
     });
     
     const newRefreshToken = await generateRefreshToken({
@@ -200,6 +231,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ token:
       storeId: payload.storeId,
       email: payload.email,
       role: payload.role,
+      title: payload.title,
+      permissions: payload.permissions,
     });
     
     return { token: newToken, refreshToken: newRefreshToken };
@@ -216,6 +249,16 @@ export async function logoutUser(token: string): Promise<void> {
 export async function getUserById(id: string) {
   return prisma.user.findUnique({
     where: { id },
-    select: { id: true, email: true, role: true, storeId: true, firstName: true, lastName: true, isActive: true },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      storeId: true,
+      firstName: true,
+      lastName: true,
+      title: true,
+      permissions: true,
+      isActive: true,
+    },
   });
 }
