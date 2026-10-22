@@ -11,6 +11,7 @@ import {
   validateCartSandboxSeparation,
   validateOrderSandboxIntegrity,
 } from '@/lib/paymentGateway';
+import { dispatchLowStockWarningNotification } from '@/lib/orderNotificationService';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -119,7 +120,9 @@ export async function createOrder(
   voucherCode?: string,
   expectedUnitPrices?: Record<string, number>
 ) {
-  return prisma.$transaction(async (tx) => {
+  const lowStockAlerts: Array<{ name: string; remaining: number; storeId: string }> = [];
+
+  const createdOrder = await prisma.$transaction(async (tx) => {
     const now = new Date();
 
     // Scoped by storeId: an id from another tenant must not be orderable, and
@@ -249,6 +252,11 @@ export async function createOrder(
         if (stockTaken.count === 0) {
           throw new Error(`Insufficient stock for product ${product.name}`);
         }
+
+        const remaining = product.stock - item.quantity;
+        if (remaining <= 3) {
+          lowStockAlerts.push({ name: product.name, remaining, storeId });
+        }
       }
     }
 
@@ -297,6 +305,12 @@ export async function createOrder(
       data: { subtotal, discount, totalAmount: subtotal - discount },
     });
   });
+
+  for (const alert of lowStockAlerts) {
+    dispatchLowStockWarningNotification(alert.name, alert.remaining, alert.storeId);
+  }
+
+  return createdOrder;
 }
 
 export async function processOrderPayment(

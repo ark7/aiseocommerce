@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { dispatchPaymentProofNotification } from '@/lib/orderNotificationService';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       status: 'PENDING' as const,
     };
 
-    await prisma.$transaction([
+    const [savedPayment] = await prisma.$transaction([
       existingPayment
         ? prisma.payment.update({ where: { id: existingPayment.id }, data: paymentData })
         : prisma.payment.create({ data: { orderId, ...paymentData } }),
@@ -78,6 +79,8 @@ export async function POST(request: Request) {
         },
       }),
     ]);
+
+    dispatchPaymentProofNotification(savedPayment.id);
     
     return NextResponse.json({
       success: true,

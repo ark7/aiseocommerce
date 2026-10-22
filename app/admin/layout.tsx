@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { verifyToken } from '@/lib/auth';
+import AdminAiDrawer from '@/components/AdminAiDrawer';
 
 interface User {
   id: string;
@@ -247,6 +248,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </main>
       </div>
+
+      {/* Slide-Over AI Copilot Assistant Drawer */}
+      <AdminAiDrawer />
     </div>
   );
 }

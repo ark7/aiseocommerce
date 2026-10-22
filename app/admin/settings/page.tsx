@@ -161,7 +161,51 @@ const EMPTY_LEGAL_FORM: LegalForm = {
   cookieConsentText: '',
 };
 
-type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal';
+interface AiForm {
+  aiProvider: 'GEMINI' | 'OPENAI';
+  aiApiKey: string;
+  aiModel: string;
+  aiCustomPrompt: string;
+}
+
+const EMPTY_AI_FORM: AiForm = {
+  aiProvider: 'GEMINI',
+  aiApiKey: '',
+  aiModel: 'gemini-1.5-flash',
+  aiCustomPrompt: '',
+};
+
+interface NotificationForm {
+  notifyTelegramEnabled: boolean;
+  notifyTelegramBotToken: string;
+  notifyTelegramChatId: string;
+  notifyWhatsappEnabled: boolean;
+  notifyWhatsappProvider: 'FONNTE' | 'GENERIC_WEBHOOK';
+  notifyWhatsappToken: string;
+  notifyWhatsappTargetPhone: string;
+  notifyLowStockThreshold: number;
+  notifyOnNewOrder: boolean;
+  notifyOnPaymentProof: boolean;
+  notifyOnPaymentSuccess: boolean;
+  notifyOnLowStock: boolean;
+}
+
+const EMPTY_NOTIFICATION_FORM: NotificationForm = {
+  notifyTelegramEnabled: false,
+  notifyTelegramBotToken: '',
+  notifyTelegramChatId: '',
+  notifyWhatsappEnabled: false,
+  notifyWhatsappProvider: 'FONNTE',
+  notifyWhatsappToken: '',
+  notifyWhatsappTargetPhone: '',
+  notifyLowStockThreshold: 3,
+  notifyOnNewOrder: true,
+  notifyOnPaymentProof: true,
+  notifyOnPaymentSuccess: true,
+  notifyOnLowStock: true,
+};
+
+type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications';
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -172,6 +216,14 @@ export default function AdminSettingsPage() {
   const [turnstileForm, setTurnstileForm] = useState<TurnstileForm>(EMPTY_TURNSTILE);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(EMPTY_PAYMENT_FORM);
   const [legalForm, setLegalForm] = useState<LegalForm>(EMPTY_LEGAL_FORM);
+  const [aiForm, setAiForm] = useState<AiForm>(EMPTY_AI_FORM);
+  const [notificationForm, setNotificationForm] = useState<NotificationForm>(EMPTY_NOTIFICATION_FORM);
+
+  const [testingAi, setTestingAi] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const [testingNotify, setTestingNotify] = useState<'TELEGRAM' | 'WHATSAPP' | null>(null);
+  const [notifyTestResult, setNotifyTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -240,6 +292,28 @@ export default function AdminSettingsPage() {
           midtransSandboxClientKey: s.midtransSandboxClientKey || '',
           midtransSandboxServerKey: s.midtransSandboxServerKey || '',
           flipSandboxApiKey: s.flipSandboxApiKey || '',
+        });
+
+        setAiForm({
+          aiProvider: s.aiProvider || 'GEMINI',
+          aiApiKey: s.aiApiKey || '',
+          aiModel: s.aiModel || 'gemini-1.5-flash',
+          aiCustomPrompt: s.aiCustomPrompt || '',
+        });
+
+        setNotificationForm({
+          notifyTelegramEnabled: s.notifyTelegramEnabled ?? false,
+          notifyTelegramBotToken: s.notifyTelegramBotToken || '',
+          notifyTelegramChatId: s.notifyTelegramChatId || '',
+          notifyWhatsappEnabled: s.notifyWhatsappEnabled ?? false,
+          notifyWhatsappProvider: s.notifyWhatsappProvider || 'FONNTE',
+          notifyWhatsappToken: s.notifyWhatsappToken || '',
+          notifyWhatsappTargetPhone: s.notifyWhatsappTargetPhone || '',
+          notifyLowStockThreshold: s.notifyLowStockThreshold ?? 3,
+          notifyOnNewOrder: s.notifyOnNewOrder ?? true,
+          notifyOnPaymentProof: s.notifyOnPaymentProof ?? true,
+          notifyOnPaymentSuccess: s.notifyOnPaymentSuccess ?? true,
+          notifyOnLowStock: s.notifyOnLowStock ?? true,
         });
       }
 
@@ -509,6 +583,133 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const saveAi = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiForm),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan pengaturan AI.');
+      }
+
+      setNotice('Pengaturan Asisten AI (BYOK) berhasil disimpan.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestAi = async () => {
+    setTestingAi(true);
+    setAiTestResult(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/ai/test', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: aiForm.aiProvider,
+          apiKey: aiForm.aiApiKey,
+          model: aiForm.aiModel,
+        }),
+      });
+
+      const data = await res.json();
+      setAiTestResult({
+        success: res.ok && data.success,
+        message: data.message || (res.ok ? 'Koneksi AI berhasil!' : 'Gagal terhubung ke AI.'),
+      });
+    } catch (err: any) {
+      setAiTestResult({
+        success: false,
+        message: err.message || 'Gagal menguji koneksi AI.',
+      });
+    } finally {
+      setTestingAi(false);
+    }
+  };
+
+  const saveNotifications = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(notificationForm),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan pengaturan notifikasi.');
+      }
+
+      setNotice('Pengaturan Notifikasi Pesanan berhasil disimpan.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestNotification = async (channel: 'TELEGRAM' | 'WHATSAPP') => {
+    setTestingNotify(channel);
+    setNotifyTestResult(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/notifications/test', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel,
+          telegramBotToken: notificationForm.notifyTelegramBotToken,
+          telegramChatId: notificationForm.notifyTelegramChatId,
+          whatsappProvider: notificationForm.notifyWhatsappProvider,
+          whatsappToken: notificationForm.notifyWhatsappToken,
+          whatsappTargetPhone: notificationForm.notifyWhatsappTargetPhone,
+        }),
+      });
+
+      const data = await res.json();
+      setNotifyTestResult({
+        success: res.ok && data.success,
+        message: data.message || (res.ok ? 'Notifikasi uji coba berhasil dikirim!' : 'Gagal mengirim notifikasi uji coba.'),
+      });
+    } catch (err: any) {
+      setNotifyTestResult({
+        success: false,
+        message: err.message || 'Gagal mengirim notifikasi uji coba.',
+      });
+    } finally {
+      setTestingNotify(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 max-w-5xl mx-auto flex items-center justify-center min-h-[400px]">
@@ -595,6 +796,28 @@ export default function AdminSettingsPage() {
           }`}
         >
           📄 Halaman Legal & Cookie
+        </button>
+        <button
+          onClick={() => setActiveTab('ai')}
+          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
+            activeTab === 'ai'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <span>✨</span>
+          <span>AI Assistant (BYOK)</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('notifications')}
+          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
+            activeTab === 'notifications'
+              ? 'border-indigo-600 text-indigo-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <span>📲</span>
+          <span>Notifikasi (WA & Telegram)</span>
         </button>
       </div>
 
@@ -1607,6 +1830,467 @@ export default function AdminSettingsPage() {
               className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
             >
               {saving ? 'Menyimpan...' : 'Simpan Pengaturan Legal & Cookie'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 6: AI ASSISTANT (BYOK) */}
+      {activeTab === 'ai' && (
+        <form onSubmit={saveAi} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+          <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <span>✨ Integrasi AI Assistant (Bring Your Own Key)</span>
+              </h2>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Hubungkan API Key AI toko Anda untuk mengaktifkan AI Copilot di panel kanan, generator copywriting, dan analisa penjualan.
+              </p>
+            </div>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition shrink-0"
+            >
+              <span>🔑 Dapatkan Gemini API Key Gratis</span>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Provider AI
+              </label>
+              <select
+                value={aiForm.aiProvider}
+                onChange={(e) => {
+                  const prov = e.target.value as 'GEMINI' | 'OPENAI';
+                  setAiForm({
+                    ...aiForm,
+                    aiProvider: prov,
+                    aiModel: prov === 'GEMINI' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+                  });
+                }}
+                className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="GEMINI">Google Gemini (Disarankan - Cepat, Cerdas & Kuota Gratis)</option>
+                <option value="OPENAI">OpenAI (ChatGPT)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Google Gemini 1.5 Flash menyediakan kuota Free Tier resmi tanpa biaya per bulan.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+                Pilihan Model AI
+              </label>
+              <select
+                value={aiForm.aiModel}
+                onChange={(e) => setAiForm({ ...aiForm, aiModel: e.target.value })}
+                className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                {aiForm.aiProvider === 'GEMINI' ? (
+                  <>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash (Paling Cepat, Hemat Biaya)</option>
+                    <option value="gemini-2.0-flash">gemini-2.0-flash (Generasi Terbaru)</option>
+                    <option value="gemini-1.5-pro">gemini-1.5-pro (Penalaran Kompleks)</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="gpt-4o-mini">gpt-4o-mini (Cepat & Ringan)</option>
+                    <option value="gpt-4o">gpt-4o (Kemampuan Tertinggi)</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                API Key ({aiForm.aiProvider})
+              </label>
+              <button
+                type="button"
+                onClick={handleTestAi}
+                disabled={testingAi || !aiForm.aiApiKey}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40 flex items-center space-x-1"
+              >
+                {testingAi ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    <span>Menguji...</span>
+                  </>
+                ) : (
+                  <span>⚡ Uji Koneksi API Key</span>
+                )}
+              </button>
+            </div>
+            <input
+              type="password"
+              value={aiForm.aiApiKey}
+              onChange={(e) => setAiForm({ ...aiForm, aiApiKey: e.target.value })}
+              placeholder={aiForm.aiProvider === 'GEMINI' ? 'AIzaSy...' : 'sk-...'}
+              className="w-full text-sm font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+            />
+            {aiTestResult && (
+              <div
+                className={`mt-2 p-2.5 rounded-lg text-xs flex items-center space-x-2 ${
+                  aiTestResult.success
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-red-50 text-red-800 border border-red-200'
+                }`}
+              >
+                <span>{aiTestResult.success ? '✅' : '❌'}</span>
+                <span>{aiTestResult.message}</span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
+              Persona & Gaya Bahasa Toko (Custom Prompt)
+            </label>
+            <textarea
+              rows={3}
+              value={aiForm.aiCustomPrompt}
+              onChange={(e) => setAiForm({ ...aiForm, aiCustomPrompt: e.target.value })}
+              placeholder="Contoh: Gunakan sapaan 'Kakak', gaya bicara santai, ceria, dan ramah. Tekankan bahwa semua produk kami berbahan 100% organik dan bergaransi resmi."
+              className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500 placeholder-gray-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              AI akan otomatis mengadopsi instruksi gaya bahasa ini setiap kali merespon di panel chat kanan atau membuat deskripsi produk.
+            </p>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
+            >
+              {saving ? 'Menyimpan...' : 'Simpan Pengaturan AI Assistant'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 7: NOTIFIKASI PESANAN (TELEGRAM & WHATSAPP) */}
+      {activeTab === 'notifications' && (
+        <form onSubmit={saveNotifications} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-8">
+          <div className="border-b border-gray-100 pb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+              <span>📲 Notifikasi Pesanan Real-Time (Telegram & WhatsApp)</span>
+            </h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Dapatkan peringatan instan di HP Anda ketika ada pesanan baru, bukti transfer diunggah, atau stok produk menipis.
+            </p>
+          </div>
+
+          {/* Alert hasil uji coba notifikasi jika ada */}
+          {notifyTestResult && (
+            <div
+              className={`p-3 rounded-lg text-xs flex items-center space-x-2 ${
+                notifyTestResult.success
+                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  : 'bg-red-50 text-red-800 border border-red-200'
+              }`}
+            >
+              <span>{notifyTestResult.success ? '✅' : '❌'}</span>
+              <span>{notifyTestResult.message}</span>
+            </div>
+          )}
+
+          {/* KANAL 1: TELEGRAM BOT */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white text-xl shadow-sm">
+                  ✈️
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Telegram Bot (Gratis & Unlimited)</h3>
+                  <p className="text-xs text-gray-500">Kirim notifikasi ke akun pribadi Anda atau ke Grup Tim Staf Toko.</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notificationForm.notifyTelegramEnabled}
+                  onChange={(e) =>
+                    setNotificationForm({ ...notificationForm, notifyTelegramEnabled: e.target.checked })
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {notificationForm.notifyTelegramEnabled && (
+              <div className="pt-3 border-t border-slate-200/60 space-y-4">
+                <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-lg text-xs text-blue-800 leading-relaxed">
+                  <div className="font-semibold mb-1">Panduan Cepat Buat Bot Telegram (2 Menit):</div>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px]">
+                    <li>Buka aplikasi Telegram dan cari bot resmi <b>@BotFather</b>.</li>
+                    <li>Ketik <code>/newbot</code>, beri nama bot toko Anda, lalu salin <b>Bot Token</b> yang diberikan.</li>
+                    <li>Mulai chat dengan bot Anda (klik Start). Untuk mengetahui <b>Chat ID</b> Anda, kirim pesan ke <b>@userinfobot</b>.</li>
+                  </ol>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Telegram Bot Token
+                    </label>
+                    <input
+                      type="password"
+                      value={notificationForm.notifyTelegramBotToken}
+                      onChange={(e) =>
+                        setNotificationForm({ ...notificationForm, notifyTelegramBotToken: e.target.value })
+                      }
+                      placeholder="123456789:ABCdefGhIJKlmNoPQRst..."
+                      className="w-full text-xs font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Telegram Chat ID (Akun atau Grup)
+                    </label>
+                    <input
+                      type="text"
+                      value={notificationForm.notifyTelegramChatId}
+                      onChange={(e) =>
+                        setNotificationForm({ ...notificationForm, notifyTelegramChatId: e.target.value })
+                      }
+                      placeholder="Contoh: 12345678 atau -100123456789 (grup)"
+                      className="w-full text-xs font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleTestNotification('TELEGRAM')}
+                    disabled={testingNotify === 'TELEGRAM' || !notificationForm.notifyTelegramBotToken || !notificationForm.notifyTelegramChatId}
+                    className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 disabled:opacity-40 flex items-center space-x-1.5 shadow-2xs"
+                  >
+                    {testingNotify === 'TELEGRAM' ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Mengirim Uji Coba...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔔 Kirim Pesan Uji Coba Telegram</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* KANAL 2: WHATSAPP GATEWAY */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xl shadow-sm">
+                  💬
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">WhatsApp Gateway (Fonnte / Webhook)</h3>
+                  <p className="text-xs text-gray-500">Kirim notifikasi langsung ke nomor WhatsApp pribadi admin/owner.</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notificationForm.notifyWhatsappEnabled}
+                  onChange={(e) =>
+                    setNotificationForm({ ...notificationForm, notifyWhatsappEnabled: e.target.checked })
+                  }
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {notificationForm.notifyWhatsappEnabled && (
+              <div className="pt-3 border-t border-slate-200/60 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Provider Gateway
+                    </label>
+                    <select
+                      value={notificationForm.notifyWhatsappProvider}
+                      onChange={(e) =>
+                        setNotificationForm({
+                          ...notificationForm,
+                          notifyWhatsappProvider: e.target.value as 'FONNTE' | 'GENERIC_WEBHOOK',
+                        })
+                      }
+                      className="w-full text-xs border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                      <option value="FONNTE">Fonnte API (fonnte.com)</option>
+                      <option value="GENERIC_WEBHOOK">Custom Webhook (HTTP POST)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Token API / Webhook URL
+                    </label>
+                    <input
+                      type="password"
+                      value={notificationForm.notifyWhatsappToken}
+                      onChange={(e) =>
+                        setNotificationForm({ ...notificationForm, notifyWhatsappToken: e.target.value })
+                      }
+                      placeholder="Token Fonnte atau URL Webhook"
+                      className="w-full text-xs font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Nomor WhatsApp Tujuan
+                    </label>
+                    <input
+                      type="text"
+                      value={notificationForm.notifyWhatsappTargetPhone}
+                      onChange={(e) =>
+                        setNotificationForm({ ...notificationForm, notifyWhatsappTargetPhone: e.target.value })
+                      }
+                      placeholder="Contoh: 081234567890"
+                      className="w-full text-xs font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleTestNotification('WHATSAPP')}
+                    disabled={testingNotify === 'WHATSAPP' || !notificationForm.notifyWhatsappToken || !notificationForm.notifyWhatsappTargetPhone}
+                    className="px-3.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-medium hover:bg-emerald-700 disabled:opacity-40 flex items-center space-x-1.5 shadow-2xs"
+                  >
+                    {testingNotify === 'WHATSAPP' ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Mengirim Uji Coba...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔔 Kirim Pesan Uji Coba WhatsApp</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CHECKLIST EVENT NOTIFIKASI */}
+          <div className="border border-gray-200 rounded-xl p-5 space-y-4">
+            <h3 className="text-sm font-bold text-gray-900">Peristiwa Notifikasi yang Diaktifkan</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                <input
+                  type="checkbox"
+                  checked={notificationForm.notifyOnNewOrder}
+                  onChange={(e) =>
+                    setNotificationForm({ ...notificationForm, notifyOnNewOrder: e.target.checked })
+                  }
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">🛍️ Pesanan Baru Masuk</div>
+                  <div className="text-[11px] text-gray-500">Kirim alert saat pembeli selesai membuat pesanan baru.</div>
+                </div>
+              </label>
+
+              <label className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                <input
+                  type="checkbox"
+                  checked={notificationForm.notifyOnPaymentProof}
+                  onChange={(e) =>
+                    setNotificationForm({ ...notificationForm, notifyOnPaymentProof: e.target.checked })
+                  }
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">📸 Bukti Transfer Diunggah</div>
+                  <div className="text-[11px] text-gray-500">Alert segera verifikasi struk transfer bank manual.</div>
+                </div>
+              </label>
+
+              <label className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                <input
+                  type="checkbox"
+                  checked={notificationForm.notifyOnPaymentSuccess}
+                  onChange={(e) =>
+                    setNotificationForm({ ...notificationForm, notifyOnPaymentSuccess: e.target.checked })
+                  }
+                  className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-0.5"
+                />
+                <div>
+                  <div className="text-xs font-semibold text-gray-800">🎉 Pembayaran Lunas</div>
+                  <div className="text-[11px] text-gray-500">Pemberitahuan untuk segera mengemas & mengirimkan produk.</div>
+                </div>
+              </label>
+
+              <div className="p-3 bg-gray-50 rounded-lg space-y-2">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notificationForm.notifyOnLowStock}
+                    onChange={(e) =>
+                      setNotificationForm({ ...notificationForm, notifyOnLowStock: e.target.checked })
+                    }
+                    className="rounded text-indigo-600 focus:ring-indigo-500 h-4 w-4 mt-0.5"
+                  />
+                  <div>
+                    <div className="text-xs font-semibold text-gray-800">⚠️ Peringatan Stok Menipis</div>
+                    <div className="text-[11px] text-gray-500">Kirim alert jika sisa stok produk mencapai ambang batas.</div>
+                  </div>
+                </label>
+                {notificationForm.notifyOnLowStock && (
+                  <div className="pl-7 flex items-center space-x-2 text-xs text-gray-600">
+                    <span>Ambang batas minimum:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={notificationForm.notifyLowStockThreshold}
+                      onChange={(e) =>
+                        setNotificationForm({
+                          ...notificationForm,
+                          notifyLowStockThreshold: parseInt(e.target.value) || 1,
+                        })
+                      }
+                      className="w-16 text-xs p-1 border-gray-300 rounded text-center"
+                    />
+                    <span>unit</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
+            >
+              {saving ? 'Menyimpan...' : 'Simpan Pengaturan Notifikasi'}
             </button>
           </div>
         </form>

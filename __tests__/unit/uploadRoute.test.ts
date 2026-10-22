@@ -197,3 +197,4 @@ describe('POST /api/upload', () => {
     expect(body.error).toContain('Terjadi kesalahan saat memproses dan mengompresi gambar');
   });
 });
+

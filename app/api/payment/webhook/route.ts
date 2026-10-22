@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { recordOrderIncome } from '@/services/transactionService';
+import { dispatchPaymentVerifiedNotification } from '@/lib/orderNotificationService';
 import { resolveGatewayCredentials } from '@/lib/paymentGateway';
 import crypto from 'crypto';
 
@@ -173,6 +174,7 @@ export async function POST(request: Request) {
     // order as paid and the money nowhere. Idempotent per order.
     if (result.status === 'PAID') {
       await recordOrderIncome(prisma, order);
+      dispatchPaymentVerifiedNotification(result.orderId);
     }
 
     return NextResponse.json({

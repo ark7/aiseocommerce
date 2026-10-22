@@ -34,6 +34,9 @@ model Store {
   voucherClaims    VoucherClaim[]
   articles         Article[]
   landingPages     LandingPage[]
+  systemErrorLogs  SystemErrorLog[]
+  pageViewLogs     PageViewLog[]
+  dailyMetrics     DailyStoreMetric[]
 
   @@map("stores")
 }
@@ -80,6 +83,24 @@ model StoreSettings {
   cookieConsentEnabled  Boolean  @default(true)
   cookieConsentTitle    String?  @default("Pemberitahuan & Izin Cookie")
   cookieConsentText     String?  @db.Text
+  // === AI Assistant (BYOK) ===
+  aiProvider               String?   @default("GEMINI")
+  aiApiKey                 String?
+  aiModel                  String?   @default("gemini-1.5-flash")
+  aiCustomPrompt           String?   @db.Text
+  // === Notifikasi Pesanan (Telegram & WhatsApp) ===
+  notifyTelegramEnabled    Boolean   @default(false)
+  notifyTelegramBotToken   String?
+  notifyTelegramChatId     String?
+  notifyWhatsappEnabled    Boolean   @default(false)
+  notifyWhatsappProvider   String?   @default("FONNTE")
+  notifyWhatsappToken      String?
+  notifyWhatsappTargetPhone String?
+  notifyLowStockThreshold  Int       @default(3)
+  notifyOnNewOrder         Boolean   @default(true)
+  notifyOnPaymentProof     Boolean   @default(true)
+  notifyOnPaymentSuccess   Boolean   @default(true)
+  notifyOnLowStock         Boolean   @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -544,4 +565,61 @@ model LandingPage {
 
   @@unique([storeId, slug])
   @@map("landing_pages")
+}
+
+// ---------- TELEMETRY & OBSERVABILITY MODELS ----------
+model SystemErrorLog {
+  id         String    @id @default(cuid())
+  storeId    String?
+  store      Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  severity   String    @default("ERROR")
+  source     String
+  message    String    @db.Text
+  stack      String?   @db.Text
+  path       String?
+  method     String?
+  statusCode Int?
+  ipAddress  String?
+  userAgent  String?
+  context    Json?
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([severity, createdAt])
+  @@map("system_error_logs")
+}
+
+model PageViewLog {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  path       String
+  referrer   String?
+  deviceType String?
+  browser    String?
+  sessionId  String
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@map("page_view_logs")
+}
+
+model DailyStoreMetric {
+  id             String   @id @default(cuid())
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date           DateTime
+  totalViews     Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  topPaths       Json     @default("[]")
+  referrers      Json     @default("[]")
+  devices        Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([storeId, date])
+  @@map("daily_store_metrics")
 }

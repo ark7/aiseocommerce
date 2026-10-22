@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { PriceChangedError, VoucherError, createOrder } from '@/services/transactionService'
+import { dispatchOrderCreatedNotification } from '@/lib/orderNotificationService'
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { OrderStatus } from '@prisma/client'
@@ -134,6 +135,8 @@ export async function POST(request: Request) {
       validatedData.voucherCode,
       validatedData.expectedUnitPrices
     )
+
+    dispatchOrderCreatedNotification(order.id)
 
     return NextResponse.json({
       success: true,

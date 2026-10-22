@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth';
 import { auditPaymentVerified } from '@/services/auditService';
 import { recordOrderIncome } from '@/services/transactionService';
 import { getIPAddress } from '@/lib/ip';
+import { dispatchPaymentVerifiedNotification } from '@/lib/orderNotificationService';
 
 export async function POST(request: Request) {
   try {
@@ -62,6 +63,8 @@ export async function POST(request: Request) {
         ip
       );
       
+      dispatchPaymentVerifiedNotification(payment.orderId);
+
       return NextResponse.json({ success: true, message: 'Payment approved', payment: { id: payment.id, status: 'PAID' } });
     } else {
       await prisma.payment.update({

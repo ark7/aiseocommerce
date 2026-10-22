@@ -54,6 +54,26 @@ const GeneralSettingsUpdateSchema = z.object({
   midtransSandboxClientKey: z.string().optional().nullable(),
   midtransSandboxServerKey: z.string().optional().nullable(),
   flipSandboxApiKey: z.string().optional().nullable(),
+
+  // AI Assistant (BYOK)
+  aiProvider: z.enum(['GEMINI', 'OPENAI']).optional().nullable(),
+  aiApiKey: z.string().optional().nullable(),
+  aiModel: z.string().optional().nullable(),
+  aiCustomPrompt: z.string().optional().nullable(),
+
+  // Order Notifications (Telegram & WhatsApp)
+  notifyTelegramEnabled: z.boolean().optional(),
+  notifyTelegramBotToken: z.string().optional().nullable(),
+  notifyTelegramChatId: z.string().optional().nullable(),
+  notifyWhatsappEnabled: z.boolean().optional(),
+  notifyWhatsappProvider: z.enum(['FONNTE', 'GENERIC_WEBHOOK']).optional().nullable(),
+  notifyWhatsappToken: z.string().optional().nullable(),
+  notifyWhatsappTargetPhone: z.string().optional().nullable(),
+  notifyLowStockThreshold: z.coerce.number().int().min(1).max(100).optional(),
+  notifyOnNewOrder: z.boolean().optional(),
+  notifyOnPaymentProof: z.boolean().optional(),
+  notifyOnPaymentSuccess: z.boolean().optional(),
+  notifyOnLowStock: z.boolean().optional(),
 });
 
 export async function GET(request: Request) {
@@ -116,6 +136,26 @@ export async function GET(request: Request) {
         midtransSandboxClientKey: s?.midtransSandboxClientKey ?? null,
         midtransSandboxServerKey: s?.midtransSandboxServerKey ? '********' : null,
         flipSandboxApiKey: s?.flipSandboxApiKey ? '********' : null,
+
+        // AI Assistant (BYOK)
+        aiProvider: s?.aiProvider ?? 'GEMINI',
+        aiApiKey: s?.aiApiKey ? '********' : null,
+        aiModel: s?.aiModel ?? 'gemini-1.5-flash',
+        aiCustomPrompt: s?.aiCustomPrompt ?? null,
+
+        // Order Notifications (Telegram & WhatsApp)
+        notifyTelegramEnabled: s?.notifyTelegramEnabled ?? false,
+        notifyTelegramBotToken: s?.notifyTelegramBotToken ? '********' : null,
+        notifyTelegramChatId: s?.notifyTelegramChatId ?? null,
+        notifyWhatsappEnabled: s?.notifyWhatsappEnabled ?? false,
+        notifyWhatsappProvider: s?.notifyWhatsappProvider ?? 'FONNTE',
+        notifyWhatsappToken: s?.notifyWhatsappToken ? '********' : null,
+        notifyWhatsappTargetPhone: s?.notifyWhatsappTargetPhone ?? null,
+        notifyLowStockThreshold: s?.notifyLowStockThreshold ?? 3,
+        notifyOnNewOrder: s?.notifyOnNewOrder ?? true,
+        notifyOnPaymentProof: s?.notifyOnPaymentProof ?? true,
+        notifyOnPaymentSuccess: s?.notifyOnPaymentSuccess ?? true,
+        notifyOnLowStock: s?.notifyOnLowStock ?? true,
       },
     });
   } catch (error) {
@@ -195,6 +235,32 @@ export async function PUT(request: Request) {
     if (data.flipSandboxApiKey !== undefined && data.flipSandboxApiKey !== '********') {
       settingsUpdateData.flipSandboxApiKey = data.flipSandboxApiKey ? data.flipSandboxApiKey.trim() : null;
     }
+
+    // AI Assistant (BYOK)
+    if (data.aiProvider !== undefined) settingsUpdateData.aiProvider = data.aiProvider;
+    if (data.aiApiKey !== undefined && data.aiApiKey !== '********') {
+      settingsUpdateData.aiApiKey = data.aiApiKey ? data.aiApiKey.trim() : null;
+    }
+    if (data.aiModel !== undefined) settingsUpdateData.aiModel = data.aiModel ? data.aiModel.trim() : 'gemini-1.5-flash';
+    if (data.aiCustomPrompt !== undefined) settingsUpdateData.aiCustomPrompt = data.aiCustomPrompt ? data.aiCustomPrompt.trim() : null;
+
+    // Order Notifications (Telegram & WhatsApp)
+    if (data.notifyTelegramEnabled !== undefined) settingsUpdateData.notifyTelegramEnabled = data.notifyTelegramEnabled;
+    if (data.notifyTelegramBotToken !== undefined && data.notifyTelegramBotToken !== '********') {
+      settingsUpdateData.notifyTelegramBotToken = data.notifyTelegramBotToken ? data.notifyTelegramBotToken.trim() : null;
+    }
+    if (data.notifyTelegramChatId !== undefined) settingsUpdateData.notifyTelegramChatId = data.notifyTelegramChatId ? data.notifyTelegramChatId.trim() : null;
+    if (data.notifyWhatsappEnabled !== undefined) settingsUpdateData.notifyWhatsappEnabled = data.notifyWhatsappEnabled;
+    if (data.notifyWhatsappProvider !== undefined) settingsUpdateData.notifyWhatsappProvider = data.notifyWhatsappProvider;
+    if (data.notifyWhatsappToken !== undefined && data.notifyWhatsappToken !== '********') {
+      settingsUpdateData.notifyWhatsappToken = data.notifyWhatsappToken ? data.notifyWhatsappToken.trim() : null;
+    }
+    if (data.notifyWhatsappTargetPhone !== undefined) settingsUpdateData.notifyWhatsappTargetPhone = data.notifyWhatsappTargetPhone ? data.notifyWhatsappTargetPhone.trim() : null;
+    if (data.notifyLowStockThreshold !== undefined) settingsUpdateData.notifyLowStockThreshold = data.notifyLowStockThreshold;
+    if (data.notifyOnNewOrder !== undefined) settingsUpdateData.notifyOnNewOrder = data.notifyOnNewOrder;
+    if (data.notifyOnPaymentProof !== undefined) settingsUpdateData.notifyOnPaymentProof = data.notifyOnPaymentProof;
+    if (data.notifyOnPaymentSuccess !== undefined) settingsUpdateData.notifyOnPaymentSuccess = data.notifyOnPaymentSuccess;
+    if (data.notifyOnLowStock !== undefined) settingsUpdateData.notifyOnLowStock = data.notifyOnLowStock;
 
     if (Object.keys(settingsUpdateData).length > 0) {
       await prisma.storeSettings.upsert({
