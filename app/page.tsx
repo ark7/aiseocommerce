@@ -29,7 +29,7 @@ export default async function LandingPage() {
       include: {
         settings: true,
         products: {
-          where: { isPublished: true, isFeatured: true },
+          where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
           take: 8,
           orderBy: { createdAt: 'desc' },
           include: { images: { where: { isPrimary: true }, take: 1 } },

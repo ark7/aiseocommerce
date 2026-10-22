@@ -24,8 +24,15 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const category = searchParams.get('category');
     const search = searchParams.get('search');
+    const includeSandbox = searchParams.get('includeSandbox') === 'true';
+    const sandboxOnly = searchParams.get('sandbox') === 'true';
     
     const where: any = { storeId: user.storeId };
+    if (sandboxOnly) {
+      where.isSandbox = true;
+    } else if (!includeSandbox) {
+      where.isSandbox = false;
+    }
     if (type) where.type = type;
     if (category) where.category = category;
     if (search) where.OR = [

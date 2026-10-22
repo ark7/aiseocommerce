@@ -57,7 +57,7 @@ export default async function CategoriesListPage({ searchParams }: CategoriesLis
         _count: {
           select: {
             products: {
-              where: { isPublished: true },
+              where: { isPublished: true, sandboxEnabled: false },
             },
           },
         },

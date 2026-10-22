@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { AttributionSchema } from '@/lib/attribution'
 import { getIPAddress } from '@/lib/ip'
 import { allow } from '@/lib/rateLimit'
+import { MixedCartSandboxError, SandboxModeDisabledError } from '@/lib/paymentGateway'
 
 /**
  * Order creation reserves stock and sale quota while the order is still
@@ -50,12 +51,20 @@ export async function GET(request: Request) {
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const sandboxParam = searchParams.get('sandbox')
     const limit = Math.min(Math.max(Number(searchParams.get('limit')) || 10, 1), 100)
     const page = Math.max(Number(searchParams.get('page')) || 1, 1)
 
-    const where: { storeId: string; status?: OrderStatus; userId?: string; createdAt?: any } = { storeId: user.storeId }
+    const where: { storeId: string; status?: OrderStatus; userId?: string; createdAt?: any; isSandbox?: boolean } = { storeId: user.storeId }
     if (status) where.status = status as OrderStatus
     if (user.role === 'CUSTOMER') where.userId = user.id
+    // Staff see real orders unless they ask otherwise (`true` = sandbox only,
+    // `all` = both), so test orders never pollute the working list. A customer
+    // always sees every order they placed, including their own sandbox ones.
+    if (user.role !== 'CUSTOMER') {
+      if (sandboxParam === 'true') where.isSandbox = true
+      else if (sandboxParam !== 'all') where.isSandbox = false
+    }
     if (startDate || endDate) {
       where.createdAt = {}
       if (startDate) {
@@ -143,6 +152,21 @@ export async function POST(request: Request) {
     if (error instanceof PriceChangedError) {
       return NextResponse.json(
         { error: error.message, code: 'PRICE_CHANGED', changes: error.changes },
+        { status: 409 }
+      )
+    }
+
+    // Sandbox rules, also well formed but not allowed. `message` is already
+    // customer-readable.
+    if (error instanceof MixedCartSandboxError) {
+      return NextResponse.json(
+        { error: error.message, code: 'SANDBOX_MIXED_CART' },
+        { status: 409 }
+      )
+    }
+    if (error instanceof SandboxModeDisabledError) {
+      return NextResponse.json(
+        { error: error.message, code: 'SANDBOX_DISABLED' },
         { status: 409 }
       )
     }

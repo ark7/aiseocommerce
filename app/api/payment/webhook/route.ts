@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { recordOrderIncome } from '@/services/transactionService';
+import { resolveGatewayCredentials } from '@/lib/paymentGateway';
 import crypto from 'crypto';
 
 const MIDTRANS_SERVER_KEY = process.env.MIDTRANS_SERVER_KEY || '';
 const FLIP_SECRET_KEY = process.env.FLIP_SECRET_KEY || '';
 
-function verifyMidtransSignature(requestBody: string, signatureKey: string): boolean {
+function verifyMidtransSignature(
+  requestBody: string,
+  signatureKey: string,
+  serverKey: string = MIDTRANS_SERVER_KEY
+): boolean {
   try {
     const expectedSignature = crypto
       .createHash('sha512')
-      .update(requestBody + MIDTRANS_SERVER_KEY)
+      .update(requestBody + serverKey)
       .digest('hex');
     return crypto.timingSafeEqual(Buffer.from(signatureKey), Buffer.from(expectedSignature));
   } catch {
@@ -18,11 +23,15 @@ function verifyMidtransSignature(requestBody: string, signatureKey: string): boo
   }
 }
 
-function verifyFlipSignature(payload: any, signature: string): boolean {
+function verifyFlipSignature(
+  payload: any,
+  signature: string,
+  secretKey: string = FLIP_SECRET_KEY
+): boolean {
   try {
     const data = JSON.stringify(payload);
     const expectedSignature = crypto
-      .createHmac('sha256', FLIP_SECRET_KEY)
+      .createHmac('sha256', secretKey)
       .update(data)
       .digest('hex');
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
@@ -68,12 +77,39 @@ export async function POST(request: Request) {
     
     const signature = request.headers.get('x-signature') || request.headers.get('x-signature-key') || payload.signature;
     if (!signature) return NextResponse.json({ error: 'Signature required' }, { status: 401 });
-    
+
+    // Which key signs this callback depends on whether the order is a sandbox
+    // one, so the order is read before the signature is checked. The id is
+    // untrusted until the signature passes: nothing from this lookup is
+    // returned to the caller, and a failed check answers the same 401 whether
+    // or not the order exists.
+    const candidateOrderId =
+      gateway.toLowerCase() === 'midtrans'
+        ? payload.order_id
+        : payload.order_id || payload.external_id;
+    const sandboxOrder = candidateOrderId
+      ? await prisma.order.findUnique({
+          where: { id: String(candidateOrderId) },
+          select: { isSandbox: true, store: { select: { settings: true } } },
+        })
+      : null;
+
+    // Sandbox orders are verified only against sandbox keys; everything else
+    // keeps the production keys exactly as before.
+    const sandboxKeys = sandboxOrder?.isSandbox
+      ? resolveGatewayCredentials(sandboxOrder.store?.settings, true)
+      : null;
+
     let isValid = false;
     if (gateway.toLowerCase() === 'midtrans') {
-      isValid = verifyMidtransSignature(rawBody, signature);
+      isValid = sandboxKeys
+        ? !!sandboxKeys.midtrans.serverKey &&
+          verifyMidtransSignature(rawBody, signature, sandboxKeys.midtrans.serverKey)
+        : verifyMidtransSignature(rawBody, signature);
     } else if (gateway.toLowerCase() === 'flip') {
-      isValid = verifyFlipSignature(payload, signature);
+      isValid = sandboxKeys
+        ? !!sandboxKeys.flip.apiKey && verifyFlipSignature(payload, signature, sandboxKeys.flip.apiKey)
+        : verifyFlipSignature(payload, signature);
     }
     
     if (!isValid) return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
@@ -124,6 +160,7 @@ export async function POST(request: Request) {
           transactionId: result.transactionId,
           gatewayResponse: JSON.stringify(payload),
           status: result.status as any,
+          isSandbox: Boolean(order.isSandbox),
         },
       }),
       prisma.order.update({

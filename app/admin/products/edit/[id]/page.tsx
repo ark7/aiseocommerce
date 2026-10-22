@@ -36,6 +36,7 @@ const EMPTY_FORM = {
   preOrderMessage: '',
   isPublished: true,
   isFeatured: false,
+  sandboxEnabled: false,
   seoTitle: '',
   seoDescription: '',
   seoKeywords: '',
@@ -124,6 +125,7 @@ export default function EditProduct() {
         preOrderMessage: asText(product.preOrderMessage),
         isPublished: Boolean(product.isPublished),
         isFeatured: Boolean(product.isFeatured),
+        sandboxEnabled: Boolean(product.sandboxEnabled),
         seoTitle: asText(product.seoTitle),
         seoDescription: asText(product.seoDescription),
         seoKeywords: asText(product.seoKeywords),
@@ -792,6 +794,26 @@ export default function EditProduct() {
               />
               <span className="text-gray-700">Tandai sebagai produk unggulan</span>
             </label>
+            <div className="pt-2 border-t border-gray-100">
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="sandboxEnabled"
+                  checked={formData.sandboxEnabled}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500 mt-0.5"
+                />
+                <div>
+                  <span className="text-gray-900 font-medium flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded">🧪 Sandbox</span>
+                    Tandai sebagai produk pengujian sandbox
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Produk ini digunakan untuk simulasi transaksi payment gateway sandbox. Penjualan produk ini tidak mempengaruhi transaksi atau pendapatan riil.
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 

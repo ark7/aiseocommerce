@@ -60,7 +60,7 @@ describe('app/sitemap.ts', () => {
     await sitemap();
 
     expect(prisma.product.findMany).toHaveBeenCalledWith({
-      where: { storeId: STORE.id, isPublished: true },
+      where: { storeId: STORE.id, isPublished: true, sandboxEnabled: false },
       select: { slug: true, updatedAt: true },
     });
 

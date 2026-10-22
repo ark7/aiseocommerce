@@ -1,23 +1,17 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import {
+  extractRequestHost,
+  isAllowedSuperAdminHost,
+  isControlPlaneEnabled,
+} from './superAdminGuard';
+
+export { extractRequestHost, isAllowedSuperAdminHost, isControlPlaneEnabled };
 
 export interface SuperAdminPayload {
   role: 'SUPER_ADMIN_OWNER';
   email: string;
   type: 'super_admin_control_plane';
-}
-
-/**
- * Checks whether the Super-Admin Control Plane is enabled on this deployment.
- * Customer deployments automatically receive ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"
- * so that the duplication portal is completely disabled on client stores.
- */
-export function isControlPlaneEnabled(): boolean {
-  const flag = process.env.ENABLE_SUPER_ADMIN_CONTROL_PLANE;
-  if (flag && (flag.toLowerCase() === 'false' || flag === '0')) {
-    return false;
-  }
-  return true;
 }
 
 function getSuperAdminSecret(): string {
@@ -53,8 +47,12 @@ export function getOwnerCredentials(): {
 /**
  * Verifies the owner's email and password against the configured single Super-Admin account.
  */
-export async function verifyOwnerCredentials(inputEmail: string, inputPassword: string): Promise<boolean> {
-  if (!isControlPlaneEnabled()) return false;
+export async function verifyOwnerCredentials(
+  inputEmail: string,
+  inputPassword: string,
+  request?: Request
+): Promise<boolean> {
+  if (!isControlPlaneEnabled(request)) return false;
 
   const owner = getOwnerCredentials();
   const normalizedInputEmail = inputEmail.trim().toLowerCase();
@@ -89,8 +87,8 @@ export function generateSuperAdminToken(email: string): string {
 /**
  * Verifies a Super-Admin JWT and guarantees it is NOT a regular store admin token.
  */
-export function verifySuperAdminToken(token: string): SuperAdminPayload | null {
-  if (!isControlPlaneEnabled()) return null;
+export function verifySuperAdminToken(token: string, request?: Request): SuperAdminPayload | null {
+  if (!isControlPlaneEnabled(request)) return null;
 
   try {
     const decoded = jwt.verify(token, getSuperAdminSecret(), {
@@ -124,7 +122,7 @@ export function verifySuperAdminToken(token: string): SuperAdminPayload | null {
  * Extracts and verifies the Super-Admin Owner from a Request (Authorization header or cookie).
  */
 export function requireSuperAdminOwner(request: Request): SuperAdminPayload | null {
-  if (!isControlPlaneEnabled()) return null;
+  if (!isControlPlaneEnabled(request)) return null;
 
   let token: string | null = null;
   const authHeader = request.headers.get('authorization');
@@ -140,6 +138,6 @@ export function requireSuperAdminOwner(request: Request): SuperAdminPayload | nu
   }
 
   if (!token) return null;
-  return verifySuperAdminToken(token);
+  return verifySuperAdminToken(token, request);
 }
 

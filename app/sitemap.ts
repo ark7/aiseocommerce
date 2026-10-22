@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
     // 2. Dynamic Products
     const products = await prisma.product.findMany({
-      where: { storeId: store.id, isPublished: true },
+      where: { storeId: store.id, isPublished: true, sandboxEnabled: false },
       select: { slug: true, updatedAt: true },
     });
 

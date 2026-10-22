@@ -51,9 +51,25 @@ interface DuplicationSuccessResult {
   deployment: {
     databaseMode: string;
     deployMode: string;
+    jwtSecret?: string;
+    cronSecret?: string;
     envContent: string;
     handoverMessage: string;
   };
+}
+
+function generateRandomHexBrowser(bytes: number = 32): string {
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint8Array(bytes);
+    window.crypto.getRandomValues(arr);
+    return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  let s = '';
+  const hex = '0123456789abcdef';
+  for (let i = 0; i < bytes * 2; i++) {
+    s += hex.charAt(Math.floor(Math.random() * 16));
+  }
+  return s;
 }
 
 function generateStrongPassword(): string {
@@ -154,11 +170,18 @@ export default function SuperAdminControlPlanePage() {
   const [deployMode, setDeployMode] = useState<'MANUAL_EXPORT' | 'AUTO_VERCEL' | 'AUTO_COOLIFY'>(
     'MANUAL_EXPORT'
   );
+  const [jwtSecret, setJwtSecret] = useState(() => generateRandomHexBrowser(32));
+  const [cronSecret, setCronSecret] = useState(() => generateRandomHexBrowser(24));
   const [subscriptionPlan, setSubscriptionPlan] = useState<'STARTER' | 'BUSINESS' | 'ENTERPRISE'>(
     'BUSINESS'
   );
   const [expiresAt, setExpiresAt] = useState('');
   const [internalNotes, setInternalNotes] = useState('');
+
+  // Standalone Secret Key Generator Modal State
+  const [showSecretModal, setShowSecretModal] = useState(false);
+  const [toolJwtSecret, setToolJwtSecret] = useState(() => generateRandomHexBrowser(32));
+  const [toolCronSecret, setToolCronSecret] = useState(() => generateRandomHexBrowser(24));
 
   // Submission & Output State
   const [submitting, setSubmitting] = useState(false);
@@ -205,6 +228,8 @@ export default function SuperAdminControlPlanePage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccessNotice, setEditSuccessNotice] = useState<string | null>(null);
+  const [editNewJwtSecret, setEditNewJwtSecret] = useState('');
+  const [editNewCronSecret, setEditNewCronSecret] = useState('');
 
   const fetchTenants = useCallback(async (activeToken?: string | null) => {
     try {
@@ -352,6 +377,8 @@ export default function SuperAdminControlPlanePage() {
     setEditError(null);
     setEditSuccessNotice(null);
     setEditNewPassword('');
+    setEditNewJwtSecret(generateRandomHexBrowser(32));
+    setEditNewCronSecret(generateRandomHexBrowser(24));
 
     // Prepopulate known basic fields
     setEditStoreName(tenant.name);
@@ -525,6 +552,8 @@ export default function SuperAdminControlPlanePage() {
         dbMode,
         customDatabaseUrl: dbMode === 'CUSTOM_DB_URL' ? customDatabaseUrl : null,
         deployMode,
+        jwtSecret: jwtSecret.trim() || undefined,
+        cronSecret: cronSecret.trim() || undefined,
         subscriptionPlan,
         expiresAt,
         internalNotes,
@@ -686,6 +715,19 @@ export default function SuperAdminControlPlanePage() {
               }`}
             >
               + Duplikasi Website Pelanggan
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setToolJwtSecret(generateRandomHexBrowser(32));
+                setToolCronSecret(generateRandomHexBrowser(24));
+                setShowSecretModal(true);
+              }}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 flex items-center gap-1.5 transition"
+              title="Generator Instan Kunci Rahasia JWT_SECRET & CRON_SECRET"
+            >
+              <span>🔑</span>
+              <span>Tool Kunci</span>
             </button>
             <button
               type="button"
@@ -986,6 +1028,73 @@ export default function SuperAdminControlPlanePage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Dedicated Secret Keys Individual 1-Click Copy */}
+                {(duplicationResult.deployment.jwtSecret || duplicationResult.deployment.cronSecret) && (
+                  <div className="bg-white p-4 rounded-xl border border-indigo-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">🔑</span>
+                        <h4 className="font-bold text-sm text-indigo-950">
+                          Kunci Rahasia Environment Individual (Siap Pasang di Hosting)
+                        </h4>
+                      </div>
+                      <span className="self-start sm:self-auto text-[11px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full">
+                        256-Bit Cryptographically Secure
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-gray-600">
+                      Jika Anda menyiapkan Environment Variables di dashboard hosting (seperti Vercel, Coolify, Railway, atau VPS) satu per satu, salin nilainya secara instan dengan tombol di bawah:
+                    </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {duplicationResult.deployment.jwtSecret && (
+                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-bold text-indigo-900">
+                              JWT_SECRET (64 karakter)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopy('res_jwt', duplicationResult.deployment.jwtSecret || '')
+                              }
+                              className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
+                            >
+                              {copiedKey === 'res_jwt' ? '✓ Tersalin!' : '📋 Copy JWT_SECRET'}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-700 break-all bg-white p-2.5 rounded-lg border border-gray-200 select-all">
+                            {duplicationResult.deployment.jwtSecret}
+                          </div>
+                        </div>
+                      )}
+
+                      {duplicationResult.deployment.cronSecret && (
+                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-mono font-bold text-indigo-900">
+                              CRON_SECRET (48 karakter)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleCopy('res_cron', duplicationResult.deployment.cronSecret || '')
+                              }
+                              className="px-2.5 py-1 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs"
+                            >
+                              {copiedKey === 'res_cron' ? '✓ Tersalin!' : '📋 Copy CRON_SECRET'}
+                            </button>
+                          </div>
+                          <div className="text-[11px] font-mono text-gray-700 break-all bg-white p-2.5 rounded-lg border border-gray-200 select-all">
+                            {duplicationResult.deployment.cronSecret}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1683,6 +1792,102 @@ export default function SuperAdminControlPlanePage() {
                       className="w-full rounded-lg border-gray-300 text-sm"
                     />
                   </div>
+
+                  {/* KUNCI KEAMANAN ENVIRONMENT UNIK (JWT & CRON) */}
+                  <div className="md:col-span-3 pt-4 border-t border-gray-100 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                          <span>🔑</span>
+                          <span>Kunci Keamanan Environment Unik Toko Pelanggan</span>
+                        </h4>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          Kunci ini di-generate otomatis secara acak menggunakan standar kriptografi aman (256-bit). Setiap pelanggan otomatis memiliki kunci unik agar otentikasi sesi login klien tidak bisa saling tumpang tindih.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setJwtSecret(generateRandomHexBrowser(32));
+                          setCronSecret(generateRandomHexBrowser(24));
+                        }}
+                        className="self-start sm:self-auto text-xs font-semibold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+                      >
+                        <span>🎲</span>
+                        <span>Acak Ulang Semua Kunci</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-gray-700">
+                            JWT_SECRET (64 Karakter Hex) *
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setJwtSecret(generateRandomHexBrowser(32))}
+                              className="text-[11px] text-gray-500 hover:text-gray-800"
+                              title="Acak ulang JWT Secret"
+                            >
+                              🎲 Acak
+                            </button>
+                            <span className="text-gray-300">•</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy('form_jwt', jwtSecret)}
+                              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+                            >
+                              {copiedKey === 'form_jwt' ? '✓ Tersalin' : '📋 Copy'}
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={jwtSecret}
+                          onChange={(e) => setJwtSecret(e.target.value)}
+                          placeholder="64-character hex secret..."
+                          className="w-full rounded-lg border-gray-300 text-xs font-mono text-gray-800 bg-gray-50 focus:bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-gray-700">
+                            CRON_SECRET (48 Karakter Hex) *
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setCronSecret(generateRandomHexBrowser(24))}
+                              className="text-[11px] text-gray-500 hover:text-gray-800"
+                              title="Acak ulang Cron Secret"
+                            >
+                              🎲 Acak
+                            </button>
+                            <span className="text-gray-300">•</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy('form_cron', cronSecret)}
+                              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+                            >
+                              {copiedKey === 'form_cron' ? '✓ Tersalin' : '📋 Copy'}
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type="text"
+                          required
+                          value={cronSecret}
+                          onChange={(e) => setCronSecret(e.target.value)}
+                          placeholder="48-character hex secret..."
+                          className="w-full rounded-lg border-gray-300 text-xs font-mono text-gray-800 bg-gray-50 focus:bg-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -2214,6 +2419,68 @@ export default function SuperAdminControlPlanePage() {
                 </div>
               </div>
 
+              {/* Bagian 5: Rotasi Kunci Keamanan Environment (Opsional) */}
+              <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-sm text-gray-900 text-indigo-700 flex items-center gap-1.5">
+                    <span>🔑</span>
+                    <span>5. Rotasi Kunci Rahasia Deployment Toko Ini</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditNewJwtSecret(generateRandomHexBrowser(32));
+                      setEditNewCronSecret(generateRandomHexBrowser(24));
+                    }}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-white border border-gray-300 px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-xs"
+                  >
+                    <span>🎲</span>
+                    <span>Acak Baru</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Gunakan bagian ini jika klien memindahkan hosting (misal dari Vercel ke Coolify/VPS) atau perlu merotasi JWT_SECRET / CRON_SECRET baru:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-700">JWT_SECRET Baru</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('edit_jwt', editNewJwtSecret)}
+                        className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+                      >
+                        {copiedKey === 'edit_jwt' ? '✓ Tersalin' : '📋 Copy'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={editNewJwtSecret}
+                      onChange={(e) => setEditNewJwtSecret(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-xs font-mono bg-white"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-gray-700">CRON_SECRET Baru</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy('edit_cron', editNewCronSecret)}
+                        className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+                      >
+                        {copiedKey === 'edit_cron' ? '✓ Tersalin' : '📋 Copy'}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={editNewCronSecret}
+                      onChange={(e) => setEditNewCronSecret(e.target.value)}
+                      className="w-full rounded-lg border-gray-300 text-xs font-mono bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white">
                 <button
                   type="button"
@@ -2231,6 +2498,128 @@ export default function SuperAdminControlPlanePage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* STANDALONE SECRET KEY GENERATOR TOOL MODAL */}
+      {showSecretModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🔑</span>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Generator Kunci Rahasia Instan
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    Kriptografis Acak (256-bit) untuk Konfigurasi Environment Klien
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSecretModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                &times;
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Gunakan alat ini untuk men-generate kunci rahasia kapan saja Anda menyiapkan hosting baru untuk website pelanggan di Vercel, Coolify, Railway, atau VPS.
+            </p>
+
+            <div className="space-y-3.5">
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-gray-800">
+                    JWT_SECRET (64 Karakter Hex)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setToolJwtSecret(generateRandomHexBrowser(32))}
+                      className="text-xs text-gray-500 hover:text-gray-800"
+                    >
+                      🎲 Acak
+                    </button>
+                    <span className="text-gray-300">•</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('tool_jwt', toolJwtSecret)}
+                      className="px-2.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                    >
+                      {copiedKey === 'tool_jwt' ? '✓ Tersalin!' : '📋 Copy'}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs font-mono text-gray-700 break-all bg-white p-2.5 rounded-lg border select-all">
+                  {toolJwtSecret}
+                </div>
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-gray-800">
+                    CRON_SECRET (48 Karakter Hex)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setToolCronSecret(generateRandomHexBrowser(24))}
+                      className="text-xs text-gray-500 hover:text-gray-800"
+                    >
+                      🎲 Acak
+                    </button>
+                    <span className="text-gray-300">•</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy('tool_cron', toolCronSecret)}
+                      className="px-2.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                    >
+                      {copiedKey === 'tool_cron' ? '✓ Tersalin!' : '📋 Copy'}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs font-mono text-gray-700 break-all bg-white p-2.5 rounded-lg border select-all">
+                  {toolCronSecret}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setToolJwtSecret(generateRandomHexBrowser(32));
+                  setToolCronSecret(generateRandomHexBrowser(24));
+                }}
+                className="px-3.5 py-2 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center gap-1.5 transition"
+              >
+                <span>🎲</span>
+                <span>Acak Ulang Sepasang</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleCopy('tool_both', `JWT_SECRET="${toolJwtSecret}"\nCRON_SECRET="${toolCronSecret}"`)
+                  }
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-xs"
+                >
+                  {copiedKey === 'tool_both' ? '✓ Tersalin Keduanya!' : '📋 Copy Pasangan (JWT + CRON)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSecretModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

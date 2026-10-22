@@ -104,6 +104,7 @@ const productFields = {
   minStock: optionalNumber,
   isPublished: formBoolean,
   isFeatured: formBoolean,
+  sandboxEnabled: formBoolean,
   isPreOrder: formBoolean,
   preOrderDays: nullableInt,
   preOrderMessage: nullableText,
@@ -156,6 +157,7 @@ const createProductSchema = z.object({
   minStock: withDefault(productFields.minStock, 0),
   isPublished: withDefault(productFields.isPublished, true),
   isFeatured: withDefault(productFields.isFeatured, false),
+  sandboxEnabled: withDefault(productFields.sandboxEnabled, false),
 });
 
 /**
@@ -178,6 +180,7 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
     const isPublished = searchParams.get('isPublished');
     const isFeatured = searchParams.get('isFeatured');
+    const sandbox = searchParams.get('sandbox');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const page = parseInt(searchParams.get('page') || '1');
@@ -192,6 +195,12 @@ export async function GET(request: Request) {
     if (isPublished !== null) where.isPublished = isPublished === 'true';
     else if (!user) where.isPublished = true;
     if (isFeatured !== null) where.isFeatured = isFeatured === 'true';
+    // Sandbox products are test fixtures: only store staff may list them. The
+    // public, and signed-in customers, never see them (the `sandbox` filter is
+    // ignored for them rather than honoured).
+    const isStaff = !!user && ['ADMIN', 'STAFF'].includes(user.role);
+    if (!isStaff) where.sandboxEnabled = false;
+    else if (sandbox !== null) where.sandboxEnabled = sandbox === 'true';
     if (startDate || endDate) {
       where.createdAt = {};
       if (startDate) {

@@ -7,6 +7,10 @@ import {
   resolveVoucherDiscount,
 } from '@/lib/voucher';
 import type { VoucherRejection } from '@/lib/voucher';
+import {
+  validateCartSandboxSeparation,
+  validateOrderSandboxIntegrity,
+} from '@/lib/paymentGateway';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -57,7 +61,7 @@ function reservationTtlMs(): number {
  */
 export async function recordOrderIncome(
   db: Db,
-  order: { id: string; storeId: string; orderNumber: string; totalAmount: number }
+  order: { id: string; storeId: string; orderNumber: string; totalAmount: number; isSandbox?: boolean }
 ) {
   const existing = await db.ledger.findFirst({
     where: { referenceId: order.id, referenceType: 'ORDER', type: LedgerType.INCOME },
@@ -65,15 +69,18 @@ export async function recordOrderIncome(
   });
   if (existing) return existing;
 
+  const isSandbox = Boolean(order.isSandbox);
+
   return db.ledger.create({
     data: {
       storeId: order.storeId,
       type: LedgerType.INCOME,
       amount: order.totalAmount,
-      description: `Order ${order.orderNumber}`,
+      description: isSandbox ? `[SANDBOX] Order ${order.orderNumber}` : `Order ${order.orderNumber}`,
       referenceId: order.id,
       referenceType: 'ORDER',
-      category: 'SALES',
+      category: isSandbox ? 'SANDBOX_SALES' : 'SALES',
+      isSandbox,
     },
   });
 }
@@ -122,6 +129,17 @@ export async function createOrder(
     });
     const byId = new Map(products.map((product) => [product.id, product]));
 
+    // Validate sandbox cart integrity: do not mix sandbox test products with regular products,
+    // and ensure sandbox mode is enabled if ordering a sandbox product.
+    const { isSandbox } = validateCartSandboxSeparation(products);
+    if (isSandbox) {
+      const storeSettings = await tx.storeSettings.findUnique({
+        where: { storeId },
+        select: { sandboxPaymentEnabled: true },
+      });
+      validateOrderSandboxIntegrity(true, storeSettings);
+    }
+
     const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const order = await tx.order.create({
       data: {
@@ -134,6 +152,7 @@ export async function createOrder(
         shippingCost: 0,
         discount: 0,
         status: 'PENDING', // initial status before payment
+        isSandbox,
         // An unpaid order holds real stock and real sale quota. Without a
         // deadline it holds them forever, and an abandoned cart can empty a
         // promotion without anyone buying anything.
@@ -565,20 +584,25 @@ export async function recordPettyCash(
 export async function getFinanceSummary(
   storeId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  options?: { includeSandbox?: boolean }
 ): Promise<FinanceSummary> {
   try {
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const where = {
+    const where: Prisma.LedgerWhereInput = {
       storeId,
       createdAt: {
         gte: startDate || firstDayOfMonth,
         lte: endDate || lastDayOfMonth,
       },
     };
+
+    if (!options?.includeSandbox) {
+      where.isSandbox = false;
+    }
 
     const ledgers = await prisma.ledger.findMany({ where, orderBy: { createdAt: 'asc' } });
 

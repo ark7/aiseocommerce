@@ -17,7 +17,7 @@ export async function GET(
           include: {
             settings: true,
             products: {
-              where: { isPublished: true },
+              where: { isPublished: true, sandboxEnabled: false },
               take: 8,
               orderBy: { createdAt: 'desc' },
               include: { images: { where: { isPrimary: true }, take: 1 } },
@@ -35,7 +35,7 @@ export async function GET(
         include: {
           settings: true,
           products: {
-            where: { isPublished: true },
+            where: { isPublished: true, sandboxEnabled: false },
             take: 8,
             orderBy: { createdAt: 'desc' },
             include: { images: { where: { isPrimary: true }, take: 1 } },
@@ -49,11 +49,11 @@ export async function GET(
     
     const [featuredProducts, totalProducts, totalCategories] = await Promise.all([
       prisma.product.findMany({
-        where: { storeId: store.id, isPublished: true, isFeatured: true },
+        where: { storeId: store.id, isPublished: true, sandboxEnabled: false, isFeatured: true },
         take: 4,
         include: { images: { where: { isPrimary: true }, take: 1 } },
       }),
-      prisma.product.count({ where: { storeId: store.id, isPublished: true } }),
+      prisma.product.count({ where: { storeId: store.id, isPublished: true, sandboxEnabled: false } }),
       prisma.category.count({ where: { storeId: store.id } }),
     ]);
     

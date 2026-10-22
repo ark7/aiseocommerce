@@ -110,10 +110,15 @@ export const TenantDuplicationInputSchema = z.object({
   tiktokPixelId: z.string().max(60).optional().nullable(),
 
   // --- GRUP 6: Payment Gateway & Proteksi Bot (Opsional) ---
+  sandboxPaymentEnabled: z.boolean().default(false),
   midtransMerchantId: z.string().max(100).optional().nullable(),
   midtransClientKey: z.string().max(150).optional().nullable(),
   midtransServerKey: z.string().max(150).optional().nullable(),
   flipApiKey: z.string().max(150).optional().nullable(),
+  midtransSandboxMerchantId: z.string().max(100).optional().nullable(),
+  midtransSandboxClientKey: z.string().max(150).optional().nullable(),
+  midtransSandboxServerKey: z.string().max(150).optional().nullable(),
+  flipSandboxApiKey: z.string().max(150).optional().nullable(),
   turnstileEnabled: z.boolean().default(false),
   turnstileSiteKey: z.string().max(150).optional().nullable(),
   turnstileSecretKey: z.string().max(150).optional().nullable(),
@@ -124,6 +129,8 @@ export const TenantDuplicationInputSchema = z.object({
   neonApiKey: z.string().optional().nullable(),
   neonProjectId: z.string().optional().nullable(),
   deployMode: DeployModeEnum.default('MANUAL_EXPORT'),
+  jwtSecret: z.string().min(16, 'JWT Secret minimal 16 karakter').max(256).optional().nullable(),
+  cronSecret: z.string().min(16, 'Cron Secret minimal 16 karakter').max(256).optional().nullable(),
   vercelApiToken: z.string().optional().nullable(),
   vercelTeamId: z.string().optional().nullable(),
   gitRepoSlug: z.string().optional().nullable(),
@@ -134,6 +141,7 @@ export const TenantDuplicationInputSchema = z.object({
 });
 
 export type TenantDuplicationInput = z.infer<typeof TenantDuplicationInputSchema>;
+export type TenantDuplicationInputRaw = z.input<typeof TenantDuplicationInputSchema>;
 
 export const DEFAULT_LEDGER_CATEGORIES: Array<{ type: LedgerType; name: string }> = [
   { type: 'INCOME', name: 'Penjualan Produk' },
@@ -355,6 +363,24 @@ export function buildDefaultPrivacyHtml(input: {
 }
 
 /**
+ * Generates cryptographically secure random hexadecimal string (Node.js crypto).
+ * Default 32 bytes = 64 characters hex (industry standard for JWT_SECRET).
+ */
+export function generateRandomHex(bytes: number = 32): string {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+/**
+ * Generates an aligned pair of deployment secrets: JWT_SECRET (64 hex) & CRON_SECRET (48 hex).
+ */
+export function generateSecureSecrets(): { jwtSecret: string; cronSecret: string } {
+  return {
+    jwtSecret: generateRandomHex(32),
+    cronSecret: generateRandomHex(24),
+  };
+}
+
+/**
  * Generates a ready-to-use .env file string for the duplicated client website.
  */
 export function generateTenantEnvConfig(params: {
@@ -367,8 +393,8 @@ export function generateTenantEnvConfig(params: {
   cronSecret: string;
   envContent: string;
 } {
-  const jwtSecret = params.jwtSecret || crypto.randomBytes(32).toString('hex');
-  const cronSecret = params.cronSecret || crypto.randomBytes(24).toString('hex');
+  const jwtSecret = params.jwtSecret || generateRandomHex(32);
+  const cronSecret = params.cronSecret || generateRandomHex(24);
   const appUrl = params.domain.startsWith('localhost')
     ? `http://${params.domain}`
     : `https://${params.domain}`;
@@ -385,6 +411,26 @@ export function generateTenantEnvConfig(params: {
     `CRON_SECRET="${cronSecret}"`,
     `# Nonaktifkan portal Super-Admin di website pelanggan demi keamanan:`,
     `ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"`,
+    ``,
+    `# ============================================================================`,
+    `# TELEMETRY & ANALYTICS MASTER (SENTRY & POSTHOG)`,
+    `# Otomatis terhubung ke 1 dashboard master Anda dengan label domain toko ini`,
+    `# ============================================================================`,
+    process.env.NEXT_PUBLIC_SENTRY_DSN
+      ? `NEXT_PUBLIC_SENTRY_DSN="${process.env.NEXT_PUBLIC_SENTRY_DSN}"`
+      : `# NEXT_PUBLIC_SENTRY_DSN=""`,
+    process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || process.env.NEXT_PUBLIC_POSTHOG_KEY
+      ? `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN="${process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN || process.env.NEXT_PUBLIC_POSTHOG_KEY}"`
+      : `# NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=""`,
+    process.env.NEXT_PUBLIC_POSTHOG_KEY
+      ? `NEXT_PUBLIC_POSTHOG_KEY="${process.env.NEXT_PUBLIC_POSTHOG_KEY}"`
+      : `# NEXT_PUBLIC_POSTHOG_KEY=""`,
+    process.env.NEXT_PUBLIC_POSTHOG_HOST
+      ? `NEXT_PUBLIC_POSTHOG_HOST="${process.env.NEXT_PUBLIC_POSTHOG_HOST}"`
+      : `# NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"`,
+    process.env.NEXT_PUBLIC_MASTER_GA4_ID
+      ? `NEXT_PUBLIC_MASTER_GA4_ID="${process.env.NEXT_PUBLIC_MASTER_GA4_ID}"`
+      : `# NEXT_PUBLIC_MASTER_GA4_ID=""`,
     ``,
   ].join('\n');
 
@@ -460,6 +506,11 @@ export const TenantUpdateInputSchema = z.object({
   midtransClientKey: z.string().max(150).optional().nullable(),
   midtransServerKey: z.string().max(150).optional().nullable(),
   flipApiKey: z.string().max(150).optional().nullable(),
+  sandboxPaymentEnabled: z.boolean().optional(),
+  midtransSandboxMerchantId: z.string().max(100).optional().nullable(),
+  midtransSandboxClientKey: z.string().max(150).optional().nullable(),
+  midtransSandboxServerKey: z.string().max(150).optional().nullable(),
+  flipSandboxApiKey: z.string().max(150).optional().nullable(),
   turnstileEnabled: z.boolean().optional(),
   turnstileSiteKey: z.string().max(150).optional().nullable(),
   turnstileSecretKey: z.string().max(150).optional().nullable(),
@@ -490,6 +541,8 @@ export interface ProvisionTenantResult {
   deployment: {
     databaseMode: string;
     deployMode: string;
+    jwtSecret: string;
+    cronSecret: string;
     envContent: string;
     handoverMessage: string;
     vercelDeploymentUrl?: string | null;
@@ -500,7 +553,7 @@ export interface ProvisionTenantResult {
  * Executes the duplication / provisioning of a customer store into the target database.
  */
 export async function provisionTenantStore(
-  rawInput: TenantDuplicationInput,
+  rawInput: TenantDuplicationInputRaw,
   customPrisma?: PrismaClient
 ): Promise<ProvisionTenantResult> {
   const input = TenantDuplicationInputSchema.parse(rawInput);
@@ -603,6 +656,11 @@ export async function provisionTenantStore(
         midtransClientKey: input.midtransClientKey?.trim() || null,
         midtransServerKey: input.midtransServerKey?.trim() || null,
         flipApiKey: input.flipApiKey?.trim() || null,
+        sandboxPaymentEnabled: input.sandboxPaymentEnabled,
+        midtransSandboxMerchantId: input.midtransSandboxMerchantId?.trim() || null,
+        midtransSandboxClientKey: input.midtransSandboxClientKey?.trim() || null,
+        midtransSandboxServerKey: input.midtransSandboxServerKey?.trim() || null,
+        flipSandboxApiKey: input.flipSandboxApiKey?.trim() || null,
         turnstileEnabled: input.turnstileEnabled,
         turnstileSiteKey: input.turnstileSiteKey?.trim() || null,
         turnstileSecretKey: input.turnstileSecretKey?.trim() || null,
@@ -635,6 +693,11 @@ export async function provisionTenantStore(
         midtransClientKey: input.midtransClientKey?.trim() || null,
         midtransServerKey: input.midtransServerKey?.trim() || null,
         flipApiKey: input.flipApiKey?.trim() || null,
+        sandboxPaymentEnabled: input.sandboxPaymentEnabled,
+        midtransSandboxMerchantId: input.midtransSandboxMerchantId?.trim() || null,
+        midtransSandboxClientKey: input.midtransSandboxClientKey?.trim() || null,
+        midtransSandboxServerKey: input.midtransSandboxServerKey?.trim() || null,
+        flipSandboxApiKey: input.flipSandboxApiKey?.trim() || null,
         turnstileEnabled: input.turnstileEnabled,
         turnstileSiteKey: input.turnstileSiteKey?.trim() || null,
         turnstileSecretKey: input.turnstileSecretKey?.trim() || null,
@@ -777,12 +840,14 @@ export async function provisionTenantStore(
       }
     }
 
-    const { envContent } = generateTenantEnvConfig({
+    const { jwtSecret, cronSecret, envContent } = generateTenantEnvConfig({
       domain: input.domain,
       databaseUrl:
         input.dbMode === 'CUSTOM_DB_URL' && input.customDatabaseUrl?.trim()
           ? input.customDatabaseUrl.trim()
           : '<ISI_DATABASE_URL_PELANGGAN_DI_SINI>',
+      jwtSecret: input.jwtSecret?.trim() || undefined,
+      cronSecret: input.cronSecret?.trim() || undefined,
     });
 
     const siteUrl = input.domain.startsWith('localhost')
@@ -827,6 +892,8 @@ export async function provisionTenantStore(
       deployment: {
         databaseMode: input.dbMode,
         deployMode: input.deployMode,
+        jwtSecret,
+        cronSecret,
         envContent,
         handoverMessage,
         vercelDeploymentUrl: null,

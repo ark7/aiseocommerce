@@ -43,6 +43,17 @@ const GeneralSettingsUpdateSchema = z.object({
   // SEO Defaults
   defaultSeoTitle: z.string().optional().nullable(),
   defaultSeoDescription: z.string().optional().nullable(),
+
+  // Payment Gateway & Sandbox
+  sandboxPaymentEnabled: z.boolean().optional(),
+  midtransMerchantId: z.string().optional().nullable(),
+  midtransClientKey: z.string().optional().nullable(),
+  midtransServerKey: z.string().optional().nullable(),
+  flipApiKey: z.string().optional().nullable(),
+  midtransSandboxMerchantId: z.string().optional().nullable(),
+  midtransSandboxClientKey: z.string().optional().nullable(),
+  midtransSandboxServerKey: z.string().optional().nullable(),
+  flipSandboxApiKey: z.string().optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -96,6 +107,15 @@ export async function GET(request: Request) {
         socialLinks: (s?.socialLinks as Record<string, string>) ?? {},
         defaultSeoTitle: s?.defaultSeoTitle ?? null,
         defaultSeoDescription: s?.defaultSeoDescription ?? null,
+        sandboxPaymentEnabled: s?.sandboxPaymentEnabled ?? false,
+        midtransMerchantId: s?.midtransMerchantId ?? null,
+        midtransClientKey: s?.midtransClientKey ?? null,
+        midtransServerKey: s?.midtransServerKey ? '********' : null,
+        flipApiKey: s?.flipApiKey ? '********' : null,
+        midtransSandboxMerchantId: s?.midtransSandboxMerchantId ?? null,
+        midtransSandboxClientKey: s?.midtransSandboxClientKey ?? null,
+        midtransSandboxServerKey: s?.midtransSandboxServerKey ? '********' : null,
+        flipSandboxApiKey: s?.flipSandboxApiKey ? '********' : null,
       },
     });
   } catch (error) {
@@ -158,6 +178,23 @@ export async function PUT(request: Request) {
     if (data.socialLinks !== undefined) settingsUpdateData.socialLinks = data.socialLinks || {};
     if (data.defaultSeoTitle !== undefined) settingsUpdateData.defaultSeoTitle = data.defaultSeoTitle ? data.defaultSeoTitle.trim() : null;
     if (data.defaultSeoDescription !== undefined) settingsUpdateData.defaultSeoDescription = data.defaultSeoDescription ? data.defaultSeoDescription.trim() : null;
+    if (data.sandboxPaymentEnabled !== undefined) settingsUpdateData.sandboxPaymentEnabled = data.sandboxPaymentEnabled;
+    if (data.midtransMerchantId !== undefined) settingsUpdateData.midtransMerchantId = data.midtransMerchantId ? data.midtransMerchantId.trim() : null;
+    if (data.midtransClientKey !== undefined) settingsUpdateData.midtransClientKey = data.midtransClientKey ? data.midtransClientKey.trim() : null;
+    if (data.midtransServerKey !== undefined && data.midtransServerKey !== '********') {
+      settingsUpdateData.midtransServerKey = data.midtransServerKey ? data.midtransServerKey.trim() : null;
+    }
+    if (data.flipApiKey !== undefined && data.flipApiKey !== '********') {
+      settingsUpdateData.flipApiKey = data.flipApiKey ? data.flipApiKey.trim() : null;
+    }
+    if (data.midtransSandboxMerchantId !== undefined) settingsUpdateData.midtransSandboxMerchantId = data.midtransSandboxMerchantId ? data.midtransSandboxMerchantId.trim() : null;
+    if (data.midtransSandboxClientKey !== undefined) settingsUpdateData.midtransSandboxClientKey = data.midtransSandboxClientKey ? data.midtransSandboxClientKey.trim() : null;
+    if (data.midtransSandboxServerKey !== undefined && data.midtransSandboxServerKey !== '********') {
+      settingsUpdateData.midtransSandboxServerKey = data.midtransSandboxServerKey ? data.midtransSandboxServerKey.trim() : null;
+    }
+    if (data.flipSandboxApiKey !== undefined && data.flipSandboxApiKey !== '********') {
+      settingsUpdateData.flipSandboxApiKey = data.flipSandboxApiKey ? data.flipSandboxApiKey.trim() : null;
+    }
 
     if (Object.keys(settingsUpdateData).length > 0) {
       await prisma.storeSettings.upsert({

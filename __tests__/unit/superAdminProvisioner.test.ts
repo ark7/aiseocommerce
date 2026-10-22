@@ -4,14 +4,20 @@ import {
   generateSuperAdminToken,
   verifySuperAdminToken,
   requireSuperAdminOwner,
+  isAllowedSuperAdminHost,
+  extractRequestHost,
+  isControlPlaneEnabled,
 } from '@/lib/superAdminAuth';
 import {
   TenantDuplicationInputSchema,
   provisionTenantStore,
   generateTenantEnvConfig,
+  generateRandomHex,
+  generateSecureSecrets,
 } from '@/lib/tenantProvisioner';
 import { GET as listTenants, POST as createTenant } from '@/app/api/super-admin/tenants/route';
 import { GET as getTenant, PUT as updateTenant } from '@/app/api/super-admin/tenants/[id]/route';
+import { GET as getPreview } from '@/app/api/super-admin/preview/route';
 import { prisma } from '@/lib/prisma';
 
 jest.mock('@/lib/prisma', () => ({
@@ -106,6 +112,46 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
 
       const res = await listTenants(req);
       expect(res.status).toBe(404);
+    });
+
+    it('enforces strict host lockdown: allows localhost but blocks customer external hosts with 404', async () => {
+      expect(isAllowedSuperAdminHost('localhost')).toBe(true);
+      expect(isAllowedSuperAdminHost('127.0.0.1')).toBe(true);
+      expect(isAllowedSuperAdminHost('::1')).toBe(true);
+      expect(isAllowedSuperAdminHost('test.localhost')).toBe(true);
+      expect(isAllowedSuperAdminHost('customerstore.com')).toBe(false);
+      expect(isAllowedSuperAdminHost('berkahhijab.id')).toBe(false);
+
+      // Support custom whitelisted domain via SUPER_ADMIN_ALLOWED_HOSTS
+      process.env.SUPER_ADMIN_ALLOWED_HOSTS = 'control.agency.com, master.aiseo.id';
+      expect(isAllowedSuperAdminHost('control.agency.com')).toBe(true);
+      expect(isAllowedSuperAdminHost('master.aiseo.id')).toBe(true);
+      expect(isAllowedSuperAdminHost('randomstore.com')).toBe(false);
+
+      // Host extraction normalizes ports and brackets
+      expect(extractRequestHost(new Request('http://localhost:3000/api/super-admin'))).toBe('localhost');
+      expect(extractRequestHost(new Request('http://[::1]:3000/api/super-admin'))).toBe('::1');
+      expect(extractRequestHost(new Request('https://customerstore.com:443/api/super-admin'))).toBe('customerstore.com');
+
+      // Request from external customer store hostname must return 404 Not Found
+      const ownerToken = generateSuperAdminToken('myowner@aiseo.id');
+      const externalReq = new Request('https://customerstore.com/api/super-admin/tenants', {
+        headers: {
+          Host: 'customerstore.com',
+          Authorization: `Bearer ${ownerToken}`,
+        },
+      });
+
+      expect(isControlPlaneEnabled(externalReq)).toBe(false);
+      const res = await listTenants(externalReq);
+      expect(res.status).toBe(404);
+
+      // Preview endpoint also blocks external customer hostnames with 404
+      const previewExternalReq = new Request('https://customerstore.com/api/super-admin/preview?domain=demo', {
+        headers: { Host: 'customerstore.com' },
+      });
+      const previewRes = await getPreview(previewExternalReq);
+      expect(previewRes.status).toBe(404);
     });
   });
 
@@ -215,9 +261,21 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
       // Verify generated .env disables Super-Admin Control Plane on the client's deployment
       expect(result.deployment.envContent).toContain('ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"');
       expect(result.deployment.envContent).toContain('DEFAULT_STORE_DOMAIN="berkahhijab.com"');
+      expect(result.deployment.jwtSecret).toHaveLength(64);
+      expect(result.deployment.cronSecret).toHaveLength(48);
     });
 
-    it('generates isolated .env config with unique cryptographic secrets', () => {
+    it('generates isolated .env config with unique cryptographic secrets (JWT_SECRET & CRON_SECRET)', () => {
+      // Test random hex helper
+      const hex32 = generateRandomHex(32);
+      expect(hex32).toHaveLength(64);
+      expect(hex32).toMatch(/^[0-9a-f]{64}$/);
+
+      // Test secure secrets pair generator
+      const pair = generateSecureSecrets();
+      expect(pair.jwtSecret).toHaveLength(64);
+      expect(pair.cronSecret).toHaveLength(48);
+
       const cfg1 = generateTenantEnvConfig({
         domain: 'klien1.com',
         databaseUrl: 'postgresql://db1',
@@ -229,7 +287,23 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
 
       expect(cfg1.jwtSecret).not.toEqual(cfg2.jwtSecret);
       expect(cfg1.cronSecret).not.toEqual(cfg2.cronSecret);
+      expect(cfg1.jwtSecret).toHaveLength(64);
+      expect(cfg1.cronSecret).toHaveLength(48);
+      expect(cfg1.envContent).toContain(`JWT_SECRET="${cfg1.jwtSecret}"`);
+      expect(cfg1.envContent).toContain(`CRON_SECRET="${cfg1.cronSecret}"`);
       expect(cfg1.envContent).toContain('ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"');
+
+      // Accepts custom secrets if provided
+      const customCfg = generateTenantEnvConfig({
+        domain: 'klien-custom.com',
+        databaseUrl: 'postgresql://db-custom',
+        jwtSecret: 'my-custom-super-secret-jwt-key-2026',
+        cronSecret: 'my-custom-cron-secret-2026',
+      });
+      expect(customCfg.jwtSecret).toBe('my-custom-super-secret-jwt-key-2026');
+      expect(customCfg.cronSecret).toBe('my-custom-cron-secret-2026');
+      expect(customCfg.envContent).toContain('JWT_SECRET="my-custom-super-secret-jwt-key-2026"');
+      expect(customCfg.envContent).toContain('CRON_SECRET="my-custom-cron-secret-2026"');
     });
   });
 

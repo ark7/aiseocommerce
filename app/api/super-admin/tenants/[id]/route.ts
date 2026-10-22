@@ -13,7 +13,7 @@ interface Context {
 }
 
 export async function GET(request: Request, { params }: Context) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }
@@ -72,7 +72,7 @@ export async function GET(request: Request, { params }: Context) {
 }
 
 export async function PUT(request: Request, { params }: Context) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }
@@ -167,6 +167,11 @@ export async function PUT(request: Request, { params }: Context) {
     if (data.midtransClientKey !== undefined) settingsUpdateData.midtransClientKey = data.midtransClientKey?.trim() || null;
     if (data.midtransServerKey !== undefined) settingsUpdateData.midtransServerKey = data.midtransServerKey?.trim() || null;
     if (data.flipApiKey !== undefined) settingsUpdateData.flipApiKey = data.flipApiKey?.trim() || null;
+    if (data.sandboxPaymentEnabled !== undefined) settingsUpdateData.sandboxPaymentEnabled = data.sandboxPaymentEnabled;
+    if (data.midtransSandboxMerchantId !== undefined) settingsUpdateData.midtransSandboxMerchantId = data.midtransSandboxMerchantId?.trim() || null;
+    if (data.midtransSandboxClientKey !== undefined) settingsUpdateData.midtransSandboxClientKey = data.midtransSandboxClientKey?.trim() || null;
+    if (data.midtransSandboxServerKey !== undefined) settingsUpdateData.midtransSandboxServerKey = data.midtransSandboxServerKey?.trim() || null;
+    if (data.flipSandboxApiKey !== undefined) settingsUpdateData.flipSandboxApiKey = data.flipSandboxApiKey?.trim() || null;
     if (data.turnstileEnabled !== undefined) settingsUpdateData.turnstileEnabled = data.turnstileEnabled;
     if (data.turnstileSiteKey !== undefined) settingsUpdateData.turnstileSiteKey = data.turnstileSiteKey?.trim() || null;
     if (data.turnstileSecretKey !== undefined) settingsUpdateData.turnstileSecretKey = data.turnstileSecretKey?.trim() || null;

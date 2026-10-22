@@ -322,6 +322,11 @@ export default function ProductsList() {
                       PO {product.preOrderDays ? `${product.preOrderDays}H` : ''}
                     </span>
                   )}
+                  {product.sandboxEnabled && (
+                    <span className="bg-amber-600 text-white text-xs font-bold px-2 py-1 rounded shadow-xs">
+                      🧪 SANDBOX
+                    </span>
+                  )}
                   {product.isFeatured && (
                     <span className="bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded">FEATURED</span>
                   )}

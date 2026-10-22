@@ -8,7 +8,7 @@ import {
 import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }
@@ -90,7 +90,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }

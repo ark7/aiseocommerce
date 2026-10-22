@@ -59,6 +59,7 @@ async function main() {
     generateLegalPages: true,
     cookieConsentEnabled: true,
     turnstileEnabled: false,
+    sandboxPaymentEnabled: false,
     dbMode: process.env.CUSTOM_DATABASE_URL ? 'CUSTOM_DB_URL' : 'CURRENT_DB',
     customDatabaseUrl: process.env.CUSTOM_DATABASE_URL || null,
     deployMode: 'MANUAL_EXPORT',

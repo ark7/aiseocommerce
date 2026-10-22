@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { resolvePaymentRedirectUrl } from '@/lib/paymentGateway'
 
 // Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
 // so uuid() rejected every real id.
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
+    const isSandbox = Boolean(order.isSandbox)
+
     // Create a payment record
     const payment = await prisma.payment.create({
       data: {
@@ -35,18 +38,22 @@ export async function POST(request: Request) {
         method: validatedData.paymentMethod,
         amount: order.totalAmount,
         status: 'PENDING',
+        isSandbox,
       },
     })
 
-    // Generate redirect URL based on payment method (Mocked for gateway integration)
-    let redirectUrl = `/checkout/success?orderId=${order.id}`
-    if (validatedData.paymentMethod === 'MIDTRANS' || validatedData.paymentMethod === 'FLIP') {
-      redirectUrl = `https://simulator.payment-gateway.example.com/pay/${payment.id}`
-    }
+    // Generate redirect URL based on payment method and sandbox status
+    const redirectUrl = resolvePaymentRedirectUrl({
+      paymentMethod: validatedData.paymentMethod,
+      paymentId: payment.id,
+      orderId: order.id,
+      isSandbox,
+    })
 
     return NextResponse.json({
       success: true,
       payment,
+      isSandbox,
       paymentGatewayResponse: {
         redirectUrl,
         transactionId: payment.id,

@@ -45,7 +45,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const page = Math.max(1, Number(searchParams.page) || 1);
   const pageSize = store.settings?.defaultPageSize ?? 10;
 
-  const where: Prisma.ProductWhereInput = { storeId: store.id, isPublished: true };
+  const where: Prisma.ProductWhereInput = { storeId: store.id, isPublished: true, sandboxEnabled: false };
   if (categoryId) where.categoryId = categoryId;
   if (startDate || endDate) {
     const createdAtFilter: any = {};

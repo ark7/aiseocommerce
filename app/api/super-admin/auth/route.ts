@@ -14,7 +14,7 @@ const LoginSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isControlPlaneEnabled()) {
+  if (!isControlPlaneEnabled(request)) {
     return NextResponse.json(
       { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
       { status: 404 }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     }
 
     const { email, password } = parsed.data;
-    const isValid = await verifyOwnerCredentials(email, password);
+    const isValid = await verifyOwnerCredentials(email, password, request);
 
     if (!isValid) {
       logger.warn('Failed Super-Admin Control Plane login attempt', { email });

@@ -55,7 +55,11 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
         images: product.images?.[0]?.url ? [product.images[0].url] : [],
       },
       alternates: { canonical: `/product/${params.slug}` },
-      robots: { index: true, follow: true },
+      // A sandbox product is reachable by direct link for testing, but must
+      // never be indexed or followed.
+      robots: product.sandboxEnabled
+        ? { index: false, follow: false }
+        : { index: true, follow: true },
     };
   } catch {
     return { title: 'Product', description: 'View product details' };
@@ -73,7 +77,7 @@ async function loadProductPage(slug: string) {
   if (!product || !product.isPublished) return null;
 
   const relatedProducts = await prisma.product.findMany({
-    where: { storeId: store.id, isPublished: true, id: { not: product.id }, categoryId: product.categoryId },
+    where: { storeId: store.id, isPublished: true, sandboxEnabled: false, id: { not: product.id }, categoryId: product.categoryId },
     take: 4,
     select: { id: true, name: true, slug: true, sellingPrice: true, isPreOrder: true, images: { where: { isPrimary: true }, take: 1 } },
   });
@@ -140,6 +144,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
         storeLogo={store.logo}
         storeAddress={store.address}
       />
+
+      {product.sandboxEnabled && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm text-center px-4 py-2">
+          🧪 <strong>Produk uji coba (Sandbox).</strong> Pembelian ini hanya simulasi, tidak ada
+          uang sungguhan yang diproses dan tidak masuk laporan penjualan.
+        </div>
+      )}
 
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -57,6 +57,30 @@ interface TurnstileForm {
   turnstileEnabled: boolean;
 }
 
+interface PaymentForm {
+  sandboxPaymentEnabled: boolean;
+  midtransMerchantId: string;
+  midtransClientKey: string;
+  midtransServerKey: string;
+  flipApiKey: string;
+  midtransSandboxMerchantId: string;
+  midtransSandboxClientKey: string;
+  midtransSandboxServerKey: string;
+  flipSandboxApiKey: string;
+}
+
+const EMPTY_PAYMENT_FORM: PaymentForm = {
+  sandboxPaymentEnabled: false,
+  midtransMerchantId: '',
+  midtransClientKey: '',
+  midtransServerKey: '',
+  flipApiKey: '',
+  midtransSandboxMerchantId: '',
+  midtransSandboxClientKey: '',
+  midtransSandboxServerKey: '',
+  flipSandboxApiKey: '',
+};
+
 const COLOR_PRESETS = [
   { name: 'Indigo (Modern Tech)', hex: '#4F46E5', bgClass: 'bg-indigo-600' },
   { name: 'Emerald (Natural / Eco)', hex: '#059669', bgClass: 'bg-emerald-600' },
@@ -145,6 +169,7 @@ export default function AdminSettingsPage() {
   const [themeForm, setThemeForm] = useState<ThemeForm>(EMPTY_THEME_FORM);
   const [analyticsForm, setAnalyticsForm] = useState<AnalyticsForm>(EMPTY_ANALYTICS);
   const [turnstileForm, setTurnstileForm] = useState<TurnstileForm>(EMPTY_TURNSTILE);
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>(EMPTY_PAYMENT_FORM);
   const [legalForm, setLegalForm] = useState<LegalForm>(EMPTY_LEGAL_FORM);
 
   const [loading, setLoading] = useState(true);
@@ -202,6 +227,18 @@ export default function AdminSettingsPage() {
         setThemeForm({
           primaryColor: s.primaryColor || '#4F46E5',
           fontFamily: s.fontFamily || 'inter',
+        });
+
+        setPaymentForm({
+          sandboxPaymentEnabled: s.sandboxPaymentEnabled ?? false,
+          midtransMerchantId: s.midtransMerchantId || '',
+          midtransClientKey: s.midtransClientKey || '',
+          midtransServerKey: s.midtransServerKey || '',
+          flipApiKey: s.flipApiKey || '',
+          midtransSandboxMerchantId: s.midtransSandboxMerchantId || '',
+          midtransSandboxClientKey: s.midtransSandboxClientKey || '',
+          midtransSandboxServerKey: s.midtransSandboxServerKey || '',
+          flipSandboxApiKey: s.flipSandboxApiKey || '',
         });
       }
 
@@ -435,6 +472,35 @@ export default function AdminSettingsPage() {
       }
 
       setNotice('Pengaturan Cloudflare Turnstile berhasil disimpan.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savePaymentSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentForm),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan pengaturan payment gateway.');
+      }
+
+      setNotice('Pengaturan Payment Gateway & Mode Sandbox berhasil disimpan.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
     } finally {
@@ -1134,6 +1200,163 @@ export default function AdminSettingsPage() {
                 className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {saving ? 'Menyimpan...' : 'Simpan Analitik'}
+              </button>
+            </div>
+          </form>
+
+          {/* Payment Gateway & Sandbox Testing Mode */}
+          <form onSubmit={savePaymentSettings} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <span>💳 Payment Gateway & Mode Pengujian Sandbox</span>
+                  {paymentForm.sandboxPaymentEnabled ? (
+                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                      🧪 SANDBOX AKTIF
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      🟢 LIVE PRODUCTION
+                    </span>
+                  )}
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Atur kredensial payment gateway (Midtrans & Flip) serta aktifkan mode sandbox untuk simulasi dan pengujian pembayaran tanpa risiko.
+                </p>
+              </div>
+            </div>
+
+            {/* Sandbox Toggle Box */}
+            <div className={`p-4 rounded-xl border ${paymentForm.sandboxPaymentEnabled ? 'bg-amber-50/70 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+              <div className="flex items-start space-x-3">
+                <input
+                  type="checkbox"
+                  id="sandboxPaymentEnabled"
+                  checked={paymentForm.sandboxPaymentEnabled}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, sandboxPaymentEnabled: e.target.checked })}
+                  className="h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500 mt-0.5"
+                />
+                <div className="flex-1">
+                  <label htmlFor="sandboxPaymentEnabled" className="text-sm font-bold text-gray-900 cursor-pointer">
+                    Aktifkan Mode Sandbox (Pengujian Payment Gateway)
+                  </label>
+                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                    Saat mode ini aktif, produk yang memiliki label <strong>🧪 Sandbox</strong> dapat dibeli menggunakan simulator / gateway sandbox. 
+                    <span className="block mt-1 text-amber-900 font-medium">
+                      🔒 Keamanan Laporan: Seluruh transaksi sandbox terisolasi penuh dan tidak akan pernah dihitung ke dalam omset, revenue, saldo kas, atau laporan keuangan riil toko.
+                    </span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Sandbox Credentials */}
+            {paymentForm.sandboxPaymentEnabled && (
+              <div className="bg-amber-50/40 border border-amber-200 rounded-xl p-5 space-y-4">
+                <h3 className="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                  <span>🧪 Kredensial Sandbox (Test Keys)</span>
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">Midtrans Sandbox Merchant ID</label>
+                    <input
+                      type="text"
+                      value={paymentForm.midtransSandboxMerchantId}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, midtransSandboxMerchantId: e.target.value })}
+                      placeholder="G123456789 (Sandbox)"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">Midtrans Sandbox Client Key</label>
+                    <input
+                      type="text"
+                      value={paymentForm.midtransSandboxClientKey}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, midtransSandboxClientKey: e.target.value })}
+                      placeholder="SB-Mid-client-..."
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">Midtrans Sandbox Server Key</label>
+                    <input
+                      type="password"
+                      value={paymentForm.midtransSandboxServerKey}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, midtransSandboxServerKey: e.target.value })}
+                      placeholder="SB-Mid-server-..."
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700">Flip Sandbox API Key</label>
+                    <input
+                      type="password"
+                      value={paymentForm.flipSandboxApiKey}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, flipSandboxApiKey: e.target.value })}
+                      placeholder="Sandbox Secret Key"
+                      className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Production Credentials */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-gray-900">
+                🟢 Kredensial Produksi (Live Keys)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Midtrans Merchant ID</label>
+                  <input
+                    type="text"
+                    value={paymentForm.midtransMerchantId}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, midtransMerchantId: e.target.value })}
+                    placeholder="M123456789"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Midtrans Client Key</label>
+                  <input
+                    type="text"
+                    value={paymentForm.midtransClientKey}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, midtransClientKey: e.target.value })}
+                    placeholder="Mid-client-..."
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Midtrans Server Key</label>
+                  <input
+                    type="password"
+                    value={paymentForm.midtransServerKey}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, midtransServerKey: e.target.value })}
+                    placeholder="Mid-server-..."
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700">Flip API Key (Production)</label>
+                  <input
+                    type="password"
+                    value={paymentForm.flipApiKey}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, flipApiKey: e.target.value })}
+                    placeholder="Live API Key"
+                    className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Konfigurasi Payment Gateway'}
               </button>
             </div>
           </form>

@@ -16,8 +16,15 @@ interface OrderRow {
   totalAmount: number;
   status: string;
   createdAt: string;
+  isSandbox?: boolean;
   payments: { id: string; method: string; status: string }[];
 }
+
+const SANDBOX_FILTERS = [
+  { value: '', label: 'Order Riil' },
+  { value: 'true', label: '🧪 Sandbox' },
+  { value: 'all', label: 'Semua' },
+];
 
 const STATUS_FILTERS = [
   { value: '', label: 'Semua' },
@@ -58,6 +65,7 @@ function AdminOrdersContent() {
 
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [status, setStatus] = useState(urlStatus);
+  const [sandbox, setSandbox] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -105,6 +113,7 @@ function AdminOrdersContent() {
 
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (status) params.set('status', status);
+      if (sandbox) params.set('sandbox', sandbox);
       if (startDate) params.set('startDate', startDate);
       if (endDate) params.set('endDate', endDate);
 
@@ -125,7 +134,7 @@ function AdminOrdersContent() {
     } finally {
       setLoading(false);
     }
-  }, [status, page, limit, startDate, endDate]);
+  }, [status, sandbox, page, limit, startDate, endDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -142,9 +151,16 @@ function AdminOrdersContent() {
     setPage(1);
   };
 
+  const changeSandbox = (value: string) => {
+    setSandbox(value);
+    setPage(1);
+  };
+
   // Derived during render, not stored. Only the rows on screen are summed, so
   // the label says "halaman ini" instead of claiming the whole store's revenue.
+  // Sandbox rows are left out: test money is not revenue.
   const revenue = orders
+    .filter((order) => !order.isSandbox)
     .filter((order) => REVENUE_STATUSES.includes(order.status as OrderStatus))
     .reduce((sum, order) => sum + order.totalAmount, 0);
 
@@ -166,6 +182,22 @@ function AdminOrdersContent() {
       </div>
 
       <div className="bg-white rounded-lg shadow border overflow-hidden">
+        <div className="px-4 py-2 border-b bg-gray-50 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-gray-500 mr-1">Jenis order:</span>
+          {SANDBOX_FILTERS.map((filter) => (
+            <button
+              key={filter.value}
+              onClick={() => changeSandbox(filter.value)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                sandbox === filter.value
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
         <div className="px-4 py-3 border-b flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5">
             {STATUS_FILTERS.map((filter) => (
@@ -233,6 +265,11 @@ function AdminOrdersContent() {
                   <tr key={order.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {order.orderNumber}
+                      {order.isSandbox && (
+                        <span className="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded">
+                          🧪 SANDBOX
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {order.customerName || '-'}

@@ -46,6 +46,11 @@ model StoreSettings {
   midtransClientKey     String?
   midtransServerKey     String?
   flipApiKey            String?
+  sandboxPaymentEnabled Boolean  @default(false)
+  midtransSandboxMerchantId String?
+  midtransSandboxClientKey  String?
+  midtransSandboxServerKey  String?
+  flipSandboxApiKey         String?
   defaultSeoTitle       String?
   defaultSeoDescription String?
   googleTagId           String?
@@ -144,6 +149,7 @@ model Product {
   category         Category?      @relation(fields: [categoryId], references: [id])
   isPublished      Boolean        @default(true)
   isFeatured       Boolean        @default(false)
+  sandboxEnabled   Boolean        @default(false)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -238,6 +244,7 @@ model Order {
   shippedAt       DateTime?
   deliveredAt     DateTime?
   completedAt     DateTime?
+  isSandbox       Boolean     @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -288,6 +295,7 @@ model Payment {
   transactionId   String?
   gatewayResponse String?       @db.Text
   status          PaymentStatus @default(PENDING)
+  isSandbox       Boolean       @default(false)
   verifiedById    String?
   verifiedBy      User?         @relation(fields: [verifiedById], references: [id])
   verifiedAt      DateTime?
@@ -323,6 +331,7 @@ model Ledger {
   referenceId   String?
   referenceType String?
   category      String?
+  isSandbox     Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 

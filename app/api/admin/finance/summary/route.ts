@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
+    const includeSandbox = searchParams.get('includeSandbox') === 'true';
     const now = new Date();
     let start: Date | undefined, end: Date | undefined;
     
@@ -41,11 +42,15 @@ export async function GET(request: Request) {
         break;
     }
     
-    const summary = await getFinanceSummary(user.storeId, start, end);
+    const summary = await getFinanceSummary(user.storeId, start, end, { includeSandbox });
     
     const [recentTransactions, lowStockProducts, pendingPayments, todaySales] = await Promise.all([
       prisma.ledger.findMany({
-        where: { storeId: user.storeId, createdAt: { gte: start, lte: end } },
+        where: {
+          storeId: user.storeId,
+          createdAt: { gte: start, lte: end },
+          ...(includeSandbox ? {} : { isSandbox: false }),
+        },
         orderBy: { createdAt: 'desc' },
         take: 10,
         select: { id: true, type: true, amount: true, description: true, category: true, createdAt: true },
@@ -53,7 +58,12 @@ export async function GET(request: Request) {
       prisma.product.count({ where: { storeId: user.storeId, stock: { lte: 5 }, isPublished: true } }),
       prisma.payment.count({ where: { order: { storeId: user.storeId }, method: 'MANUAL', status: 'PENDING' } }),
       prisma.order.aggregate({
-        where: { storeId: user.storeId, status: 'PAID', createdAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } },
+        where: {
+          storeId: user.storeId,
+          status: 'PAID',
+          ...(includeSandbox ? {} : { isSandbox: false }),
+          createdAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
+        },
         _sum: { totalAmount: true },
         _count: { _all: true },
       }),

@@ -75,12 +75,80 @@ class Logger {
         entry.context ? { context: entry.context } : ''
       );
     }
+
+    // Stream to PostHog OpenTelemetry Logger if initialized
+    this.emitToPostHog(entry);
+  }
+
+  private emitToPostHog(entry: LogEntry): void {
+    if (typeof window !== 'undefined' || process.env.NEXT_RUNTIME === 'edge') return;
+
+    try {
+      const posthogLogger = (globalThis as any).__posthogLogger;
+      if (posthogLogger && typeof posthogLogger.emit === 'function') {
+        const severityMap: Record<LogLevel, { num: number; text: string }> = {
+          verbose: { num: 1, text: 'TRACE' },
+          debug: { num: 5, text: 'DEBUG' },
+          info: { num: 9, text: 'INFO' },
+          warn: { num: 13, text: 'WARN' },
+          error: { num: 17, text: 'ERROR' },
+        };
+        const sev = severityMap[entry.level] || { num: 9, text: 'INFO' };
+
+        const attributes: Record<string, unknown> = {
+          service: this.serviceName,
+          ...(entry.context || {}),
+        };
+
+        if (entry.error) {
+          attributes['error.message'] =
+            entry.error instanceof Error ? entry.error.message : String(entry.error);
+          if (entry.error instanceof Error && entry.error.stack) {
+            attributes['error.stack'] = entry.error.stack;
+          }
+        }
+
+        posthogLogger.emit({
+          severityNumber: sev.num,
+          severityText: sev.text,
+          body: entry.message,
+          attributes,
+        });
+      }
+    } catch {
+      // Silently guard against logging transport errors
+    }
   }
 
   error(message: string, context?: LogContext, error?: Error | string): void {
     if (!this.shouldLog('error')) return;
     const entry = this.formatLog('error', message, context, error);
     this.writeToConsole(entry);
+
+    // Persist to telemetry database in background (server-side Node runtime only, non-blocking)
+    if (typeof window === 'undefined' && process.env.NEXT_RUNTIME !== 'edge' && process.env.PERSIST_ERROR_LOGS !== 'false') {
+      try {
+        const errorStack = error instanceof Error ? error.stack : typeof error === 'string' ? error : undefined;
+        // Dynamic import prevents circular dependencies and boot-time module stalls
+        import('@/services/telemetryService').then(({ recordSystemError }) => {
+          recordSystemError({
+            severity: 'ERROR',
+            source: 'SERVER_API',
+            message,
+            stack: errorStack,
+            path: context?.path as string | undefined,
+            method: context?.method as string | undefined,
+            statusCode: context?.statusCode as number | undefined,
+            storeId: context?.storeId as string | undefined,
+            ipAddress: context?.ip as string | undefined,
+            userAgent: context?.userAgent as string | undefined,
+            context: context as Record<string, unknown> | undefined,
+          }).catch(() => {});
+        }).catch(() => {});
+      } catch {
+        // Silently guard against recursion
+      }
+    }
   }
 
   warn(message: string, context?: LogContext, error?: Error | string): void {

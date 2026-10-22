@@ -93,6 +93,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     storeId: store.id,
     categoryId: category.id,
     isPublished: true,
+    sandboxEnabled: false,
   };
 
   if (startDate || endDate) {

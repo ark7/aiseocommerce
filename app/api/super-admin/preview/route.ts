@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
+import { isControlPlaneEnabled } from '@/lib/superAdminAuth';
 
 export async function GET(request: Request) {
+  if (!isControlPlaneEnabled(request)) {
+    return NextResponse.json(
+      { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
+      { status: 404 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const domain = searchParams.get('domain');
   const redirectPath = searchParams.get('redirect') || '/';
@@ -27,3 +35,4 @@ export async function GET(request: Request) {
 
   return response;
 }
+

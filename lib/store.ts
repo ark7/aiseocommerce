@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
+import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
 /**
  * Resolves the primary store for this standalone e-commerce deployment.
@@ -20,19 +21,21 @@ export const getActiveStore = cache(async (domainHint?: string) => {
       if (store) return store;
     }
 
-    // Check preview cookie (for Super-Admin previewing created customer stores in dev)
-    try {
-      const cookieStore = cookies();
-      const previewDomain = cookieStore.get('preview_store_domain')?.value;
-      if (previewDomain) {
-        const store = await prisma.store.findUnique({
-          where: { domain: previewDomain },
-          include: { settings: true },
-        });
-        if (store) return store;
+    // Check preview cookie (only allowed when Super-Admin Control Plane is enabled in dev/localhost)
+    if (isControlPlaneEnabled()) {
+      try {
+        const cookieStore = cookies();
+        const previewDomain = cookieStore.get('preview_store_domain')?.value;
+        if (previewDomain) {
+          const store = await prisma.store.findUnique({
+            where: { domain: previewDomain },
+            include: { settings: true },
+          });
+          if (store) return store;
+        }
+      } catch {
+        // cookies() might not be available in non-request contexts or unit tests
       }
-    } catch {
-      // cookies() might not be available in non-request contexts or unit tests
     }
 
     const defaultDomain = process.env.DEFAULT_STORE_DOMAIN || process.env.LANDING_STORE_DOMAIN;

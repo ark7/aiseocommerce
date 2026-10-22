@@ -4,6 +4,11 @@ import { getIPAddress } from '@/lib/ip';
 import { requiredTierFor, meetsTier } from '@/lib/tiers';
 import { generateGuestToken, verifyGuestToken } from '@/lib/guestSession';
 import { prisma } from '@/lib/prisma';
+import {
+  isControlPlaneEnabled,
+  isAllowedSuperAdminHost,
+  extractRequestHost,
+} from '@/lib/superAdminGuard';
 
 // Lazy load jose for JWT verification (Node.js only)
 let jwtVerifyCache: any = null;
@@ -167,6 +172,30 @@ export async function middleware(request: NextRequest) {
       return addCorsHeaders(
         NextResponse.json({ error: 'Too many login attempts' }, { status: 429 })
     );
+    }
+  }
+
+  // Super-Admin Control Plane Isolation (Localhost & Whitelist Lockdown)
+  if (path.startsWith('/super-admin') || path.startsWith('/api/super-admin')) {
+    const host = extractRequestHost(request);
+    const allowed = isControlPlaneEnabled(request) && (!host || isAllowedSuperAdminHost(host));
+
+    if (!allowed) {
+      logger.warn('Blocked attempt to access Super-Admin Control Plane on unallowed host/deployment', {
+        ...logContext,
+        host,
+      });
+
+      if (path.startsWith('/api/')) {
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Not Found' }, { status: 404 })
+        );
+      }
+
+      // Return a clean 404 rewrite so client stores appear to have no /super-admin page at all
+      return addCorsHeaders(
+        NextResponse.rewrite(new URL('/404', request.url), { status: 404 })
+      );
     }
   }
 

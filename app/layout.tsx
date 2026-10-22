@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { getActiveStore } from '@/lib/store';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
+import MasterThirdPartyTracker from '@/components/MasterThirdPartyTracker';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
+import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getActiveStore();
@@ -50,10 +52,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const fontFamily = store?.settings?.fontFamily || 'inter';
 
   let previewDomain: string | null = null;
-  try {
-    previewDomain = cookies().get('preview_store_domain')?.value || null;
-  } catch {
-    // ignore
+  if (isControlPlaneEnabled()) {
+    try {
+      previewDomain = cookies().get('preview_store_domain')?.value || null;
+    } catch {
+      // ignore
+    }
   }
 
   return (
@@ -91,6 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
         )}
         {children}
+        <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
         <CookieConsentBanner
           enabled={store?.settings?.cookieConsentEnabled ?? true}
           title={store?.settings?.cookieConsentTitle}

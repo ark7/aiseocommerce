@@ -40,7 +40,7 @@ export async function updateOrderStatus(
 
   const existing = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, storeId: true, status: true, totalAmount: true, orderNumber: true },
+    select: { id: true, storeId: true, status: true, totalAmount: true, orderNumber: true, isSandbox: true },
   });
 
   if (!existing || existing.storeId !== storeId) {
@@ -80,6 +80,7 @@ export async function updateOrderStatus(
           storeId,
           orderNumber: existing.orderNumber,
           totalAmount: existing.totalAmount,
+          isSandbox: existing.isSandbox,
         });
       }
 
@@ -134,10 +135,13 @@ export async function updateOrderStatus(
               storeId,
               type: LedgerType.REFUND,
               amount: existing.totalAmount,
-              description: `Order ${existing.orderNumber} ${newStatus}`,
+              description: existing.isSandbox
+                ? `[SANDBOX] Order ${existing.orderNumber} ${newStatus}`
+                : `Order ${existing.orderNumber} ${newStatus}`,
               referenceId: orderId,
               referenceType: 'ORDER',
-              category: 'REFUND',
+              category: existing.isSandbox ? 'SANDBOX_REFUND' : 'REFUND',
+              isSandbox: Boolean(existing.isSandbox),
             },
           });
         }
