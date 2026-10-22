@@ -22,9 +22,22 @@ type LandingStore = Prisma.StoreGetPayload<{
 export default async function LandingPage() {
   let store: LandingStore | null = null;
   try {
-    const landingStoreDomain = process.env.LANDING_STORE_DOMAIN;
+    let hostDomain: string | undefined;
+    try {
+      const headerList = headers();
+      const rawHost = headerList.get('x-forwarded-host') || headerList.get('host');
+      if (rawHost) {
+        hostDomain = rawHost.split(':')[0].toLowerCase();
+      }
+    } catch {
+      // headers() unavailable outside request scope
+    }
+
+    const isLocal = !hostDomain || hostDomain === 'localhost' || hostDomain === '127.0.0.1';
+    const targetDomain = (!isLocal ? hostDomain : null) || process.env.LANDING_STORE_DOMAIN || process.env.DEFAULT_STORE_DOMAIN;
+
     store = await prisma.store.findFirst({
-      where: landingStoreDomain ? { domain: landingStoreDomain } : {},
+      where: targetDomain ? { domain: targetDomain } : {},
       orderBy: { createdAt: 'asc' },
       include: {
         settings: true,

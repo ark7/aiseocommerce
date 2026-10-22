@@ -1,21 +1,37 @@
 import { prisma } from '@/lib/prisma';
 import { cache } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
 /**
  * Resolves the primary store for this standalone e-commerce deployment.
  * Supports override via:
  * 1. domainHint (direct argument)
- * 2. preview_store_domain cookie (useful for previewing any customer's store in Super-Admin localhost)
- * 3. DEFAULT_STORE_DOMAIN or LANDING_STORE_DOMAIN environment variables
- * 4. Fallback to the first registered store in the database
+ * 2. Incoming request host header (x-forwarded-host or host)
+ * 3. preview_store_domain cookie (useful for previewing any customer's store in Super-Admin localhost)
+ * 4. DEFAULT_STORE_DOMAIN or LANDING_STORE_DOMAIN environment variables
+ * 5. Fallback to the first registered store in the database
  */
 export const getActiveStore = cache(async (domainHint?: string) => {
   try {
-    if (domainHint && domainHint !== 'localhost' && domainHint !== '127.0.0.1') {
+    let resolvedDomain = domainHint;
+
+    // Automatically resolve domain from incoming HTTP request headers if not explicitly hinted
+    if (!resolvedDomain) {
+      try {
+        const headerList = headers();
+        const rawHost = headerList.get('x-forwarded-host') || headerList.get('host');
+        if (rawHost) {
+          resolvedDomain = rawHost.split(':')[0].toLowerCase();
+        }
+      } catch {
+        // headers() is unavailable outside request scope or during static generation
+      }
+    }
+
+    if (resolvedDomain && resolvedDomain !== 'localhost' && resolvedDomain !== '127.0.0.1') {
       const store = await prisma.store.findUnique({
-        where: { domain: domainHint },
+        where: { domain: resolvedDomain },
         include: { settings: true },
       });
       if (store) return store;
