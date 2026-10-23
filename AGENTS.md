@@ -47,3 +47,4 @@ Setiap kali melakukan modifikasi pada [`prisma/schema.prisma`](file:///home/ngab
 | `npm test` | Jalankan seluruh unit test dengan Jest |
 | `npm run build` | Verifikasi build produksi Next.js |
 | `npm run dev` | Jalankan server pengembangan lokal (port 3000) |
+

@@ -91,6 +91,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: 'Manajemen Staf', href: '/admin/staff', icon: 'UserGroupIcon', permission: 'staff' as PermissionKey },
   ];
 
+  const SETTINGS_SUBNAV = [
+    { id: 'general', name: 'Identitas & Kontak', icon: '🏢' },
+    { id: 'hero', name: 'Hero Section', icon: '🖼️' },
+    { id: 'theme', name: 'Tema & Font', icon: '🎨' },
+    { id: 'integrations', name: 'Pixel & Keamanan', icon: '🛡️' },
+    { id: 'legal', name: 'Legal & Cookie', icon: '📄' },
+    { id: 'ai', name: 'AI Assistant', icon: '✨' },
+    { id: 'notifications', name: 'Notifikasi (WA/TG)', icon: '📲' },
+  ];
+
   // Filter navigation items based on user role and permissions
   const visibleNavigation = allNavigation.filter((item) => {
     if (user.role === 'ADMIN') return true;
@@ -193,6 +203,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <ul className="space-y-1.5">
             {visibleNavigation.map((item) => {
               const Icon = IconComponent[item.icon];
+              const isSettings = item.href === '/admin/settings';
               const isActive = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href + '/'));
               return (
                 <li key={item.name}>
@@ -201,8 +212,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors text-sm ${isActive ? 'bg-indigo-50 text-indigo-600 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                   >
                     <Icon />
-                    <span>{item.name}</span>
+                    <span className="flex-1">{item.name}</span>
+                    {isSettings && (
+                      <span className="text-xs text-gray-400">
+                        {pathname.startsWith('/admin/settings') ? '▾' : '▸'}
+                      </span>
+                    )}
                   </Link>
+
+                  {/* Expand sub-menus when on settings page */}
+                  {isSettings && pathname.startsWith('/admin/settings') && (
+                    <ul className="mt-1 pl-6 pr-1 space-y-1 border-l-2 border-indigo-100 ml-4 py-1">
+                      {SETTINGS_SUBNAV.map((sub) => (
+                        <li key={sub.id}>
+                          <Link
+                            href={`/admin/settings?tab=${sub.id}`}
+                            className="flex items-center space-x-2 px-2 py-1 rounded-md text-xs text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors"
+                          >
+                            <span>{sub.icon}</span>
+                            <span className="truncate">{sub.name}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}

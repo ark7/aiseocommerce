@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import ImageUploader from '@/components/ImageUploader';
@@ -207,8 +208,82 @@ const EMPTY_NOTIFICATION_FORM: NotificationForm = {
 
 type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications';
 
-export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+interface SettingsCategory {
+  id: SettingsTab;
+  title: string;
+  subtitle: string;
+  icon: string;
+  badge?: string;
+}
+
+const SETTINGS_CATEGORIES: SettingsCategory[] = [
+  {
+    id: 'general',
+    title: 'Identitas & Kontak',
+    subtitle: 'Profil toko, kontak, dan logo',
+    icon: '🏢',
+  },
+  {
+    id: 'hero',
+    title: 'Hero Section Builder',
+    subtitle: 'Headline, banner & tombol CTA',
+    icon: '🖼️',
+  },
+  {
+    id: 'theme',
+    title: 'Tema Warna & Font',
+    subtitle: 'Warna brand & tipografi',
+    icon: '🎨',
+  },
+  {
+    id: 'integrations',
+    title: 'Pixel & Keamanan',
+    subtitle: 'Meta Pixel, Turnstile, & Sandbox',
+    icon: '🛡️',
+  },
+  {
+    id: 'legal',
+    title: 'Legal & Cookie',
+    subtitle: 'Syarat ketentuan & banner privasi',
+    icon: '📄',
+  },
+  {
+    id: 'ai',
+    title: 'AI Assistant (BYOK)',
+    subtitle: 'Model AI, API Key, & Copilot Toko',
+    icon: '✨',
+    badge: 'Baru',
+  },
+  {
+    id: 'notifications',
+    title: 'Notifikasi Otomatis',
+    subtitle: 'Alert pesanan WhatsApp & Telegram',
+    icon: '📲',
+    badge: 'Baru',
+  },
+];
+
+function AdminSettingsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as SettingsTab | null;
+  const initialTab: SettingsTab =
+    tabParam && SETTINGS_CATEGORIES.some((c) => c.id === tabParam)
+      ? tabParam
+      : 'general';
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+
+  useEffect(() => {
+    if (tabParam && SETTINGS_CATEGORIES.some((c) => c.id === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (newTab: SettingsTab) => {
+    setActiveTab(newTab);
+    router.replace(`/admin/settings?tab=${newTab}`, { scroll: false });
+  };
   const [storeForm, setStoreForm] = useState<StoreForm>(EMPTY_STORE_FORM);
   const [heroForm, setHeroForm] = useState<HeroForm>(EMPTY_HERO_FORM);
   const [themeForm, setThemeForm] = useState<ThemeForm>(EMPTY_THEME_FORM);
@@ -722,7 +797,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header Halaman */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Pengaturan Toko & Identitas Digital</h1>
@@ -745,81 +820,79 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 space-x-2 md:space-x-8 overflow-x-auto pb-1">
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${
-            activeTab === 'general'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Identitas & Kontak Toko
-        </button>
-        <button
-          onClick={() => setActiveTab('hero')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${
-            activeTab === 'hero'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Hero Section Builder
-        </button>
-        <button
-          onClick={() => setActiveTab('theme')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${
-            activeTab === 'theme'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Tema Warna & Font
-        </button>
-        <button
-          onClick={() => setActiveTab('integrations')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${
-            activeTab === 'integrations'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Pixel & Keamanan
-        </button>
-        <button
-          onClick={() => setActiveTab('legal')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors ${
-            activeTab === 'legal'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          📄 Halaman Legal & Cookie
-        </button>
-        <button
-          onClick={() => setActiveTab('ai')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
-            activeTab === 'ai'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <span>✨</span>
-          <span>AI Assistant (BYOK)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('notifications')}
-          className={`py-3 px-2 font-medium text-sm border-b-2 whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
-            activeTab === 'notifications'
-              ? 'border-indigo-600 text-indigo-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <span>📲</span>
-          <span>Notifikasi (WA & Telegram)</span>
-        </button>
+      {/* Mobile Navigation Dropdown (< md) */}
+      <div className="block md:hidden">
+        <label htmlFor="settings-mobile-nav" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          Kategori Pengaturan
+        </label>
+        <div className="relative">
+          <select
+            id="settings-mobile-nav"
+            value={activeTab}
+            onChange={(e) => handleTabChange(e.target.value as SettingsTab)}
+            className="w-full bg-white border border-gray-300 rounded-xl py-3 px-4 text-sm font-medium text-gray-900 shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
+          >
+            {SETTINGS_CATEGORIES.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.icon} {cat.title} {cat.badge ? `(${cat.badge})` : ''}
+              </option>
+            ))}
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-gray-500">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
       </div>
+
+      {/* Main Grid: Kolom Kiri (Navigasi Vertikal) + Kolom Kanan (Konten Formulir) */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        {/* Kolom Kiri: Sidebar Pengaturan Vertikal (Desktop >= md) */}
+        <aside className="hidden md:block md:col-span-4 lg:col-span-3 sticky top-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-2.5 space-y-1">
+            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+              Menu Pengaturan
+            </div>
+            {SETTINGS_CATEGORIES.map((cat) => {
+              const isActive = activeTab === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => handleTabChange(cat.id)}
+                  className={`w-full text-left p-3 rounded-xl transition-all flex items-start space-x-3 ${
+                    isActive
+                      ? 'bg-indigo-50/80 text-indigo-700 font-semibold border border-indigo-200/70 shadow-xs'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900 border border-transparent'
+                  }`}
+                >
+                  <span className="text-xl flex-shrink-0 mt-0.5">{cat.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium truncate">{cat.title}</span>
+                      {cat.badge && (
+                        <span
+                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ml-1.5 flex-shrink-0 ${
+                            isActive ? 'bg-indigo-200 text-indigo-800' : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {cat.badge}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs mt-0.5 line-clamp-1 ${isActive ? 'text-indigo-600/80' : 'text-gray-400'}`}>
+                      {cat.subtitle}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* Kolom Kanan: Konten Formulir */}
+        <div className="md:col-span-8 lg:col-span-9 space-y-6">
 
       {/* TAB 1: IDENTITAS TOKO */}
       {activeTab === 'general' && (
@@ -2295,6 +2368,22 @@ export default function AdminSettingsPage() {
           </div>
         </form>
       )}
+        </div>
+      </div>
     </div>
+  );
+}
+
+export default function AdminSettingsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 max-w-7xl mx-auto flex items-center justify-center min-h-[300px]">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      }
+    >
+      <AdminSettingsContent />
+    </Suspense>
   );
 }
