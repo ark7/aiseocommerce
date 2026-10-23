@@ -26,32 +26,45 @@ export default async function LandingPage() {
   try {
     const active = await getActiveStore();
     if (active) {
-      store = await prisma.store.findUnique({
-        where: { id: active.id },
-        include: {
-          settings: true,
-          products: {
-            where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
-            take: 8,
-            orderBy: { createdAt: 'desc' },
-            include: { images: { where: { isPrimary: true }, take: 1 } },
+      try {
+        store = await prisma.store.findUnique({
+          where: { id: active.id },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            articles: {
+              where: { isFeatured: true },
+              take: 6,
+              orderBy: { createdAt: 'desc' },
+            },
           },
-          articles: {
-            where: { isFeatured: true },
-            take: 6,
-            orderBy: { createdAt: 'desc' },
-          },
-        },
-      });
+        });
+      } catch (relationError) {
+        console.error('[LandingPage] Failed to load store relations, using active store fallback:', relationError);
+        store = {
+          ...active,
+          products: [],
+          articles: [],
+        } as LandingStore;
+      }
     }
-  } catch {
+  } catch (error) {
+    console.error('[LandingPage] Failed to resolve active store:', error);
     store = null;
   }
 
   if (!store) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>Store not found</p>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center">
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Store not found</h1>
+        <p className="text-sm text-gray-600 max-w-md">
+          Pastikan koneksi database aktif dan toko telah terdaftar di sistem.
+        </p>
       </div>
     );
   }

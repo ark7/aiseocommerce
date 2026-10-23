@@ -52,7 +52,18 @@ export const getActiveStore = cache(async (domainHint?: string) => {
       orderBy: { createdAt: 'asc' },
       include: { settings: true },
     });
-  } catch {
+  } catch (error) {
+    console.error('[getActiveStore] Primary query failed, attempting minimal store fallback:', error);
+    try {
+      const fallbackStore = await prisma.store.findFirst({
+        orderBy: { createdAt: 'asc' },
+      });
+      if (fallbackStore) {
+        return { ...fallbackStore, settings: null };
+      }
+    } catch (fallbackErr) {
+      console.error('[getActiveStore] Minimal fallback failed:', fallbackErr);
+    }
     return null;
   }
 });

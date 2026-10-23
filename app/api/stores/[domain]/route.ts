@@ -29,20 +29,37 @@ export async function GET(
 
     if (!store) {
       const defaultDomain = process.env.DEFAULT_STORE_DOMAIN || process.env.LANDING_STORE_DOMAIN;
-      store = await prisma.store.findFirst({
-        where: defaultDomain ? { domain: defaultDomain } : {},
-        orderBy: { createdAt: 'asc' },
-        include: {
-          settings: true,
-          products: {
-            where: { isPublished: true, sandboxEnabled: false },
-            take: 8,
-            orderBy: { createdAt: 'desc' },
-            include: { images: { where: { isPrimary: true }, take: 1 } },
+      if (defaultDomain) {
+        store = await prisma.store.findFirst({
+          where: { domain: defaultDomain },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            categories: { where: { parentId: null }, take: 10 },
           },
-          categories: { where: { parentId: null }, take: 10 },
-        },
-      });
+        });
+      }
+      if (!store) {
+        store = await prisma.store.findFirst({
+          orderBy: { createdAt: 'asc' },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            categories: { where: { parentId: null }, take: 10 },
+          },
+        });
+      }
     }
 
     if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });

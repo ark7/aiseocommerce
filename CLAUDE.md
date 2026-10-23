@@ -47,3 +47,7 @@ Multi-tenant E-Commerce SaaS built with Next.js (App Router), TypeScript, Tailwi
 - **Error Handling:** Explicit error handling with structured responses and audit logging.
 - **Logging:** No `console.log` in production code; use `@/lib/logger` instead.
 - **Database Transactions:** Use `prisma.$transaction` for multi-step stock reservation and order/ledger processing.
+- **Prisma Schema Drift Prevention:** Whenever `prisma/schema.prisma` is modified, ALWAYS run BOTH `npm run db:generate` AND `npm run db:push`. Never skip `db:push`, or queries will fail on missing columns.
+- **Remote Database Access:** The database is hosted on Neon Cloud PostgreSQL. Any process querying the DB (e.g. `npm run dev` or `db:push`) requires outbound network access.
+- **Graceful Query Fallbacks:** Never let secondary relation failures (products/articles) crash top-level entities (Store). Always isolate relations so core pages render gracefully with empty arrays instead of returning 404/`Store not found`.
+- **Build vs Dev Separation:** Always stop `npm run dev` before running `npm run build` to avoid `.next` lock and manifest collisions.
