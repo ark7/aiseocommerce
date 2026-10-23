@@ -16,6 +16,7 @@ interface CartItem {
   quantity: number
   imageUrl?: string
   isPreOrder?: boolean
+  productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT'
 }
 
 // Prisma ids are cuids, and seeded rows use plain strings like demo-prod-001.
@@ -27,6 +28,7 @@ const CartItemSchema = z.object({
   quantity: z.number().int().positive(),
   imageUrl: z.string().url().optional(),
   isPreOrder: z.boolean().optional(),
+  productType: z.enum(['PHYSICAL', 'DIGITAL', 'EVENT']).optional(),
   storeDomain: z.string().optional(),
 })
 
@@ -283,6 +285,15 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           </div>
         ) : (
           <div className="space-y-4">
+            {cartItems.some(item => item.productType === 'DIGITAL' || item.productType === 'EVENT') && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs flex items-center gap-2">
+                <span>⚡</span>
+                <span>
+                  <strong>Pengiriman Instan Elektronik:</strong> Produk digital / Tiket seminar otomatis dapat diakses dan diunduh langsung setelah pembayaran Anda lunas (Bebas Ongkir).
+                </span>
+              </div>
+            )}
+
             {cartItems.map(item => (
               <div key={item.productId} className="bg-white rounded-lg shadow border p-4 flex items-center">
                 {item.imageUrl && (
@@ -295,8 +306,18 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                   />
                 )}
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-medium text-gray-900">{item.name}</h3>
+                    {item.productType === 'DIGITAL' && (
+                      <span className="bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-blue-200">
+                        💻 File Digital
+                      </span>
+                    )}
+                    {item.productType === 'EVENT' && (
+                      <span className="bg-purple-100 text-purple-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-purple-200">
+                        🎟️ Tiket Event
+                      </span>
+                    )}
                     {item.isPreOrder && (
                       <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-300">
                         PO

@@ -12,7 +12,20 @@ interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  product: { id: string; name: string; slug: string } | null;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT';
+    digitalFileUrl?: string | null;
+    digitalInstructions?: string | null;
+    eventStartDate?: string | null;
+    eventEndDate?: string | null;
+    eventLocationType?: string | null;
+    eventVenueName?: string | null;
+    eventLocationAddress?: string | null;
+    eventBenefits?: any;
+  } | null;
 }
 
 interface PaymentInfo {
@@ -321,6 +334,86 @@ export default function CustomerOrderDetailPage() {
             >
               {busy ? 'Memproses...' : 'Pesanan Diterima'}
             </button>
+          </div>
+        )}
+
+        {/* Digital Products & Seminar Tickets Fulfillment Cards */}
+        {['PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
+          <div className="space-y-4 mb-6">
+            {order.orderItems
+              .filter((item) => item.product?.productType === 'DIGITAL')
+              .map((item, idx) => (
+                <div key={`dig_${item.id || idx}`} className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="inline-block px-2 py-0.5 bg-emerald-200 text-emerald-800 text-[10px] font-bold uppercase rounded mb-1">
+                        💻 Akses Produk Digital
+                      </span>
+                      <h3 className="text-base font-bold text-emerald-950">
+                        {item.product?.name}
+                      </h3>
+                      {item.product?.digitalInstructions && (
+                        <p className="text-xs text-emerald-800 mt-1 leading-relaxed">
+                          <strong>Petunjuk:</strong> {item.product.digitalInstructions}
+                        </p>
+                      )}
+                    </div>
+                    {item.product?.digitalFileUrl && (
+                      <a
+                        href={item.product.digitalFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition whitespace-nowrap"
+                      >
+                        ⬇️ Buka / Unduh File Digital
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+            {order.orderItems
+              .filter((item) => item.product?.productType === 'EVENT')
+              .map((item, idx) => (
+                <div key={`evt_${item.id || idx}`} className="bg-purple-50 border-2 border-purple-300 rounded-xl p-5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block px-2 py-0.5 bg-purple-200 text-purple-800 text-[10px] font-bold uppercase rounded">
+                          🎟️ E-Tiket Seminar & Event
+                        </span>
+                        <span className="font-mono text-xs font-bold text-purple-900 bg-white px-2 py-0.5 rounded border border-purple-200">
+                          Kode Tiket: TKT-{order.orderNumber.replace('ORD-', '')}-{idx + 1}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-bold text-purple-950 mt-1">
+                        {item.product?.name}
+                      </h3>
+                      <div className="text-xs text-purple-800 space-y-0.5 pt-1">
+                        {item.product?.eventStartDate && (
+                          <p>
+                            📅 <strong>Waktu:</strong> {new Date(item.product.eventStartDate).toLocaleString('id-ID', { dateStyle: 'full', timeStyle: 'short' })} WIB
+                          </p>
+                        )}
+                        <p>
+                          {item.product?.eventLocationType === 'ONLINE' ? '💻' : '📍'}{' '}
+                          <strong>Platform / Lokasi:</strong> {item.product?.eventVenueName || 'Online Webinar'}
+                        </p>
+                      </div>
+                    </div>
+                    {item.product?.eventLocationAddress && (
+                      <a
+                        href={item.product.eventLocationAddress}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs rounded-xl shadow transition whitespace-nowrap sm:self-center"
+                      >
+                        {item.product.eventLocationType === 'ONLINE' ? '🌐 Buka Ruang Zoom / Acara' : '🗺️ Petunjuk Lokasi Venue'}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
           </div>
         )}
 

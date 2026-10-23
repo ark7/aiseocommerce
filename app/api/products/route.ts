@@ -89,11 +89,46 @@ const nullableDate = z
   .optional()
   .transform((value) => (value === '' ? null : value));
 
+const jsonArrayTransform = z
+  .union([z.literal(''), z.string(), z.array(z.any())])
+  .optional()
+  .transform((val) => {
+    if (!val || val === '') return [];
+    if (Array.isArray(val)) return val;
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+const productTypeEnum = z
+  .enum(['PHYSICAL', 'DIGITAL', 'EVENT'])
+  .optional()
+  .transform((val) => (val === undefined ? 'PHYSICAL' : val));
+
+const eventLocationTypeEnum = z
+  .enum(['ONLINE', 'OFFLINE'])
+  .optional()
+  .transform((val) => (val === undefined ? 'ONLINE' : val));
+
 const productFields = {
   name: z.string().min(1),
   slug: z.string().min(1),
   description: nullableText,
   shortDescription: nullableText,
+  productType: productTypeEnum,
+  digitalFileUrl: nullableText,
+  digitalInstructions: nullableText,
+  eventStartDate: nullableDate,
+  eventEndDate: nullableDate,
+  eventLocationType: eventLocationTypeEnum,
+  eventVenueName: nullableText,
+  eventLocationAddress: nullableText,
+  eventSpeakers: jsonArrayTransform,
+  eventBenefits: jsonArrayTransform,
+  eventQuota: nullableInt,
   basePrice: z.coerce.number().min(0),
   sellingPrice: z.coerce.number().min(0),
   discountPrice: nullableNumber,

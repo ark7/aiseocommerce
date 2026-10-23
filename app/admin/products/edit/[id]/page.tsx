@@ -21,6 +21,16 @@ const EMPTY_FORM = {
   slug: '',
   description: '',
   shortDescription: '',
+  productType: 'PHYSICAL',
+  digitalFileUrl: '',
+  digitalInstructions: '',
+  eventStartDate: '',
+  eventEndDate: '',
+  eventLocationType: 'ONLINE',
+  eventVenueName: '',
+  eventLocationAddress: '',
+  eventQuota: '',
+  eventBenefits: '',
   basePrice: '',
   sellingPrice: '',
   discountPrice: '',
@@ -110,6 +120,16 @@ export default function EditProduct() {
         slug: asText(product.slug),
         description: asText(product.description),
         shortDescription: asText(product.shortDescription),
+        productType: product.productType || 'PHYSICAL',
+        digitalFileUrl: asText(product.digitalFileUrl),
+        digitalInstructions: asText(product.digitalInstructions),
+        eventStartDate: toDateTimeInput(product.eventStartDate),
+        eventEndDate: toDateTimeInput(product.eventEndDate),
+        eventLocationType: product.eventLocationType || 'ONLINE',
+        eventVenueName: asText(product.eventVenueName),
+        eventLocationAddress: asText(product.eventLocationAddress),
+        eventQuota: asText(product.eventQuota),
+        eventBenefits: Array.isArray(product.eventBenefits) ? product.eventBenefits.join('\n') : asText(product.eventBenefits),
         basePrice: asText(product.basePrice),
         sellingPrice: asText(product.sellingPrice),
         discountPrice: asText(product.discountPrice),
@@ -280,6 +300,41 @@ export default function EditProduct() {
         {/* Product Information */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Informasi Produk</h2>
+
+          {/* Product Type Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Produk / Komoditas *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'PHYSICAL' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'PHYSICAL' ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">📦</div>
+                <div className="text-sm font-bold text-gray-900">Produk Fisik</div>
+                <div className="text-xs text-gray-500 mt-0.5">Barang fisik yang dikirim melalui kurir ekspedisi</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'DIGITAL' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'DIGITAL' ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">💻</div>
+                <div className="text-sm font-bold text-blue-900">Produk Digital / File</div>
+                <div className="text-xs text-blue-700 mt-0.5">E-book, template, software, file unduh langsung</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'EVENT' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'EVENT' ? 'bg-purple-50 border-purple-600 ring-2 ring-purple-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">🎟️</div>
+                <div className="text-sm font-bold text-purple-900">Event / Seminar</div>
+                <div className="text-xs text-purple-700 mt-0.5">Webinar online Zoom, seminar, tiket workshop</div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="name">
@@ -344,6 +399,163 @@ export default function EditProduct() {
             </div>
           </div>
         </div>
+
+        {/* Digital Product Delivery Settings */}
+        {formData.productType === 'DIGITAL' && (
+          <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-200 space-y-4">
+            <h2 className="text-base font-bold text-blue-900 flex items-center gap-2">
+              <span>💻</span>
+              <span>Pengaturan Pengiriman Produk Digital (Instant Access)</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="digitalFileUrl">
+                  Tautan / Link Unduhan File Digital (URL) *
+                </label>
+                <input
+                  id="digitalFileUrl"
+                  type="url"
+                  name="digitalFileUrl"
+                  value={formData.digitalFileUrl}
+                  onChange={handleChange}
+                  placeholder="https://drive.google.com/... atau https://dropbox.com/..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Tautan ini otomatis diberikan kepada pembeli di halaman rincian pesanan dan notifikasi WhatsApp/Telegram setelah pembayaran Lunas.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="digitalInstructions">
+                  Petunjuk Akses / Cara Menggunakan File
+                </label>
+                <textarea
+                  id="digitalInstructions"
+                  name="digitalInstructions"
+                  rows={2}
+                  value={formData.digitalInstructions}
+                  onChange={handleChange}
+                  placeholder="Contoh: Ekstrak file .zip, buka folder dokumen, gunakan password 'VIP2026'..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Event / Seminar Settings */}
+        {formData.productType === 'EVENT' && (
+          <div className="bg-purple-50/50 p-5 rounded-xl border border-purple-200 space-y-4">
+            <h2 className="text-base font-bold text-purple-900 flex items-center gap-2">
+              <span>🎟️</span>
+              <span>Pengaturan Detail Seminar & Event</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventStartDate">
+                  Tanggal & Jam Mulai Acara *
+                </label>
+                <input
+                  id="eventStartDate"
+                  type="datetime-local"
+                  name="eventStartDate"
+                  value={formData.eventStartDate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventEndDate">
+                  Tanggal & Jam Selesai Acara
+                </label>
+                <input
+                  id="eventEndDate"
+                  type="datetime-local"
+                  name="eventEndDate"
+                  value={formData.eventEndDate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventLocationType">
+                  Format Pelaksanaan Acara
+                </label>
+                <select
+                  id="eventLocationType"
+                  name="eventLocationType"
+                  value={formData.eventLocationType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="ONLINE">💻 Online (Zoom / Webinar / Live)</option>
+                  <option value="OFFLINE">📍 Offline (Tatap Muka di Lokasi)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventVenueName">
+                  Nama Platform / Gedung
+                </label>
+                <input
+                  id="eventVenueName"
+                  type="text"
+                  name="eventVenueName"
+                  value={formData.eventVenueName}
+                  onChange={handleChange}
+                  placeholder="Misal: Zoom Cloud Meetings atau Hotel Mulia"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventQuota">
+                  Kuota Maksimal Peserta Tiket
+                </label>
+                <input
+                  id="eventQuota"
+                  type="number"
+                  name="eventQuota"
+                  value={formData.eventQuota}
+                  onChange={handleChange}
+                  placeholder="Misal: 100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventLocationAddress">
+                {formData.eventLocationType === 'ONLINE' ? 'Tautan Ruang Meeting (Zoom / GMeet / Webinar)' : 'Alamat Lengkap Venue'}
+              </label>
+              <input
+                id="eventLocationAddress"
+                type="text"
+                name="eventLocationAddress"
+                value={formData.eventLocationAddress}
+                onChange={handleChange}
+                placeholder={formData.eventLocationType === 'ONLINE' ? 'https://zoom.us/j/... (Diberikan ke pembeli setelah lunas)' : 'Jl. Gatot Subroto No. Kav 1...'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventBenefits">
+                Fasilitas Peserta (Ketik satu per baris)
+              </label>
+              <textarea
+                id="eventBenefits"
+                name="eventBenefits"
+                rows={3}
+                value={formData.eventBenefits}
+                onChange={handleChange}
+                placeholder="E-Sertifikat Resmi Ber-SKP&#10;Rekaman Video Full HD&#10;Slide Materi PDF&#10;Grup Diskusi WhatsApp"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-xs"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Pricing */}
         <div>

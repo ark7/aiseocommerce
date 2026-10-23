@@ -143,6 +143,12 @@ enum Role {
   STAFF
 }
 
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+  EVENT
+}
+
 model Product {
   id               String         @id @default(cuid())
   storeId          String
@@ -152,6 +158,22 @@ model Product {
   slug             String
   description      String?        @db.Text
   shortDescription String?
+  productType      ProductType    @default(PHYSICAL)
+
+  // Field Khusus Produk Digital
+  digitalFileUrl        String?
+  digitalInstructions   String?        @db.Text
+
+  // Field Khusus Event & Seminar
+  eventStartDate        DateTime?
+  eventEndDate          DateTime?
+  eventLocationType     String?        @default("ONLINE")
+  eventVenueName        String?
+  eventLocationAddress  String?
+  eventSpeakers         Json?          @default("[]")
+  eventBenefits         Json?          @default("[]")
+  eventQuota            Int?
+
   basePrice        Float
   sellingPrice     Float
   discountPrice    Float?

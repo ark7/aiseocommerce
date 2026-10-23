@@ -317,6 +317,16 @@ export default function ProductsList() {
                 )}
                 
                 <div className="absolute top-2 right-2 flex space-x-1">
+                  {product.productType === 'DIGITAL' && (
+                    <span className="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded shadow-xs">
+                      💻 DIGITAL
+                    </span>
+                  )}
+                  {product.productType === 'EVENT' && (
+                    <span className="bg-purple-600 text-white text-xs font-bold px-2 py-1 rounded shadow-xs">
+                      🎟️ EVENT
+                    </span>
+                  )}
                   {product.isPreOrder && (
                     <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded shadow-xs">
                       PO {product.preOrderDays ? `${product.preOrderDays}H` : ''}
@@ -356,7 +366,15 @@ export default function ProductsList() {
                 
                 <div className="mt-3 flex justify-between items-center">
                   <div className="flex flex-wrap gap-1.5">
-                    {product.isPreOrder ? (
+                    {product.productType === 'DIGITAL' ? (
+                      <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-1 rounded">
+                        💻 File Digital
+                      </span>
+                    ) : product.productType === 'EVENT' ? (
+                      <span className="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded">
+                        🎟️ Event / Tiket
+                      </span>
+                    ) : product.isPreOrder ? (
                       <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-1 rounded flex items-center gap-1">
                         <span>⏳ Pre-Order</span>
                         {product.preOrderDays && <span>({product.preOrderDays} hari)</span>}
