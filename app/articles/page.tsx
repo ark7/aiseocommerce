@@ -93,7 +93,7 @@ export default async function ArticlesListPage({ searchParams }: ArticlesListPag
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const base = '/articles';
 
-  const queryFor = (overrides: { page?: number; search?: string; startDate?: string; endDate?: string }) => {
+  const queryFor = (overrides: { page?: number | string; search?: string; startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
     const nextSearch = overrides.search !== undefined ? overrides.search : search;
     if (nextSearch) sp.set('search', nextSearch);
@@ -102,7 +102,7 @@ export default async function ArticlesListPage({ searchParams }: ArticlesListPag
     const nextEnd = overrides.endDate !== undefined ? overrides.endDate : endDate;
     if (nextEnd) sp.set('endDate', nextEnd);
     const nextPage = overrides.page !== undefined ? overrides.page : page;
-    if (nextPage > 1) sp.set('page', String(nextPage));
+    if (typeof nextPage === 'string' || nextPage > 1) sp.set('page', String(nextPage));
     const qs = sp.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -289,7 +289,7 @@ export default async function ArticlesListPage({ searchParams }: ArticlesListPag
                 totalPages={totalPages}
                 totalItems={total}
                 limit={pageSize}
-                createPageUrl={(p) => queryFor({ page: p })}
+                pageUrlPattern={queryFor({ page: '__PAGE__' })}
                 showLimitSelector={false}
               />
             </div>

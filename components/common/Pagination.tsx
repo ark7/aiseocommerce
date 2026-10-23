@@ -11,6 +11,7 @@ interface PaginationProps {
   onPageChange?: (page: number) => void;
   onLimitChange?: (limit: number) => void;
   createPageUrl?: (page: number) => string;
+  pageUrlPattern?: string;
   limitOptions?: number[];
   className?: string;
   showLimitSelector?: boolean;
@@ -24,6 +25,7 @@ export default function Pagination({
   onPageChange,
   onLimitChange,
   createPageUrl,
+  pageUrlPattern,
   limitOptions = [10, 20, 25, 50, 100],
   className = '',
   showLimitSelector = true,
@@ -71,6 +73,16 @@ export default function Pagination({
     }
   };
 
+  const resolvePageHref = (targetPage: number): string | null => {
+    if (pageUrlPattern) {
+      return pageUrlPattern.replace('__PAGE__', String(targetPage)).replace('[page]', String(targetPage));
+    }
+    if (createPageUrl) {
+      return createPageUrl(targetPage);
+    }
+    return null;
+  };
+
   const renderPageButton = (p: number | string, index: number) => {
     if (typeof p === 'string') {
       return (
@@ -90,11 +102,12 @@ export default function Pagination({
         : 'text-gray-700 hover:bg-gray-100 hover:text-indigo-600 border border-gray-200'
     }`;
 
-    if (createPageUrl) {
+    const href = resolvePageHref(p);
+    if (href) {
       return (
         <Link
           key={p}
-          href={createPageUrl(p)}
+          href={href}
           onClick={(e) => onPageChange && handlePageClick(p, e)}
           className={commonClasses}
         >
@@ -135,10 +148,11 @@ export default function Pagination({
       );
     }
 
-    if (createPageUrl) {
+    const href = resolvePageHref(targetPage);
+    if (href) {
       return (
         <Link
-          href={createPageUrl(targetPage)}
+          href={href}
           onClick={(e) => onPageChange && handlePageClick(targetPage, e)}
           className={commonClasses}
         >

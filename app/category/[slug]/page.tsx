@@ -138,14 +138,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const base = `/category/${category.slug}`;
 
-  const queryFor = (overrides: { page?: number; startDate?: string; endDate?: string }) => {
+  const queryFor = (overrides: { page?: number | string; startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
     const nextStart = overrides.startDate !== undefined ? overrides.startDate : startDate;
     if (nextStart) sp.set('startDate', nextStart);
     const nextEnd = overrides.endDate !== undefined ? overrides.endDate : endDate;
     if (nextEnd) sp.set('endDate', nextEnd);
     const nextPage = overrides.page !== undefined ? overrides.page : page;
-    if (nextPage > 1) sp.set('page', String(nextPage));
+    if (typeof nextPage === 'string' || nextPage > 1) sp.set('page', String(nextPage));
     const qs = sp.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -302,7 +302,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                 totalPages={totalPages}
                 totalItems={total}
                 limit={pageSize}
-                createPageUrl={(p) => queryFor({ page: p })}
+                pageUrlPattern={queryFor({ page: '__PAGE__' })}
                 showLimitSelector={false}
               />
             </div>

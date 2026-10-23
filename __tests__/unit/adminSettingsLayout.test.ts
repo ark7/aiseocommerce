@@ -32,3 +32,4 @@ describe('Admin Settings Layout & Navigation', () => {
     expect(resolveTab(null)).toBe('general');
   });
 });
+

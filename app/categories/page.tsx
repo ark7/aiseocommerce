@@ -72,12 +72,12 @@ export default async function CategoriesListPage({ searchParams }: CategoriesLis
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const base = '/categories';
 
-  const queryFor = (overrides: { page?: number; search?: string }) => {
+  const queryFor = (overrides: { page?: number | string; search?: string }) => {
     const sp = new URLSearchParams();
     const nextSearch = overrides.search !== undefined ? overrides.search : search;
     if (nextSearch) sp.set('search', nextSearch);
     const nextPage = overrides.page !== undefined ? overrides.page : page;
-    if (nextPage > 1) sp.set('page', String(nextPage));
+    if (typeof nextPage === 'string' || nextPage > 1) sp.set('page', String(nextPage));
     const qs = sp.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -185,7 +185,7 @@ export default async function CategoriesListPage({ searchParams }: CategoriesLis
                 totalPages={totalPages}
                 totalItems={total}
                 limit={pageSize}
-                createPageUrl={(p) => queryFor({ page: p })}
+                pageUrlPattern={queryFor({ page: '__PAGE__' })}
                 showLimitSelector={false}
               />
             </div>

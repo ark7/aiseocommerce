@@ -104,7 +104,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const base = '/products';
 
-  const queryFor = (overrides: { categoryId?: string; page?: number; startDate?: string; endDate?: string }) => {
+  const queryFor = (overrides: { categoryId?: string; page?: number | string; startDate?: string; endDate?: string }) => {
     const sp = new URLSearchParams();
     if (search) sp.set('search', search);
     const nextCategory = overrides.categoryId !== undefined ? overrides.categoryId : categoryId;
@@ -114,7 +114,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     const nextEnd = overrides.endDate !== undefined ? overrides.endDate : endDate;
     if (nextEnd) sp.set('endDate', nextEnd);
     const nextPage = overrides.page !== undefined ? overrides.page : page;
-    if (nextPage > 1) sp.set('page', String(nextPage));
+    if (typeof nextPage === 'string' || nextPage > 1) sp.set('page', String(nextPage));
     const qs = sp.toString();
     return qs ? `${base}?${qs}` : base;
   };
@@ -306,7 +306,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 totalPages={totalPages}
                 totalItems={total}
                 limit={pageSize}
-                createPageUrl={(p) => queryFor({ page: p })}
+                pageUrlPattern={queryFor({ page: '__PAGE__' })}
                 showLimitSelector={false}
               />
             </div>
