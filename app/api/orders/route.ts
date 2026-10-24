@@ -9,6 +9,7 @@ import { AttributionSchema } from '@/lib/attribution'
 import { getIPAddress } from '@/lib/ip'
 import { allow } from '@/lib/rateLimit'
 import { MixedCartSandboxError, SandboxModeDisabledError } from '@/lib/paymentGateway'
+import { logger } from '@/lib/logger'
 
 /**
  * Order creation reserves stock and sale quota while the order is still
@@ -183,8 +184,26 @@ export async function POST(request: Request) {
       )
     }
 
+    logger.error('Failed to create order', {
+      error,
+      path: '/api/orders',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
+    const isClientFriendly =
+      error instanceof Error &&
+      (error.message.startsWith('Product') ||
+        error.message.startsWith('Insufficient stock') ||
+        error.message.includes('stock') ||
+        error.message.includes('stok') ||
+        error.message.includes('tidak ditemukan'));
+
+    const errorMsg = isClientFriendly
+      ? (error as Error).message
+      : (error instanceof Error ? error.message : 'Failed to create order');
+
     return NextResponse.json(
-      { error: 'Failed to create order' },
+      { error: errorMsg },
       { status: 500 }
     )
   }

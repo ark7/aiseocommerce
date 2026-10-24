@@ -8,6 +8,7 @@ import StoreFooter from '@/components/StoreFooter'
 import { readStoredAttribution } from '@/lib/attribution'
 import { trackFunnelEvent } from '@/lib/funnelEvents'
 import { z } from 'zod'
+import { updateCartQuantity, removeFromCart, clearCart, dispatchCartUpdated } from '@/lib/cart'
 
 interface CartItem {
   productId: string
@@ -47,6 +48,12 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const [voucherMessage, setVoucherMessage] = useState<string | null>(null)
   const [isCheckingVoucher, setIsCheckingVoucher] = useState(false)
 
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    setIsLoggedIn(Boolean(localStorage.getItem('token')))
+  }, [])
+
   useEffect(() => {
     if (storeDomain) {
       const storedCart = localStorage.getItem(`cart_${storeDomain}`)
@@ -78,19 +85,14 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return
 
-    const updatedItems = cartItems.map(item =>
-      item.productId === productId ? { ...item, quantity: newQuantity } : item
-    )
-
-    setCartItems(updatedItems)
-    localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
+    const { cart } = updateCartQuantity(storeDomain, productId, newQuantity)
+    setCartItems(cart)
     forgetVoucher()
   }
 
   const removeItem = (productId: string) => {
-    const updatedItems = cartItems.filter(item => item.productId !== productId)
-    setCartItems(updatedItems)
-    localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(updatedItems))
+    const { cart } = removeFromCart(storeDomain, productId)
+    setCartItems(cart)
     forgetVoucher()
   }
 
@@ -174,13 +176,13 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     setError(null)
 
     try {
-      // First create order. The store and the customer are taken from the token
-      // server-side, so neither is sent from here.
+      // First create order. The store and the customer are validated server-side
       const orderResponse = await fetch('/api/orders', {
         method: 'POST',
         // The token travels with the order: it is what says who is checking out.
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
+          storeId,
           items: cartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
@@ -201,6 +203,20 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       if (!orderResponse.ok) {
         const data = await orderResponse.json().catch(() => ({}))
 
+        if (data.code === 'STORE_MISMATCH') {
+          localStorage.removeItem('token')
+          localStorage.removeItem('refreshToken')
+          localStorage.removeItem('user')
+          setIsLoggedIn(false)
+          throw new Error(data.error || 'Sesi akun Anda terdaftar di toko lain. Silakan masuk kembali.')
+        }
+
+        if (orderResponse.status === 401) {
+          localStorage.removeItem('token')
+          setIsLoggedIn(false)
+          throw new Error('Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan pesanan.')
+        }
+
         if (data.code === 'PRICE_CHANGED') {
           const changes: { productId: string; actual: number }[] = data.changes ?? []
           const repriced = cartItems.map(item => {
@@ -210,6 +226,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
 
           setCartItems(repriced)
           localStorage.setItem(`cart_${storeDomain}`, JSON.stringify(repriced))
+          dispatchCartUpdated(storeDomain)
           // The subtotal just moved, so whatever the voucher was worth before
           // is no longer what it is worth now.
           setAppliedVoucher(null)
@@ -221,7 +238,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           throw new Error(data.error || 'Voucher tidak bisa dipakai')
         }
 
-        throw new Error(data.error || 'Failed to create order')
+        throw new Error(data.error || 'Gagal membuat pesanan')
       }
 
       const orderData = await orderResponse.json()
@@ -242,8 +259,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
         throw new Error('Gagal memulai pembayaran')
       }
 
-      // Clear cart after successful checkout
-      localStorage.removeItem(`cart_${storeDomain}`)
+      // Clear cart after successful checkout and notify all listeners
+      clearCart(storeDomain)
       setCartItems([])
 
       // A manual transfer has no gateway to visit - the customer uploads the
@@ -452,12 +469,41 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                 </div>
               </fieldset>
 
+              {!isLoggedIn && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base shrink-0">🔒</span>
+                    <span>
+                      <strong>Belum masuk akun:</strong> Masuk atau daftar terlebih dahulu agar pesanan dapat diproses ke akun Anda.
+                    </span>
+                  </div>
+                  <Link
+                    href={`/login?from=${encodeURIComponent('/cart')}`}
+                    className="px-3.5 py-1.5 bg-indigo-600 text-white font-semibold text-xs rounded-lg hover:bg-indigo-700 transition shrink-0 shadow-xs"
+                  >
+                    Masuk Sekarang
+                  </Link>
+                </div>
+              )}
+
               <button
                 onClick={handleCheckout}
                 disabled={isLoading}
-                className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                className="mt-4 w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 font-semibold text-sm sm:text-base flex items-center justify-center gap-2 shadow-xs"
               >
-                {isLoading ? 'Memproses...' : 'Lanjut ke Pembayaran'}
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Memproses Pesanan...</span>
+                  </>
+                ) : !isLoggedIn ? (
+                  'Masuk Akun & Lanjut ke Pembayaran'
+                ) : (
+                  'Lanjut ke Pembayaran'
+                )}
               </button>
             </div>
           </div>

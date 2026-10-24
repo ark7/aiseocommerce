@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getCartCount, CART_UPDATED_EVENT } from '@/lib/cart';
 
 interface StoreHeaderProps {
   storeDomain?: string;
@@ -14,9 +15,8 @@ interface StoreHeaderProps {
 /**
  * Storefront header shared by every page under /[storeDomain].
  *
- * The cart badge needs localStorage, so this is a client component. When the
- * caller already has the store loaded it can pass the name/logo/address in;
- * otherwise the header fetches them itself.
+ * Displays live cart counter badge with instant real-time synchronization
+ * across AddToCart, quantity updates, and checkout actions.
  */
 export default function StoreHeader({
   storeDomain,
@@ -28,6 +28,8 @@ export default function StoreHeader({
   const [logo, setLogo] = useState<string | null>(storeLogo ?? null);
   const [address, setAddress] = useState<string | null>(storeAddress ?? null);
   const [cartItemCount, setCartItemCount] = useState(0);
+  const [badgeAnimate, setBadgeAnimate] = useState(false);
+  const prevCountRef = useRef(0);
   const [user, setUser] = useState<{ id: string; email: string; role: string; firstName?: string; lastName?: string } | null>(null);
 
   useEffect(() => {
@@ -38,15 +40,15 @@ export default function StoreHeader({
 
   const updateCartCount = useCallback(() => {
     try {
-      const stored = (storeDomain ? localStorage.getItem(`cart_${storeDomain}`) : null) || localStorage.getItem('cart');
-      if (!stored) {
-        setCartItemCount(0);
-        return;
+      const count = getCartCount(storeDomain);
+      setCartItemCount(count);
+
+      // Trigger subtle pulse animation when count increases
+      if (count > prevCountRef.current && count > 0) {
+        setBadgeAnimate(true);
+        setTimeout(() => setBadgeAnimate(false), 700);
       }
-      const items = JSON.parse(stored);
-      setCartItemCount(
-        items.reduce((sum: number, item: { quantity?: number }) => sum + (item.quantity || 1), 0)
-      );
+      prevCountRef.current = count;
     } catch {
       setCartItemCount(0);
     }
@@ -54,15 +56,22 @@ export default function StoreHeader({
 
   useEffect(() => {
     updateCartCount();
+
     try {
       const storedUser = localStorage.getItem('user');
       if (storedUser) setUser(JSON.parse(storedUser));
     } catch {
       // ignore
     }
-    // The storefront fires a synthetic 'storage' event after adding to cart.
+
+    // Listen to custom cart-updated event (same window) and storage event (multi-tab)
+    window.addEventListener(CART_UPDATED_EVENT, updateCartCount);
     window.addEventListener('storage', updateCartCount);
-    return () => window.removeEventListener('storage', updateCartCount);
+
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, updateCartCount);
+      window.removeEventListener('storage', updateCartCount);
+    };
   }, [updateCartCount]);
 
   const handleLogout = async () => {
@@ -145,20 +154,23 @@ export default function StoreHeader({
           </nav>
 
           <div className="flex items-center space-x-3 sm:space-x-4">
+            {/* Real-time Cart Icon with Dynamic Count Badge */}
             <Link
               href="/cart"
-              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+              className="relative p-2.5 rounded-full hover:bg-gray-100 transition-colors group"
               title="Keranjang Belanja"
             >
-              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-gray-600 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               {cartItemCount > 0 && (
                 <span
                   style={{ backgroundColor: 'var(--brand-primary, #4F46E5)' }}
-                  className="absolute -top-1 -right-1 w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold shadow"
+                  className={`absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1.5 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-md transition-transform duration-300 ${
+                    badgeAnimate ? 'scale-125 ring-2 ring-indigo-300' : 'scale-100'
+                  }`}
                 >
-                  {cartItemCount}
+                  {cartItemCount > 99 ? '99+' : cartItemCount}
                 </span>
               )}
             </Link>
