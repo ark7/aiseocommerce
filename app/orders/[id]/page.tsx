@@ -175,7 +175,41 @@ export default function CustomerOrderDetailPage() {
   };
 
   const handleConfirmReceived = async () => {
-    if (!confirm('Pastikan Anda sudah menerima pesanan ini. Lanjutkan konfirmasi?')) {
+    if (!confirm('Pastikan Anda sudah menerima paket pesanan ini. Lanjutkan konfirmasi penerimaan?')) {
+      return;
+    }
+
+    try {
+      setBusy(true);
+      setError(null);
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Silakan login terlebih dahulu.');
+        return;
+      }
+
+      const response = await fetch(`/api/orders/${orderId}/received`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal mengonfirmasi penerimaan pesanan');
+      }
+
+      setNotice('Terima kasih! Pesanan telah dikonfirmasi diterima.');
+      fetchOrder();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengonfirmasi penerimaan pesanan');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCompleteOrder = async () => {
+    if (!confirm('Pastikan kondisi dan kelengkapan barang sudah sesuai. Selesaikan pesanan ini?')) {
       return;
     }
 
@@ -202,7 +236,7 @@ export default function CustomerOrderDetailPage() {
       setNotice('Terima kasih! Pesanan Anda telah ditandai selesai.');
       fetchOrder();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal mengonfirmasi penerimaan');
+      setError(err instanceof Error ? err.message : 'Gagal menyelesaikan pesanan');
     } finally {
       setBusy(false);
     }
@@ -317,19 +351,38 @@ export default function CustomerOrderDetailPage() {
           </div>
         )}
 
-        {/* Delivered Confirmation Button */}
-        {order.status === 'DELIVERED' && (
-          <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm flex items-center justify-between">
+        {/* Shipped: Customer Confirms Goods Arrived */}
+        {order.status === 'SHIPPED' && (
+          <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Pesanan Telah Tiba</h2>
-              <p className="text-sm text-gray-600">Konfirmasi bila Anda telah menerima pesanan dengan baik.</p>
+              <h2 className="text-lg font-semibold text-gray-900">Pesanan Sedang Dikirim</h2>
+              <p className="text-sm text-gray-600">
+                Paket pesanan Anda sedang dalam perjalanan. Jika barang telah tiba dengan baik di tangan Anda, silakan konfirmasi penerimaan.
+              </p>
             </div>
             <button
               onClick={handleConfirmReceived}
               disabled={busy}
-              className="bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition"
+              className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50 transition shrink-0"
             >
-              {busy ? 'Memproses...' : 'Pesanan Diterima'}
+              {busy ? 'Memproses...' : 'Konfirmasi Pesanan Diterima'}
+            </button>
+          </div>
+        )}
+
+        {/* Delivered: Customer Completes Order */}
+        {order.status === 'DELIVERED' && (
+          <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Pesanan Telah Tiba</h2>
+              <p className="text-sm text-gray-600">Pastikan kondisi dan kelengkapan barang sudah sesuai sebelum menyelesaikan pesanan.</p>
+            </div>
+            <button
+              onClick={handleCompleteOrder}
+              disabled={busy}
+              className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shrink-0"
+            >
+              {busy ? 'Memproses...' : 'Selesaikan Pesanan'}
             </button>
           </div>
         )}

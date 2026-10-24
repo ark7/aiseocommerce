@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { LoginForm } from '@/components/LoginForm';
 import { redirectPathFromUrl } from '@/lib/redirect';
 import Link from 'next/link';
@@ -13,9 +14,7 @@ export default async function LoginPage({
 
   let store: any = null;
   try {
-    store = await prisma.store.findFirst({
-      include: { settings: true },
-    });
+    store = await getActiveStore();
   } catch (err) {
     console.warn('Database connection fallback on LoginPage:', err);
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { registerUser } from '@/lib/auth';
 import { z } from 'zod';
 import { verifyTurnstile, isTurnstileRequired } from '@/lib/turnstile';
@@ -39,9 +40,7 @@ export async function POST(request: Request) {
       });
     }
     if (!store) {
-      store = await prisma.store.findFirst({
-        include: { settings: true }
-      });
+      store = await getActiveStore(domain);
       if (!store) {
         return NextResponse.json({ error: 'No store configured' }, { status: 500 });
       }

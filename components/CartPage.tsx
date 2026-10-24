@@ -274,7 +274,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       // Create the payment intent with the method the customer picked
       const checkoutResponse = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           storeId,
           orderId,

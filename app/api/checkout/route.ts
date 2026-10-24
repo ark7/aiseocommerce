@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { requireUser } from '@/lib/auth'
 import { resolvePaymentRedirectUrl } from '@/lib/paymentGateway'
 
 // Prisma ids are cuids, and seeded rows use plain strings like demo-store-001,
@@ -27,6 +28,16 @@ export async function POST(request: Request) {
 
     if (order.storeId !== validatedData.storeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const user = await requireUser(request)
+    if (user) {
+      if (order.storeId !== user.storeId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+      }
+      if (order.userId && order.userId !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     const isSandbox = Boolean(order.isSandbox)

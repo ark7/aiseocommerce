@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { loginUser } from '@/lib/auth';
 import { getIPAddress } from '@/lib/ip';
 import { z } from 'zod';
@@ -62,9 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!store) {
-      store = await prisma.store.findFirst({
-        include: { settings: true }
-      });
+      store = await getActiveStore(domain);
       if (!store) {
         return NextResponse.json({ error: 'No store configured' }, { status: 500 });
       }

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { RegisterForm } from '@/components/RegisterForm';
 import Link from 'next/link';
 
@@ -12,9 +13,7 @@ export default async function RegisterPage({
 
   let store: any = null;
   try {
-    store = await prisma.store.findFirst({
-      include: { settings: true },
-    });
+    store = await getActiveStore();
   } catch (err) {
     console.warn('Database connection fallback on RegisterPage:', err);
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { verifyToken } from '@/lib/auth';
 import { z } from 'zod';
 import { revalidateCategory } from '@/lib/revalidate';
@@ -45,8 +46,19 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '10');
     
     const where: any = {};
-    if (storeId) where.storeId = storeId;
-    else if (user) where.storeId = user.storeId;
+    let effectiveStoreId = storeId;
+    if (!effectiveStoreId && user) {
+      effectiveStoreId = user.storeId;
+    }
+    if (!effectiveStoreId) {
+      const activeStore = await getActiveStore();
+      if (activeStore) {
+        effectiveStoreId = activeStore.id;
+      }
+    }
+    if (effectiveStoreId) {
+      where.storeId = effectiveStoreId;
+    }
     if (parentId !== undefined && parentId !== null && parentId !== 'all') {
       where.parentId = parentId === '' ? null : parentId;
     } else if (parentId === null && !hasPagination && !search) {

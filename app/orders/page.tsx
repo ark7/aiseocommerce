@@ -126,7 +126,20 @@ export default function CustomerOrdersPage() {
         </div>
 
         {error && (
-          <div className="bg-amber-50 text-amber-800 px-4 py-3 rounded-lg text-sm mb-4">{error}</div>
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-4 rounded-xl text-sm mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🔒</span>
+              <span>{error}</span>
+            </div>
+            {error.toLowerCase().includes('login') && (
+              <Link
+                href="/login?from=/orders"
+                className="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 text-white font-medium text-xs rounded-lg hover:bg-indigo-700 transition shrink-0"
+              >
+                Masuk Sekarang &rarr;
+              </Link>
+            )}
+          </div>
         )}
 
         {loading ? (
