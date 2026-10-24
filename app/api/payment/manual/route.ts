@@ -25,6 +25,20 @@ export async function POST(request: Request) {
     if (proofFile.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: 'File too large (max 2MB)' }, { status: 400 });
     }
+
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+    ];
+    if (proofFile.type && !allowedMimeTypes.includes(proofFile.type)) {
+      return NextResponse.json(
+        { error: 'Format file tidak didukung. Harap unggah gambar (JPG, PNG, WebP) atau PDF.' },
+        { status: 400 }
+      );
+    }
     
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -32,6 +46,9 @@ export async function POST(request: Request) {
     });
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     if (order.storeId !== user.storeId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (user.role === 'CUSTOMER' && order.userId && order.userId !== user.id) {
+      return NextResponse.json({ error: 'Unauthorized: Pesanan bukan milik akun Anda' }, { status: 403 });
+    }
     
     if (order.status !== 'PENDING' && order.status !== 'MANUAL_VERIFICATION') {
       return NextResponse.json(

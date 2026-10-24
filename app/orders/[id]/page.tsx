@@ -150,34 +150,18 @@ export default function CustomerOrderDetailPage() {
       }
 
       const formData = new FormData();
-      formData.append('file', proofFile);
+      formData.append('orderId', orderId);
+      formData.append('proof', proofFile);
 
-      const uploadResponse = await fetch('/api/upload', {
+      const response = await fetch('/api/payment/manual', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
-      if (!uploadResponse.ok) {
-        const data = await uploadResponse.json().catch(() => ({}));
-        throw new Error(data.error || 'Gagal mengunggah file bukti');
-      }
-
-      const uploadData = await uploadResponse.json();
-      const fileUrl = uploadData.fileUrl || uploadData.url;
-
-      const submitResponse = await fetch(`/api/orders/${orderId}/payment-proof`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ fileUrl }),
-      });
-
-      if (!submitResponse.ok) {
-        const data = await submitResponse.json().catch(() => ({}));
-        throw new Error(data.error || 'Gagal menyimpan bukti pembayaran');
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal mengirim bukti transfer');
       }
 
       setNotice('Bukti transfer berhasil dikirim. Menunggu verifikasi admin.');
@@ -317,6 +301,19 @@ export default function CustomerOrderDetailPage() {
                 {busy ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* Manual Payment Verification Status */}
+        {order.status === 'MANUAL_VERIFICATION' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 shadow-xs flex items-start gap-3">
+            <span className="text-2xl shrink-0">⏳</span>
+            <div>
+              <h2 className="text-sm font-semibold text-blue-900">Bukti Pembayaran Sedang Diverifikasi</h2>
+              <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                Bukti transfer Anda telah kami terima dan sedang dalam antrean verifikasi tim admin toko. Status pesanan akan otomatis diperbarui begitu pembayaran disetujui.
+              </p>
+            </div>
           </div>
         )}
 
