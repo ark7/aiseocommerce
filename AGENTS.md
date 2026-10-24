@@ -24,6 +24,20 @@ Setiap kali melakukan modifikasi pada [`prisma/schema.prisma`](file:///home/ngab
 - Jika relasi gagal dimuat atau mengalami masalah sementara, sistem harus tetap merender toko dengan fallback array kosong (`products: []`), bukan mengubah store menjadi `null` yang memicu tampilan `Store not found`.
 - Selalu catat error ke logger atau console agar mudah diinvestigasi.
 
+### D. SOP Evolusi Skema Aman (The Expand-and-Contract Pattern)
+Untuk menjamin *zero downtime* dan mencegah kerusakan data toko dan pelanggan:
+1. **Fase 1 (Expand)**: Tambahkan kolom baru selalu bersifat opsional (`?`) atau sertakan `@default(...)`. Jangan pernah menambahkan kolom `NOT NULL` tanpa nilai default pada tabel yang sudah memiliki data.
+2. **Fase 2 (Backfill)**: Jika ada migrasi data yang diperlukan, jalankan patch idempoten per-toko menggunakan `npm run patch:run`.
+3. **Fase 3 (Contract)**: Dilarang keras melakukan `DROP COLUMN` atau `DROP TABLE` secara tiba-tiba dalam satu commit yang sama dengan pembaruan fitur. Kolom lama hanya boleh dihapus setelah 100% kode tidak lagi mereferensikannya.
+4. **Isolasi Index Multi-Tenant**: Seluruh `@@unique` pada model yang memiliki `storeId` wajib menyertakan `storeId` (misal `@@unique([storeId, slug])`). Dilarang keras membuat index unik global seperti `@@unique([slug])` yang akan bertabrakan antar toko.
+
+### E. Validasi Keamanan Skema Otomatis
+Sebelum menjalankan `npm run db:push`, jalankan terlebih dahulu:
+```bash
+npm run db:safety
+```
+Script ini akan memverifikasi bahwa perubahan skema tidak merusak data pelanggan atau melanggar aturan multi-tenant.
+
 ---
 
 ## 2. Aturan Next.js Build & Dev Server
@@ -36,14 +50,24 @@ Setiap kali melakukan modifikasi pada [`prisma/schema.prisma`](file:///home/ngab
   2. Jalankan `npm run build` untuk memverifikasi type-checking dan bundle.
   3. Setelah selesai, jalankan kembali `npm run dev` sebagai daemon dengan akses jaringan aktif.
 
+### Pre-flight Release Pipeline
+Sebelum melakukan merge atau rilis patch/fitur baru, jalankan:
+```bash
+npm run release:check
+```
+Perintah ini menjalankan validasi keamanan database (`db:safety`), sinkronisasi Prisma client (`db:generate`), dan seluruh rangkaian test unit.
+
 ---
 
 ## 3. Ringkasan Perintah Penting
 
 | Perintah | Deskripsi |
 | :--- | :--- |
+| `npm run db:safety` | Periksa keamanan skema Prisma terhadap risiko kehilangan data multi-tenant |
 | `npm run db:generate` | Update Prisma Client lokal setelah schema berubah |
 | `npm run db:push` | Terapkan perubahan schema ke database Neon PostgreSQL |
+| `npm run patch:run` | Jalankan script patch data multi-tenant secara aman & idempoten |
+| `npm run release:check` | Pre-flight check lengkap: safety check + generate + test |
 | `npm test` | Jalankan seluruh unit test dengan Jest |
 | `npm run build` | Verifikasi build produksi Next.js |
 | `npm run dev` | Jalankan server pengembangan lokal (port 3000) |

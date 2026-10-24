@@ -9,10 +9,13 @@
     "lint": "next lint",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
+    "db:safety": "ts-node scripts/db-safety-check.ts",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
+    "patch:run": "ts-node scripts/run-data-patch.ts",
     "tenant:bootstrap": "ts-node scripts/bootstrap-tenant.ts",
+    "release:check": "npm run db:safety && npm run db:generate && npm test",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
