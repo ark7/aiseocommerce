@@ -18,6 +18,7 @@ import {
   validateRawImage,
   MAX_RAW_UPLOAD_SIZE,
 } from '@/lib/imageOptimizer';
+import { getActiveStore } from '@/lib/store';
 
 const UPLOAD_DIR = './public/uploads';
 
@@ -226,8 +227,16 @@ export async function GET(request: Request) {
     const orderDirection = searchParams.get('orderDirection') || 'desc';
     
     const where: any = {};
-    if (storeId) where.storeId = storeId;
-    else if (user) where.storeId = user.storeId;
+    if (storeId) {
+      where.storeId = storeId;
+    } else if (user) {
+      where.storeId = user.storeId;
+    } else {
+      const activeStore = await getActiveStore();
+      if (activeStore) {
+        where.storeId = activeStore.id;
+      }
+    }
     if (categoryId) where.categoryId = categoryId;
     if (isPublished !== null) where.isPublished = isPublished === 'true';
     else if (!user) where.isPublished = true;

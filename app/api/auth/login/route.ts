@@ -123,6 +123,13 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     });
+    response.cookies.set('active_store_domain', store.domain, {
+      httpOnly: false,
+      sameSite: 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
     response.cookies.set('refreshToken', result.refreshToken, {
       httpOnly: true,
       sameSite: 'lax',

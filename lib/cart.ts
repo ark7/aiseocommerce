@@ -59,18 +59,21 @@ export function getCart(storeDomain?: string | null): CartItem[] {
   if (typeof window === 'undefined') return [];
 
   const key = getCartStorageKey(storeDomain);
-  let raw = localStorage.getItem(key);
-
-  // If storeDomain was specified but no cart was found, also check fallback 'cart'
-  if (!raw && storeDomain) {
-    raw = localStorage.getItem('cart');
-  }
+  const raw = localStorage.getItem(key);
 
   if (!raw) return [];
 
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
+
+    // Filter items to ensure strict tenant isolation
+    if (storeDomain && storeDomain.trim().length > 0) {
+      const cleanDomain = storeDomain.trim().toLowerCase();
+      return parsed.filter(
+        (item: any) => !item.storeDomain || item.storeDomain.trim().toLowerCase() === cleanDomain
+      );
+    }
     return parsed;
   } catch {
     return [];

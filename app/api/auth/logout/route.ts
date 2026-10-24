@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({ success: true, message: 'Logout successful' });
     response.cookies.set('token', '', { httpOnly: true, path: '/', maxAge: 0 });
     response.cookies.set('refreshToken', '', { httpOnly: true, path: '/', maxAge: 0 });
+    response.cookies.set('active_store_domain', '', { path: '/', maxAge: 0 });
 
     return response;
   } catch (error) {

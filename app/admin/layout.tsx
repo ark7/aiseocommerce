@@ -282,7 +282,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               </svg>
             </button>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <Link
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition shadow-xs"
+                title="Buka etalase toko di tab baru"
+              >
+                <span>🏪</span>
+                <span className="hidden sm:inline">Lihat Toko</span>
+                <svg className="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </Link>
               <span className="text-xs text-gray-500 hidden sm:inline-block">
                 Toko: <span className="font-semibold text-gray-700">{user.email}</span>
               </span>
