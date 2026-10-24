@@ -20,6 +20,13 @@ interface CartItem {
   productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT'
 }
 
+interface ProblematicProduct {
+  productId: string
+  productName: string
+  reason: 'NOT_FOUND' | 'INSUFFICIENT_STOCK' | 'UNPUBLISHED' | 'STORE_MISMATCH'
+  availableStock?: number
+}
+
 // Prisma ids are cuids, and seeded rows use plain strings like demo-prod-001.
 // Validating as uuid rejected every real cart item.
 const CartItemSchema = z.object({
@@ -47,6 +54,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null)
   const [voucherMessage, setVoucherMessage] = useState<string | null>(null)
   const [isCheckingVoucher, setIsCheckingVoucher] = useState(false)
+  const [problematicProduct, setProblematicProduct] = useState<ProblematicProduct | null>(null)
 
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
@@ -88,12 +96,20 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     const { cart } = updateCartQuantity(storeDomain, productId, newQuantity)
     setCartItems(cart)
     forgetVoucher()
+    if (problematicProduct?.productId === productId) {
+      setProblematicProduct(null)
+      setError(null)
+    }
   }
 
   const removeItem = (productId: string) => {
     const { cart } = removeFromCart(storeDomain, productId)
     setCartItems(cart)
     forgetVoucher()
+    if (problematicProduct?.productId === productId) {
+      setProblematicProduct(null)
+      setError(null)
+    }
   }
 
   const calculateTotal = () => {
@@ -186,6 +202,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           items: cartItems.map(item => ({
             productId: item.productId,
             quantity: item.quantity,
+            name: item.name,
           })),
           // First-touch campaign, so an order can be traced back to the ad that
           // paid for the click.
@@ -238,6 +255,16 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           throw new Error(data.error || 'Voucher tidak bisa dipakai')
         }
 
+        if (data.code === 'PRODUCT_UNAVAILABLE') {
+          setProblematicProduct({
+            productId: data.productId,
+            productName: data.productName,
+            reason: data.reason,
+            availableStock: data.availableStock,
+          })
+          throw new Error(data.error || 'Produk tidak tersedia')
+        }
+
         throw new Error(data.error || 'Gagal membuat pesanan')
       }
 
@@ -287,7 +314,45 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Keranjang</h1>
 
         {error && (
-          <div className="mb-4 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-red-800 shadow-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <p className="font-semibold text-sm flex items-center gap-1.5">
+                  <span className="text-base">⚠️</span>
+                  <span>Kendala pada Produk di Keranjang</span>
+                </p>
+                <p className="text-xs sm:text-sm text-red-700">{error}</p>
+              </div>
+              {problematicProduct && (
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  {problematicProduct.reason === 'INSUFFICIENT_STOCK' && (problematicProduct.availableStock ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateQuantity(problematicProduct.productId, problematicProduct.availableStock!)
+                        setProblematicProduct(null)
+                        setError(null)
+                      }}
+                      className="px-3 py-1.5 bg-amber-600 text-white font-medium text-xs rounded-lg hover:bg-amber-700 transition shadow-xs"
+                    >
+                      Sesuaikan ke {problematicProduct.availableStock} pcs
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeItem(problematicProduct.productId)
+                      setProblematicProduct(null)
+                      setError(null)
+                    }}
+                    className="px-3 py-1.5 bg-red-600 text-white font-medium text-xs rounded-lg hover:bg-red-700 transition shadow-xs"
+                  >
+                    Hapus Produk Bermasalah
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {cartItems.length === 0 ? (
@@ -311,62 +376,75 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
               </div>
             )}
 
-            {cartItems.map(item => (
-              <div key={item.productId} className="bg-white rounded-lg shadow border p-4 flex items-center">
-                {item.imageUrl && (
-                  <Image
-                    src={item.imageUrl}
-                    alt={item.name}
-                    width={80}
-                    height={80}
-                    className="w-20 h-20 object-cover rounded mr-4"
-                  />
-                )}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-medium text-gray-900">{item.name}</h3>
-                    {item.productType === 'DIGITAL' && (
-                      <span className="bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-blue-200">
-                        💻 File Digital
-                      </span>
-                    )}
-                    {item.productType === 'EVENT' && (
-                      <span className="bg-purple-100 text-purple-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-purple-200">
-                        🎟️ Tiket Event
-                      </span>
-                    )}
-                    {item.isPreOrder && (
-                      <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-300">
-                        PO
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
-                </div>
-                <div className="flex items-center">
-                  <button
-                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                    className="px-2 py-1 border rounded-l"
-                    disabled={item.quantity <= 1}
-                  >
-                    -
-                  </button>
-                  <span className="px-4 py-1 border-t border-b">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                    className="px-2 py-1 border rounded-r"
-                  >
-                    +
-                  </button>
-                </div>
-                <button
-                  onClick={() => removeItem(item.productId)}
-                  className="ml-4 text-red-500 hover:text-red-700"
+            {cartItems.map(item => {
+              const isProblematic = problematicProduct?.productId === item.productId
+              return (
+                <div
+                  key={item.productId}
+                  className={`bg-white rounded-lg shadow border p-4 flex items-center transition-colors ${
+                    isProblematic ? 'border-red-400 bg-red-50/30 ring-2 ring-red-200' : ''
+                  }`}
                 >
-                  Hapus
-                </button>
-              </div>
-            ))}
+                  {item.imageUrl && (
+                    <Image
+                      src={item.imageUrl}
+                      alt={item.name}
+                      width={80}
+                      height={80}
+                      className="w-20 h-20 object-cover rounded mr-4"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      {isProblematic && (
+                        <span className="bg-red-100 text-red-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-red-200">
+                          ⚠️ Perlu Diperbaiki
+                        </span>
+                      )}
+                      {item.productType === 'DIGITAL' && (
+                        <span className="bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-blue-200">
+                          💻 File Digital
+                        </span>
+                      )}
+                      {item.productType === 'EVENT' && (
+                        <span className="bg-purple-100 text-purple-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-purple-200">
+                          🎟️ Tiket Event
+                        </span>
+                      )}
+                      {item.isPreOrder && (
+                        <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-amber-300">
+                          PO
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
+                  </div>
+                  <div className="flex items-center">
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                      className="px-2 py-1 border rounded-l"
+                      disabled={item.quantity <= 1}
+                    >
+                      -
+                    </button>
+                    <span className="px-4 py-1 border-t border-b">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      className="px-2 py-1 border rounded-r"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => removeItem(item.productId)}
+                    className="ml-4 text-red-500 hover:text-red-700 font-medium text-sm"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )
+            })}
 
             <div className="bg-white rounded-lg shadow border p-4">
               <div className="flex justify-between text-gray-700">

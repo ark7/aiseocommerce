@@ -38,6 +38,34 @@ export class VoucherError extends Error {
   }
 }
 
+export type ProductUnavailableReason = 'NOT_FOUND' | 'INSUFFICIENT_STOCK' | 'UNPUBLISHED' | 'STORE_MISMATCH';
+
+/**
+ * Thrown when an ordered product is missing, out of stock, unpublished, or belongs
+ * to another store, providing clear customer-facing product names and actionable recovery data.
+ */
+export class ProductUnavailableError extends Error {
+  constructor(
+    public readonly productId: string,
+    public readonly productName: string,
+    public readonly reason: ProductUnavailableReason,
+    public readonly availableStock?: number
+  ) {
+    let msg = `Produk "${productName}" tidak ditemukan di toko ini (Product ${productName} not found).`;
+    if (reason === 'INSUFFICIENT_STOCK') {
+      msg = `Stok tidak mencukupi untuk produk "${productName}" (Insufficient stock for product ${productName}${
+        availableStock !== undefined ? `, sisa ${availableStock}` : ''
+      }).`;
+    } else if (reason === 'STORE_MISMATCH') {
+      msg = `Produk "${productName}" berasal dari toko lain dan tidak dapat diproses di toko ini.`;
+    } else if (reason === 'UNPUBLISHED') {
+      msg = `Produk "${productName}" saat ini sedang tidak dipublikasikan.`;
+    }
+    super(msg);
+    this.name = 'ProductUnavailableError';
+  }
+}
+
 /**
  * How long an unpaid order may hold the stock and sale quota it reserved.
  *
@@ -114,7 +142,7 @@ export interface FinanceSummary {
  */
 export async function createOrder(
   storeId: string,
-  items: { productId: string; quantity: number }[],
+  items: { productId: string; quantity: number; name?: string }[],
   customerId?: string,
   attribution?: Record<string, unknown>,
   voucherCode?: string,
@@ -174,11 +202,36 @@ export async function createOrder(
     for (const item of items) {
       const product = byId.get(item.productId);
       if (!product) {
-        throw new Error(`Product ${item.productId} not found`);
+        // Find if this product belongs to another store or was deleted
+        const anyProduct = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { id: true, name: true, storeId: true, isPublished: true },
+        });
+
+        const name = anyProduct?.name || item.name || item.productId;
+        const reason: ProductUnavailableReason = anyProduct
+          ? anyProduct.storeId !== storeId
+            ? 'STORE_MISMATCH'
+            : anyProduct.isPublished === false
+            ? 'UNPUBLISHED'
+            : 'NOT_FOUND'
+          : 'NOT_FOUND';
+
+        throw new ProductUnavailableError(item.productId, name, reason);
       }
+
+      if (product.isPublished === false) {
+        throw new ProductUnavailableError(product.id, product.name, 'UNPUBLISHED');
+      }
+
       // Ensure we have enough stock (should have been reserved, but double-check)
       if (!product.isPreOrder && product.stock < item.quantity) {
-        throw new Error(`Insufficient stock for product ${product.name}`);
+        throw new ProductUnavailableError(
+          product.id,
+          product.name,
+          'INSUFFICIENT_STOCK',
+          product.stock
+        );
       }
 
       let unitPrice = resolveUnitPrice(product, now);
@@ -250,7 +303,12 @@ export async function createOrder(
           data: { stock: { decrement: item.quantity } },
         });
         if (stockTaken.count === 0) {
-          throw new Error(`Insufficient stock for product ${product.name}`);
+          throw new ProductUnavailableError(
+            product.id,
+            product.name,
+            'INSUFFICIENT_STOCK',
+            0
+          );
         }
 
         const remaining = product.stock - item.quantity;

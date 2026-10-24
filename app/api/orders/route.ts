@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { PriceChangedError, VoucherError, createOrder } from '@/services/transactionService'
+import { PriceChangedError, VoucherError, ProductUnavailableError, createOrder } from '@/services/transactionService'
 import { dispatchOrderCreatedNotification } from '@/lib/orderNotificationService'
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -29,6 +29,7 @@ const OrderSchema = z.object({
     z.object({
       productId: z.string().min(1),
       quantity: z.number().int().positive(),
+      name: z.string().optional(),
     })
   ).min(1),
   // Campaign source captured on the storefront; validated and length-capped
@@ -180,6 +181,22 @@ export async function POST(request: Request) {
     if (error instanceof VoucherError) {
       return NextResponse.json(
         { error: error.message, code: 'VOUCHER_REJECTED', reason: error.reason },
+        { status: 409 }
+      )
+    }
+
+    // Product unavailable: missing from store, insufficient stock, unpublished, or store mismatch.
+    // Return 409 Conflict with structured metadata for client-side resolution.
+    if (error instanceof ProductUnavailableError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: 'PRODUCT_UNAVAILABLE',
+          productId: error.productId,
+          productName: error.productName,
+          reason: error.reason,
+          availableStock: error.availableStock,
+        },
         { status: 409 }
       )
     }
