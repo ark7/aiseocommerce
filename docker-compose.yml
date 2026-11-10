@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ==============================================================================
   # 1. Aplikasi E-Commerce SaaS (Next.js 14 Standalone Engine)
@@ -43,7 +41,7 @@ services:
   # Menggunakan buffer pool 128M agar server VPS 2GB/4GB IDCloudHost tetap lapang
   # ==============================================================================
   marketing-db:
-    image: mariadb:10.11-alpine
+    image: mariadb:10.11
     container_name: marketing-mariadb
     restart: unless-stopped
     command: [
