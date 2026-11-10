@@ -97,12 +97,12 @@ describe('Multi-Tenant Store Resolution & Isolation', () => {
       });
     });
 
-    it('prioritizes real non-demo store over dummy demo-store.local in fallback', async () => {
+    it('prioritizes real non-demo store over dummy demo-store.local and demo.larismanis.online in fallback', async () => {
       (headers as jest.Mock).mockReturnValue(new Map());
       (cookies as jest.Mock).mockReturnValue({ get: jest.fn().mockReturnValue(undefined) });
       (prisma.store.findUnique as jest.Mock).mockResolvedValue(null);
       (prisma.store.findFirst as jest.Mock).mockImplementation(({ where }) => {
-        if (where?.domain?.not === 'demo-store.local') {
+        if (where?.domain?.notIn?.includes('demo-store.local')) {
           return Promise.resolve(TOKODEMOKU);
         }
         return Promise.resolve(DEMO_STORE);
@@ -111,10 +111,20 @@ describe('Multi-Tenant Store Resolution & Isolation', () => {
       const store = await getActiveStore();
       expect(store).toEqual(TOKODEMOKU);
       expect(prisma.store.findFirst).toHaveBeenCalledWith({
-        where: { domain: { not: 'demo-store.local' } },
+        where: { domain: { notIn: ['demo.larismanis.online', 'demo-store.local'] } },
         orderBy: { createdAt: 'desc' },
         include: { settings: true },
       });
+    });
+
+    it('resolves demo store cleanly across demo.larismanis.online and demo-store.local aliases', async () => {
+      (headers as jest.Mock).mockReturnValue(new Map([['host', 'demo.larismanis.online']]));
+      (cookies as jest.Mock).mockReturnValue({ get: jest.fn().mockReturnValue(undefined) });
+      (prisma.store.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.store.findFirst as jest.Mock).mockResolvedValue(DEMO_STORE);
+
+      const store = await getActiveStore();
+      expect(store).toEqual(DEMO_STORE);
     });
   });
 
