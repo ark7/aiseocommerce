@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser, hashPassword } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { hasPermission, normalizePermissions } from '@/lib/rbac';
 import { z } from 'zod';
 
@@ -30,6 +31,10 @@ export async function GET(
 
     if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
       return NextResponse.json({ error: 'Akses Ditolak' }, { status: 403 });
+    }
+
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
     }
 
     const { id } = await params;
@@ -85,6 +90,10 @@ export async function PUT(
 
     if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
       return NextResponse.json({ error: 'Akses Ditolak' }, { status: 403 });
+    }
+
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
     }
 
     const { id } = await params;
@@ -185,6 +194,10 @@ export async function DELETE(
         { error: 'Akses Ditolak', message: 'Hanya Administrator yang dapat menghapus staf.' },
         { status: 403 }
       );
+    }
+
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
     }
 
     const { id } = await params;

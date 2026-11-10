@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { verifyToken } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { z } from 'zod';
 import { revalidateCategory } from '@/lib/revalidate';
 import { getIPAddress } from '@/lib/ip';
@@ -120,6 +121,10 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
+    
     const body = await request.json();
     const validation = createCategorySchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: validation.error.format() }, { status: 400 });
@@ -177,6 +182,10 @@ export async function PATCH(request: Request) {
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
+    
     const body = await request.json();
     const validation = updateCategorySchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: validation.error.format() }, { status: 400 });
@@ -232,6 +241,10 @@ export async function DELETE(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const body = await request.json();
     const { id } = body;

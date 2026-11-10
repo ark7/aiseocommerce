@@ -349,3 +349,4 @@ if (typeof process !== 'undefined' && process.argv[1]?.includes('db-safety-check
     process.exit(1);
   }
 }
+

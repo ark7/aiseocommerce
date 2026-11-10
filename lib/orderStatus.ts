@@ -1,4 +1,13 @@
-import type { OrderStatus } from '@prisma/client';
+export type OrderStatus =
+  | 'PENDING'
+  | 'MANUAL_VERIFICATION'
+  | 'PAID'
+  | 'PROCESSING'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUNDED';
 
 /**
  * Allowed order status transitions, kept free of any database import so both the

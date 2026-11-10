@@ -30,6 +30,8 @@ const OrderSchema = z.object({
       productId: z.string().min(1),
       quantity: z.number().int().positive(),
       name: z.string().optional(),
+      variantId: z.string().optional(),
+      variation: z.string().optional(),
     })
   ).min(1),
   // Campaign source captured on the storefront; validated and length-capped
@@ -40,6 +42,14 @@ const OrderSchema = z.object({
   // Harga yang ditampilkan keranjang, per productId. Dikirim klien supaya
   // server bisa menolak kalau harga sudah bergeser, bukan menagih diam-diam.
   expectedUnitPrices: z.record(z.string(), z.number().nonnegative()).optional(),
+  // Pilihan pengiriman (Flat Rate atau Kurir Otomatis Biteship)
+  shippingZone: z.enum(['INNER', 'OUTER']).optional(),
+  shippingAddress: z.string().max(1000).optional(),
+  courierCode: z.string().max(50).optional(),
+  courierService: z.string().max(50).optional(),
+  courierServiceName: z.string().max(100).optional(),
+  courierEtd: z.string().max(50).optional(),
+  shippingCost: z.number().nonnegative().optional(),
 })
 
 // List orders for the caller's store. Customers only see their own.
@@ -135,7 +145,16 @@ export async function POST(request: Request) {
       user.id,
       validatedData.attribution,
       validatedData.voucherCode,
-      validatedData.expectedUnitPrices
+      validatedData.expectedUnitPrices,
+      {
+        shippingZone: validatedData.shippingZone,
+        shippingAddress: validatedData.shippingAddress,
+        courierCode: validatedData.courierCode,
+        courierService: validatedData.courierService,
+        courierServiceName: validatedData.courierServiceName,
+        courierEtd: validatedData.courierEtd,
+        shippingCost: validatedData.shippingCost,
+      }
     )
 
     dispatchOrderCreatedNotification(order.id)

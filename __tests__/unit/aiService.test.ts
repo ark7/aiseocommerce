@@ -6,6 +6,13 @@ jest.mock('@/lib/prisma', () => ({
     storeSettings: {
       findUnique: jest.fn(),
     },
+    store: {
+      findUnique: jest.fn(),
+    },
+    product: {
+      findFirst: jest.fn(),
+      count: jest.fn(),
+    },
   },
 }));
 
@@ -173,6 +180,12 @@ describe('lib/aiService', () => {
         aiModel: 'gemini-1.5-flash',
         aiCustomPrompt: 'Ramah dan solutif',
       });
+      (prisma.store.findUnique as jest.Mock).mockResolvedValue({
+        id: 'store-1',
+        name: 'Toko Sepatu Bagus',
+        domain: 'sepatubagus.com',
+      });
+      (prisma.product.count as jest.Mock).mockResolvedValue(10);
 
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,

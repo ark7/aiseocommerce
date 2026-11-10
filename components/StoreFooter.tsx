@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import ThemeToggle from './ThemeToggle';
 
 interface StoreFooterProps {
   storeName?: string | null;
@@ -197,7 +198,20 @@ export default function StoreFooter({
               Kebijakan Privasi
             </Link>
           </div>
-          <p className="text-gray-400">Didukung oleh AI SEO E-Commerce Engine</p>
+          <div className="flex items-center space-x-3">
+            <p className="text-gray-400">
+              Didukung oleh{' '}
+              <a
+                href="https://larismanis.online"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-gray-300 hover:text-white transition underline decoration-gray-600 underline-offset-2"
+              >
+                LarisManis.online
+              </a>
+            </p>
+            <ThemeToggle className="text-gray-400 hover:text-white hover:bg-gray-800" />
+          </div>
         </div>
       </div>
     </footer>

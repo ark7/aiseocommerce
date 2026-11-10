@@ -66,6 +66,10 @@ describe('/api/admin/settings/general', () => {
           primaryColor: '#059669',
           fontFamily: 'plus-jakarta-sans',
           socialLinks: { instagram: 'tokosepatu' },
+          shippingOriginCity: 'Bandung',
+          shippingFlatRateInner: 12000,
+          shippingFlatRateOuter: 28000,
+          shippingFreeThreshold: 200000,
         },
       });
 
@@ -78,6 +82,10 @@ describe('/api/admin/settings/general', () => {
       expect(data.settings.heroTitle).toBe('Koleksi Sepatu 2026');
       expect(data.settings.primaryColor).toBe('#059669');
       expect(data.settings.fontFamily).toBe('plus-jakarta-sans');
+      expect(data.settings.shippingOriginCity).toBe('Bandung');
+      expect(data.settings.shippingFlatRateInner).toBe(12000);
+      expect(data.settings.shippingFlatRateOuter).toBe(28000);
+      expect(data.settings.shippingFreeThreshold).toBe(200000);
     });
   });
 
@@ -99,6 +107,10 @@ describe('/api/admin/settings/general', () => {
           primaryColor: '#E11D48',
           fontFamily: 'poppins',
           socialLinks: { instagram: 'tokokeren' },
+          shippingOriginCity: 'Surabaya',
+          shippingFlatRateInner: 8000,
+          shippingFlatRateOuter: 22000,
+          shippingFreeThreshold: 175000,
         }),
       });
 
@@ -116,6 +128,10 @@ describe('/api/admin/settings/general', () => {
           heroTitle: 'Selamat Datang di Toko Keren',
           primaryColor: '#E11D48',
           fontFamily: 'poppins',
+          shippingOriginCity: 'Surabaya',
+          shippingFlatRateInner: 8000,
+          shippingFlatRateOuter: 22000,
+          shippingFreeThreshold: 175000,
         }),
         create: expect.any(Object),
       });

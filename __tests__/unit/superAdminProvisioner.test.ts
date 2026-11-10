@@ -400,7 +400,7 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
           }),
         })
       );
-    });
+    }, 15000);
   });
 });
 

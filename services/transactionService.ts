@@ -12,6 +12,8 @@ import {
   validateOrderSandboxIntegrity,
 } from '@/lib/paymentGateway';
 import { dispatchLowStockWarningNotification } from '@/lib/orderNotificationService';
+import { calculateOrderShipping } from '@/lib/shipping';
+import type { ShippingZone } from '@/lib/shipping';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -142,11 +144,20 @@ export interface FinanceSummary {
  */
 export async function createOrder(
   storeId: string,
-  items: { productId: string; quantity: number; name?: string }[],
+  items: { productId: string; quantity: number; name?: string; variantId?: string; variation?: string }[],
   customerId?: string,
   attribution?: Record<string, unknown>,
   voucherCode?: string,
-  expectedUnitPrices?: Record<string, number>
+  expectedUnitPrices?: Record<string, number>,
+  shippingOptions?: {
+    shippingZone?: ShippingZone | string;
+    shippingAddress?: string | null;
+    courierCode?: string | null;
+    courierService?: string | null;
+    courierServiceName?: string | null;
+    courierEtd?: string | null;
+    shippingCost?: number | null;
+  }
 ) {
   const lowStockAlerts: Array<{ name: string; remaining: number; storeId: string }> = [];
 
@@ -157,17 +168,29 @@ export async function createOrder(
     // the previous unscoped lookup let one store sell another store's catalogue.
     const products = await tx.product.findMany({
       where: { id: { in: items.map((item) => item.productId) }, storeId },
+      include: { variants: true },
     });
     const byId = new Map(products.map((product) => [product.id, product]));
+
+    // Query store settings for sandbox validation and shipping configuration
+    let storeSettings: any = null;
+    if (tx.storeSettings?.findUnique) {
+      storeSettings = await tx.storeSettings.findUnique({
+        where: { storeId },
+        select: {
+          sandboxPaymentEnabled: true,
+          shippingOriginCity: true,
+          shippingFlatRateInner: true,
+          shippingFlatRateOuter: true,
+          shippingFreeThreshold: true,
+        },
+      });
+    }
 
     // Validate sandbox cart integrity: do not mix sandbox test products with regular products,
     // and ensure sandbox mode is enabled if ordering a sandbox product.
     const { isSandbox } = validateCartSandboxSeparation(products);
     if (isSandbox) {
-      const storeSettings = await tx.storeSettings.findUnique({
-        where: { storeId },
-        select: { sandboxPaymentEnabled: true },
-      });
       validateOrderSandboxIntegrity(true, storeSettings);
     }
 
@@ -224,8 +247,26 @@ export async function createOrder(
         throw new ProductUnavailableError(product.id, product.name, 'UNPUBLISHED');
       }
 
-      // Ensure we have enough stock (should have been reserved, but double-check)
-      if (!product.isPreOrder && product.stock < item.quantity) {
+      let selectedVariant = null;
+      if (item.variantId) {
+        selectedVariant = product.variants?.find((v: any) => v.id === item.variantId) || null;
+        if (!selectedVariant) {
+          throw new ProductUnavailableError(
+            item.productId,
+            `${product.name} (Varian tidak ditemukan)`,
+            'NOT_FOUND'
+          );
+        }
+
+        if (!product.isPreOrder && selectedVariant.stock < item.quantity) {
+          throw new ProductUnavailableError(
+            product.id,
+            `${product.name} (${selectedVariant.name || selectedVariant.optionValue})`,
+            'INSUFFICIENT_STOCK',
+            selectedVariant.stock
+          );
+        }
+      } else if (!product.isPreOrder && product.stock < item.quantity) {
         throw new ProductUnavailableError(
           product.id,
           product.name,
@@ -235,9 +276,12 @@ export async function createOrder(
       }
 
       let unitPrice = resolveUnitPrice(product, now);
+      if (selectedVariant && selectedVariant.price != null && selectedVariant.price > 0) {
+        unitPrice = selectedVariant.price;
+      }
       let saleQuotaUsed = false;
 
-      if (unitPrice < product.sellingPrice) {
+      if (!selectedVariant && unitPrice < product.sellingPrice) {
         // The quota check lives in the WHERE clause so it happens at write
         // time: two buyers racing for the last discounted unit cannot both
         // read "1 left" and both get it. Losing the race is not an error —
@@ -266,6 +310,10 @@ export async function createOrder(
       const itemTotal = unitPrice * item.quantity;
       subtotal += itemTotal;
 
+      const variationSnapshot =
+        item.variation ||
+        (selectedVariant ? `${selectedVariant.optionType}: ${selectedVariant.optionValue}` : null);
+
       await tx.orderItem.create({
         data: {
           orderId: order.id,
@@ -273,8 +321,8 @@ export async function createOrder(
           quantity: item.quantity,
           unitPrice,
           totalPrice: itemTotal,
-          // Which lines actually took quota. A cancelled order returns exactly
-          // these, instead of guessing from prices that may have moved since.
+          variantId: selectedVariant?.id || item.variantId || null,
+          variation: variationSnapshot,
           saleQuotaUsed,
         },
       });
@@ -282,6 +330,12 @@ export async function createOrder(
       // Reserved inside this same transaction: a nested $transaction would
       // commit the reservation independently of the order.
       if (!product.isPreOrder) {
+        if (selectedVariant) {
+          await tx.productVariant.update({
+            where: { id: selectedVariant.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
         await tx.stockLog.create({
           data: {
             productId: product.id,
@@ -358,9 +412,58 @@ export async function createOrder(
       });
     }
 
+    // Evaluate physical vs digital items and calculate server-side shipping cost
+    const hasPhysicalItems = products.some((p: any) => !p.productType || p.productType === 'PHYSICAL');
+
+    let effectiveShippingCost = 0;
+    let effectiveShippingZone: string = shippingOptions?.shippingZone || 'INNER';
+
+    if (!hasPhysicalItems) {
+      effectiveShippingCost = 0;
+      effectiveShippingZone = 'DIGITAL';
+    } else if (
+      typeof storeSettings?.shippingFreeThreshold === 'number' &&
+      storeSettings.shippingFreeThreshold > 0 &&
+      subtotal >= storeSettings.shippingFreeThreshold
+    ) {
+      effectiveShippingCost = 0;
+      effectiveShippingZone = 'FREE';
+    } else if (typeof shippingOptions?.shippingCost === 'number' && shippingOptions.shippingCost >= 0) {
+      // Biteship or client selected courier fee
+      effectiveShippingCost = shippingOptions.shippingCost;
+      effectiveShippingZone = shippingOptions.shippingZone || 'BITESHIP';
+    } else {
+      const shippingResult = calculateOrderShipping({
+        hasPhysicalItems,
+        subtotal,
+        selectedZone: shippingOptions?.shippingZone,
+        config: {
+          originCity: storeSettings?.shippingOriginCity ?? null,
+          flatRateInner: storeSettings?.shippingFlatRateInner ?? 0,
+          flatRateOuter: storeSettings?.shippingFlatRateOuter ?? 0,
+          freeThreshold: storeSettings?.shippingFreeThreshold ?? null,
+        },
+      });
+      effectiveShippingCost = shippingResult.cost;
+      effectiveShippingZone = shippingResult.zone;
+    }
+
+    const totalAmount = Math.max(0, subtotal - discount) + effectiveShippingCost;
+
     return tx.order.update({
       where: { id: order.id },
-      data: { subtotal, discount, totalAmount: subtotal - discount },
+      data: {
+        subtotal,
+        discount,
+        shippingCost: effectiveShippingCost,
+        shippingZone: effectiveShippingZone,
+        shippingAddress: shippingOptions?.shippingAddress ? shippingOptions.shippingAddress.trim() : null,
+        courierCode: shippingOptions?.courierCode || null,
+        courierService: shippingOptions?.courierService || null,
+        courierServiceName: shippingOptions?.courierServiceName || null,
+        courierEtd: shippingOptions?.courierEtd || null,
+        totalAmount,
+      },
     });
   });
 

@@ -92,7 +92,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const result = await loginUser(store.id, email, password, request);
+    let result = await loginUser(store.id, email, password, request);
+
+    // Smart Localhost / Development fallback:
+    // When running locally on localhost/127.0.0.1, the incoming request does not have a tenant-specific domain.
+    // If the user is not found in the currently resolved active store, search across stores for a user with
+    // this email. If a matching active account with valid password exists, authenticate into that store
+    // and seamlessly update the active store session.
+    const isLocalhost = !domain || domain === 'localhost' || domain === '127.0.0.1';
+    if (!result && isLocalhost) {
+      const candidateUsers = await prisma.user.findMany({
+        where: { email, isActive: true },
+        include: { store: { include: { settings: true } } },
+      });
+      for (const candidate of candidateUsers) {
+        if (candidate.store && candidate.storeId !== store.id) {
+          const candidateResult = await loginUser(candidate.storeId, email, password, request);
+          if (candidateResult) {
+            result = candidateResult;
+            store = candidate.store;
+            break;
+          }
+        }
+      }
+    }
+
     if (!result) {
       await incrementLoginAttempts(ip);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });

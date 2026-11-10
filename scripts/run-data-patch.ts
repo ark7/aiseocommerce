@@ -171,3 +171,4 @@ if (typeof process !== 'undefined' && process.argv[1]?.includes('run-data-patch'
       process.exit(1);
     });
 }
+

@@ -13,6 +13,8 @@ export interface CartItem {
   isPreOrder?: boolean;
   productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT';
   storeDomain?: string;
+  variantId?: string;
+  variation?: string;
 }
 
 export const CART_UPDATED_EVENT = 'cart-updated';
@@ -98,7 +100,9 @@ export function addToCart(storeDomain: string, item: CartItem): { cart: CartItem
 
   const key = getCartStorageKey(storeDomain);
   const cart = getCart(storeDomain);
-  const existingIndex = cart.findIndex((i) => i.productId === item.productId);
+  const existingIndex = cart.findIndex(
+    (i) => i.productId === item.productId && (i.variantId || '') === (item.variantId || '')
+  );
 
   if (existingIndex >= 0) {
     cart[existingIndex].quantity = (cart[existingIndex].quantity || 1) + (item.quantity || 1);
@@ -106,6 +110,7 @@ export function addToCart(storeDomain: string, item: CartItem): { cart: CartItem
     if (item.price) cart[existingIndex].price = item.price;
     if (item.name) cart[existingIndex].name = item.name;
     if (item.imageUrl) cart[existingIndex].imageUrl = item.imageUrl;
+    if (item.variation) cart[existingIndex].variation = item.variation;
   } else {
     cart.push({ ...item, storeDomain });
   }
@@ -124,7 +129,8 @@ export function addToCart(storeDomain: string, item: CartItem): { cart: CartItem
 export function updateCartQuantity(
   storeDomain: string,
   productId: string,
-  quantity: number
+  quantity: number,
+  variantId?: string
 ): { cart: CartItem[]; totalCount: number } {
   if (typeof window === 'undefined') {
     return { cart: [], totalCount: 0 };
@@ -133,10 +139,13 @@ export function updateCartQuantity(
   const key = getCartStorageKey(storeDomain);
   let cart = getCart(storeDomain);
 
+  const matches = (item: CartItem) =>
+    item.productId === productId && (variantId === undefined || (item.variantId || '') === (variantId || ''));
+
   if (quantity <= 0) {
-    cart = cart.filter((item) => item.productId !== productId);
+    cart = cart.filter((item) => !matches(item));
   } else {
-    cart = cart.map((item) => (item.productId === productId ? { ...item, quantity } : item));
+    cart = cart.map((item) => (matches(item) ? { ...item, quantity } : item));
   }
 
   localStorage.setItem(key, JSON.stringify(cart));
@@ -150,8 +159,12 @@ export function updateCartQuantity(
 /**
  * Removes an item from the cart.
  */
-export function removeFromCart(storeDomain: string, productId: string): { cart: CartItem[]; totalCount: number } {
-  return updateCartQuantity(storeDomain, productId, 0);
+export function removeFromCart(
+  storeDomain: string,
+  productId: string,
+  variantId?: string
+): { cart: CartItem[]; totalCount: number } {
+  return updateCartQuantity(storeDomain, productId, 0, variantId);
 }
 
 /**

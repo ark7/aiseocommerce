@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/auth';
 import { requireSuperAdminOwner } from '@/lib/superAdminAuth';
+import { isDemoStore, createDemoUploadBlockedResponse } from '@/lib/demoGuard';
 import {
   optimizeAndSaveImage,
   validateRawImage,
@@ -27,6 +28,11 @@ export async function POST(request: Request) {
         { error: 'Forbidden: Hanya admin dan staf toko yang dapat mengunggah media.' },
         { status: 403 }
       );
+    }
+
+    // Demo store guard: block physical file uploads on demo stores
+    if (user?.storeId && (await isDemoStore(user.storeId))) {
+      return createDemoUploadBlockedResponse();
     }
 
     // 2. Parse FormData

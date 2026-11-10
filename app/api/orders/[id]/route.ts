@@ -45,6 +45,7 @@ export async function GET(request: Request, { params }: RouteContext) {
             status: true,
             amount: true,
             proofFile: true,
+            proofUrl: true,
             verifiedAt: true,
           },
         },

@@ -16,6 +16,17 @@ interface AddToCartButtonProps {
   isPreOrder?: boolean;
   preOrderDays?: number | null;
   productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT';
+  variants?: ProductVariantItem[];
+}
+
+export interface ProductVariantItem {
+  id: string;
+  name: string;
+  optionType: string;
+  optionValue: string;
+  sku?: string | null;
+  price?: number | null;
+  stock: number;
 }
 
 export default function AddToCartButton({
@@ -28,6 +39,7 @@ export default function AddToCartButton({
   isPreOrder = false,
   preOrderDays,
   productType = 'PHYSICAL',
+  variants = [],
 }: AddToCartButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
@@ -35,8 +47,30 @@ export default function AddToCartButton({
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
+  const hasVariants = Boolean(variants && variants.length > 0);
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariantItem | null>(() => {
+    if (!variants || variants.length === 0) return null;
+    const inStock = variants.find((v) => v.stock > 0);
+    return inStock || variants[0];
+  });
+
+  const effectivePrice = selectedVariant?.price != null && selectedVariant.price > 0
+    ? selectedVariant.price
+    : price;
+
+  const effectiveStock = hasVariants
+    ? (selectedVariant ? selectedVariant.stock : 0)
+    : stock;
+
+  const isOutOfStock = !isPreOrder && effectiveStock < 1;
+
   const handleAddToCart = async () => {
-    if (!isPreOrder && stock < quantity) {
+    if (hasVariants && !selectedVariant) {
+      setError('Harap pilih varian terlebih dahulu');
+      return;
+    }
+
+    if (!isPreOrder && effectiveStock < quantity) {
       setError('Maaf, stok yang tersedia tidak mencukupi');
       return;
     }
@@ -44,22 +78,28 @@ export default function AddToCartButton({
     setError(null);
 
     try {
+      const variationLabel = selectedVariant
+        ? selectedVariant.name || `${selectedVariant.optionType}: ${selectedVariant.optionValue}`
+        : undefined;
+
       // 1. Centralized storage update and real-time event dispatch
       addToCart(storeDomain, {
         productId,
         name,
-        price,
+        price: effectivePrice,
         quantity,
         imageUrl,
         isPreOrder,
         productType,
         storeDomain,
+        variantId: selectedVariant?.id,
+        variation: variationLabel,
       });
 
       // 2. Conversion and funnel tracking
       sendTrackingCalls(
         buildAddToCartCalls(getTrackingConfig(), {
-          item: { id: productId, name, price, quantity },
+          item: { id: productId, name, price: effectivePrice, quantity },
         })
       );
 
@@ -84,7 +124,7 @@ export default function AddToCartButton({
   };
 
   const incrementQuantity = () => {
-    if (isPreOrder || quantity < stock) setQuantity(quantity + 1);
+    if (isPreOrder || quantity < effectiveStock) setQuantity(quantity + 1);
   };
   const decrementQuantity = () => {
     if (quantity > 1) setQuantity(quantity - 1);
@@ -92,23 +132,103 @@ export default function AddToCartButton({
 
   return (
     <div className="w-full relative">
-      <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden mb-4 bg-white">
+      {/* Varian Selector Section */}
+      {hasVariants && (
+        <div className="mb-5 space-y-3 p-4 rounded-xl bg-gray-50/80 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-slate-300">
+              Pilihan Varian:
+            </span>
+            {selectedVariant && (
+              <span
+                className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                  isPreOrder
+                    ? 'bg-amber-100 text-amber-800'
+                    : selectedVariant.stock > 0
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300'
+                }`}
+              >
+                {isPreOrder
+                  ? 'PO Varian'
+                  : selectedVariant.stock > 0
+                  ? `Sisa ${selectedVariant.stock} stok`
+                  : 'Stok Varian Habis'}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {variants.map((v) => {
+              const isSelected = selectedVariant?.id === v.id;
+              const variantOutOfStock = !isPreOrder && v.stock <= 0;
+
+              return (
+                <button
+                  type="button"
+                  key={v.id}
+                  onClick={() => {
+                    setSelectedVariant(v);
+                    setError(null);
+                    setQuantity(1);
+                  }}
+                  disabled={variantOutOfStock}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1.5 ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-300 dark:ring-indigo-900'
+                      : variantOutOfStock
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-400 border-gray-200 dark:border-slate-700 cursor-not-allowed line-through opacity-60'
+                      : 'bg-white dark:bg-slate-800 text-gray-800 dark:text-slate-200 border-gray-300 dark:border-slate-600 hover:border-indigo-400'
+                  }`}
+                >
+                  <span>{v.name || v.optionValue}</span>
+                  {v.price && v.price !== price && (
+                    <span className="text-[10px] opacity-80 font-normal">
+                      (Rp {v.price.toLocaleString('id-ID')})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedVariant && (
+            <div className="text-xs text-gray-500 dark:text-slate-400 pt-1 flex items-center justify-between border-t border-gray-200 dark:border-slate-700">
+              <span>
+                Varian terpilih: <strong>{selectedVariant.name || `${selectedVariant.optionType}: ${selectedVariant.optionValue}`}</strong>
+              </span>
+              <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                Rp {effectivePrice.toLocaleString('id-ID')}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      <div 
+        data-quantity-stepper
+        className="flex items-center border border-gray-300 dark:border-slate-700 rounded-lg overflow-hidden mb-4 bg-white dark:bg-slate-800 transition-colors"
+      >
         <button
           type="button"
           onClick={decrementQuantity}
-          className="px-3.5 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition disabled:opacity-40"
+          aria-label="Kurangi jumlah"
+          className="px-3.5 py-2 text-gray-700 dark:text-slate-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 transition disabled:opacity-40"
           disabled={quantity <= 1}
         >
           -
         </button>
-        <span className="px-4 py-2 border-l border-r border-gray-300 font-semibold text-sm flex-1 text-center">
+        <span 
+          data-quantity-counter
+          className="px-4 py-2 border-l border-r border-gray-300 dark:border-slate-700 font-semibold text-sm flex-1 text-center text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 transition-colors select-none"
+        >
           {quantity}
         </span>
         <button
           type="button"
           onClick={incrementQuantity}
-          className="px-3.5 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition disabled:opacity-40"
-          disabled={!isPreOrder && quantity >= stock}
+          aria-label="Tambah jumlah"
+          className="px-3.5 py-2 text-gray-700 dark:text-slate-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 transition disabled:opacity-40"
+          disabled={!isPreOrder && quantity >= effectiveStock}
         >
           +
         </button>
@@ -117,10 +237,12 @@ export default function AddToCartButton({
       <button
         type="button"
         onClick={handleAddToCart}
-        disabled={isLoading || (!isPreOrder && stock < 1)}
+        disabled={isLoading || isOutOfStock}
         className={`w-full border border-transparent rounded-xl py-3 px-6 flex items-center justify-center text-sm sm:text-base font-semibold text-white shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
           justAdded
             ? 'bg-emerald-600 hover:bg-emerald-700'
+            : isOutOfStock
+            ? 'bg-gray-400'
             : isPreOrder
             ? 'bg-amber-600 hover:bg-amber-700'
             : 'bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99]'
@@ -139,6 +261,8 @@ export default function AddToCartButton({
             <span className="text-lg">✓</span>
             <span>Berhasil Ditambahkan!</span>
           </div>
+        ) : isOutOfStock ? (
+          <span>Stok Habis</span>
         ) : isPreOrder ? (
           `⏳ Pre-Order Sekarang${preOrderDays ? ` (${preOrderDays} hari)` : ''}`
         ) : (

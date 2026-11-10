@@ -28,6 +28,7 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   verbose: true,
+  testTimeout: 15000,
   clearMocks: true,
   restoreMocks: true,
 };

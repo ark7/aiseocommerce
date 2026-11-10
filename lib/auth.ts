@@ -259,6 +259,12 @@ export async function getUserById(id: string) {
       title: true,
       permissions: true,
       isActive: true,
+      store: {
+        select: {
+          isDemo: true,
+          domain: true,
+        },
+      },
     },
   });
 }

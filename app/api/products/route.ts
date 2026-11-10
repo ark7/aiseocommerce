@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
@@ -149,6 +150,12 @@ const productFields = {
   seoTitle: nullableText,
   seoDescription: nullableText,
   seoKeywords: nullableText,
+  shopeeUrl: nullableText,
+  tokopediaUrl: nullableText,
+  tiktokShopUrl: nullableText,
+  blibliUrl: nullableText,
+  customMarketplaceName: nullableText,
+  customMarketplaceUrl: nullableText,
 };
 
 /** Prisma's code for "a unique constraint rejected this write". */
@@ -276,6 +283,7 @@ export async function GET(request: Request) {
         include: {
           images: { orderBy: { order: 'asc' }, take: 1 },
           category: true,
+          variants: { orderBy: { createdAt: 'asc' } },
         },
       }),
       prisma.product.count({ where }),
@@ -300,6 +308,10 @@ export async function POST(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const formData = await request.formData();
     const productData: Record<string, any> = {};
@@ -329,6 +341,25 @@ export async function POST(request: Request) {
       const url = await saveFile(image, user.storeId);
       imageUrls.push(url);
     }
+
+    let variantsData: Array<{
+      name?: string;
+      optionType?: string;
+      optionValue?: string;
+      sku?: string;
+      price?: number;
+      stock?: number;
+    }> = [];
+
+    const rawVariants = formData.get('variants');
+    if (rawVariants && typeof rawVariants === 'string') {
+      try {
+        const parsed = JSON.parse(rawVariants);
+        if (Array.isArray(parsed)) variantsData = parsed;
+      } catch (err) {
+        console.warn('Failed to parse variants JSON in create product:', err);
+      }
+    }
     
     const product = await prisma.product.create({
       data: {
@@ -342,8 +373,18 @@ export async function POST(request: Request) {
             order: index,
           })),
         },
+        variants: variantsData.length > 0 ? {
+          create: variantsData.map((v) => ({
+            name: v.name || `${v.optionType || 'Opsi'}: ${v.optionValue || ''}`.trim(),
+            optionType: v.optionType || 'CUSTOM',
+            optionValue: v.optionValue || '',
+            sku: v.sku || null,
+            price: v.price ? Number(v.price) : null,
+            stock: Number(v.stock) || 0,
+          })),
+        } : undefined,
       },
-      include: { images: true, category: true },
+      include: { images: true, category: true, variants: true },
     });
 
     // A new listing must be crawlable before the ISR window expires.
@@ -388,6 +429,10 @@ export async function PATCH(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     storeId = user.storeId;
 
@@ -436,6 +481,33 @@ export async function PATCH(request: Request) {
       const url = await saveFile(image, user.storeId);
       newImageUrls.push(url);
     }
+
+    const rawVariants = formData.get('variants');
+    if (rawVariants && typeof rawVariants === 'string') {
+      try {
+        const parsedVariants = JSON.parse(rawVariants);
+        if (Array.isArray(parsedVariants)) {
+          await prisma.productVariant.deleteMany({
+            where: { productId },
+          });
+          if (parsedVariants.length > 0) {
+            await prisma.productVariant.createMany({
+              data: parsedVariants.map((v: any) => ({
+                productId: productId as string,
+                name: v.name || `${v.optionType || 'Opsi'}: ${v.optionValue || ''}`.trim(),
+                optionType: v.optionType || 'CUSTOM',
+                optionValue: v.optionValue || '',
+                sku: v.sku || null,
+                price: v.price ? Number(v.price) : null,
+                stock: Number(v.stock) || 0,
+              })),
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to parse variants JSON in update product:', err);
+      }
+    }
     
     const product = await prisma.product.update({
       // storeId is repeated here on purpose: the ownership check above is the
@@ -452,7 +524,7 @@ export async function PATCH(request: Request) {
           })),
         },
       },
-      include: { images: true, category: true },
+      include: { images: true, category: true, variants: { orderBy: { createdAt: 'asc' } } },
     });
 
     // Pass the old slug too: a rename has to purge the URL it used to live at,
@@ -500,6 +572,10 @@ export async function DELETE(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const body = await request.json();
     const { id } = body;

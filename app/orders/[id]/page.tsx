@@ -43,11 +43,21 @@ interface OrderDetail {
   status: string;
   subtotal: number;
   totalAmount: number;
+  shippingCost?: number;
+  shippingZone?: string | null;
   shippingAddress: string | null;
+  discount?: number;
   trackingUrl: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   completedAt: string | null;
+  courierCode?: string | null;
+  courierService?: string | null;
+  courierServiceName?: string | null;
+  courierEtd?: string | null;
+  waybillNumber?: string | null;
+  biteshipTrackingId?: string | null;
+  biteshipStatus?: string | null;
   createdAt: string;
   orderItems: OrderItem[];
   payments: PaymentInfo[];
@@ -80,6 +90,8 @@ export default function CustomerOrderDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [trackingInfo, setTrackingInfo] = useState<any | null>(null);
+  const [loadingTracking, setLoadingTracking] = useState(false);
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -112,6 +124,26 @@ export default function CustomerOrderDetailPage() {
   useEffect(() => {
     if (orderId) fetchOrder();
   }, [orderId, fetchOrder]);
+
+  // Automatically fetch live tracking if order is shipped/delivered/completed
+  useEffect(() => {
+    if (!order || !['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status)) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setLoadingTracking(true);
+    fetch(`/api/shipping/track?orderId=${order.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.tracking) {
+          setTrackingInfo(data.tracking);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingTracking(false));
+  }, [order]);
 
   useEffect(() => {
     if (!order) return;
@@ -318,8 +350,25 @@ export default function CustomerOrderDetailPage() {
           <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-2">Upload Bukti Transfer Bank</h2>
             <p className="text-sm text-gray-600 mb-4">
-              Silakan lakukan transfer sejumlah <strong className="text-indigo-600">{formatIDR(order.totalAmount)}</strong>, lalu lampirkan struk / tangkapan layar bukti transfer di bawah ini.
+              Silakan lakukan transfer sejumlah <strong className="text-indigo-600">{formatIDR(order.totalAmount)}</strong> ke salah satu rekening resmi kami di bawah ini, lalu lampirkan struk / tangkapan layar bukti transfer:
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-xs font-bold text-blue-700 block uppercase">Bank BCA</span>
+                <span className="text-sm font-mono font-semibold text-slate-900 block mt-0.5">8830192810</span>
+                <span className="text-[11px] text-slate-500 block">a.n PT AI SEO Store</span>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-xs font-bold text-amber-700 block uppercase">Bank Mandiri</span>
+                <span className="text-sm font-mono font-semibold text-slate-900 block mt-0.5">1320019283011</span>
+                <span className="text-[11px] text-slate-500 block">a.n PT AI SEO Store</span>
+              </div>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <span className="text-xs font-bold text-teal-700 block uppercase">Bank BNI</span>
+                <span className="text-sm font-mono font-semibold text-slate-900 block mt-0.5">0429182390</span>
+                <span className="text-[11px] text-slate-500 block">a.n PT AI SEO Store</span>
+              </div>
+            </div>
             <form onSubmit={handleUploadProof} className="space-y-4">
               <input
                 type="file"
@@ -384,6 +433,88 @@ export default function CustomerOrderDetailPage() {
             >
               {busy ? 'Memproses...' : 'Selesaikan Pesanan'}
             </button>
+          </div>
+        )}
+
+        {/* Real-time Biteship Courier Tracker Widget */}
+        {['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
+          <div className="bg-white border rounded-xl p-6 mb-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b gap-3">
+              <div>
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <span>🚚 Pelacakan Pengiriman (Live Tracking)</span>
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Layanan kurir: <strong className="text-indigo-600">{order.courierServiceName || (order.courierCode ? order.courierCode.toUpperCase() : 'Ekspedisi')}</strong>
+                </p>
+              </div>
+
+              {order.waybillNumber && (
+                <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100 self-start sm:self-auto">
+                  <span className="text-xs text-indigo-900 font-medium">No. Resi:</span>
+                  <span className="font-mono text-xs font-bold text-indigo-700">{order.waybillNumber}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (order.waybillNumber) {
+                        navigator.clipboard.writeText(order.waybillNumber);
+                        alert('Nomor resi berhasil disalin!');
+                      }
+                    }}
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold underline pl-1"
+                  >
+                    Salin
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {loadingTracking ? (
+              <div className="py-6 flex items-center justify-center gap-2 text-sm text-gray-500">
+                <span className="animate-spin">⏳</span>
+                <span>Memuat status pelacakan kurir...</span>
+              </div>
+            ) : trackingInfo ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📍</span>
+                    <span className="text-xs font-bold text-emerald-950">Status: {trackingInfo.statusLabel}</span>
+                  </div>
+                  {order.trackingUrl && (
+                    <a
+                      href={order.trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-semibold text-emerald-700 hover:underline flex items-center gap-1"
+                    >
+                      <span>Lacak di Biteship</span>
+                      <span>↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Riwayat Perjalanan Paket:</h3>
+                  <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-indigo-200">
+                    {trackingInfo.history?.map((h: any, idx: number) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-indigo-600 ring-4 ring-indigo-50"></div>
+                        <p className="text-xs font-semibold text-gray-900 leading-snug">{h.note}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          {new Date(h.updatedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                          {h.location ? ` • ${h.location}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500 py-2">
+                Informasi posisi paket sedang disinkronkan oleh pihak ekspedisi. Silakan cek kembali secara berkala.
+              </div>
+            )}
           </div>
         )}
 
@@ -467,6 +598,36 @@ export default function CustomerOrderDetailPage() {
           </div>
         )}
 
+        {/* Shipping Address */}
+        {order.shippingAddress && (
+          <div className="bg-white border rounded-lg p-5 mb-6 shadow-sm">
+            <h2 className="text-sm font-semibold text-gray-900 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <span>📍 Alamat Pengiriman</span>
+                {order.shippingZone && (
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded">
+                    {order.shippingZone === 'INNER'
+                      ? 'Dalam Kota'
+                      : order.shippingZone === 'OUTER'
+                      ? 'Luar Kota'
+                      : order.shippingZone === 'FREE'
+                      ? 'Bebas Ongkir'
+                      : order.shippingZone}
+                  </span>
+                )}
+              </span>
+              {order.courierServiceName && (
+                <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
+                  🚚 {order.courierServiceName}
+                </span>
+              )}
+            </h2>
+            <p className="text-sm text-gray-700 whitespace-pre-line mt-2 leading-relaxed">
+              {order.shippingAddress}
+            </p>
+          </div>
+        )}
+
         {/* Order Items */}
         <div className="bg-white border rounded-lg p-6 mb-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Rincian Produk</h2>
@@ -486,8 +647,29 @@ export default function CustomerOrderDetailPage() {
 
           <div className="border-t pt-4 mt-4 space-y-2 text-sm">
             <div className="flex justify-between text-gray-600">
-              <span>Subtotal</span>
+              <span>Subtotal Produk</span>
               <span>{formatIDR(order.subtotal)}</span>
+            </div>
+            {Boolean(order.discount && order.discount > 0) && (
+              <div className="flex justify-between text-emerald-600">
+                <span>Diskon Voucher</span>
+                <span>- {formatIDR(order.discount!)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-gray-600">
+              <span>
+                Ongkos Kirim
+                {order.shippingZone === 'INNER'
+                  ? ' (Dalam Kota)'
+                  : order.shippingZone === 'OUTER'
+                  ? ' (Luar Kota)'
+                  : order.shippingZone === 'FREE'
+                  ? ' (Bebas Ongkir)'
+                  : order.shippingZone === 'DIGITAL'
+                  ? ' (Bebas Ongkir Digital)'
+                  : ''}
+              </span>
+              <span>{order.shippingCost ? formatIDR(order.shippingCost) : 'GRATIS'}</span>
             </div>
             <div className="flex justify-between font-bold text-base text-gray-900 pt-2 border-t">
               <span>Total Pembayaran</span>

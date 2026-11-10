@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser, hashPassword } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { hasPermission, normalizePermissions, ALL_MENU_PERMISSIONS } from '@/lib/rbac';
 import { z } from 'zod';
 
@@ -84,6 +85,10 @@ export async function POST(request: NextRequest) {
         { error: 'Akses Ditolak', message: 'Hanya Administrator yang dapat membuat akun staf.' },
         { status: 403 }
       );
+    }
+
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
     }
 
     const body = await request.json();

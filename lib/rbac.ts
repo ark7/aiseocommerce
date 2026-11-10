@@ -238,6 +238,7 @@ export function getRequiredPermissionForPath(pathname: string): PermissionKey | 
   if (cleanPath.startsWith('/admin/finance')) return 'finance';
   if (cleanPath.startsWith('/admin/promo')) return 'promo';
   if (cleanPath.startsWith('/admin/cms')) return 'cms';
+  if (cleanPath.startsWith('/admin/ai')) return 'products';
   if (cleanPath.startsWith('/admin/articles')) return 'articles';
   if (cleanPath.startsWith('/admin/analytics') || cleanPath.startsWith('/admin/funnel')) return 'analytics';
   if (cleanPath.startsWith('/admin/settings') || cleanPath.startsWith('/admin/system')) return 'settings';

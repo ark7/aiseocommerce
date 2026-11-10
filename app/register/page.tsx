@@ -10,10 +10,11 @@ export default async function RegisterPage({
 }) {
   const params = await searchParams;
   const fromPath = params.from as string | undefined;
+  const storeParam = params.store as string | undefined;
 
   let store: any = null;
   try {
-    store = await getActiveStore();
+    store = await getActiveStore(storeParam);
   } catch (err) {
     console.warn('Database connection fallback on RegisterPage:', err);
   }

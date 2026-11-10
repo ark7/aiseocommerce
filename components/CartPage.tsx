@@ -9,6 +9,7 @@ import { readStoredAttribution } from '@/lib/attribution'
 import { trackFunnelEvent } from '@/lib/funnelEvents'
 import { z } from 'zod'
 import { updateCartQuantity, removeFromCart, clearCart, dispatchCartUpdated } from '@/lib/cart'
+import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector'
 
 interface CartItem {
   productId: string
@@ -18,6 +19,8 @@ interface CartItem {
   imageUrl?: string
   isPreOrder?: boolean
   productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT'
+  variantId?: string
+  variation?: string
 }
 
 interface ProblematicProduct {
@@ -38,18 +41,48 @@ const CartItemSchema = z.object({
   isPreOrder: z.boolean().optional(),
   productType: z.enum(['PHYSICAL', 'DIGITAL', 'EVENT']).optional(),
   storeDomain: z.string().optional(),
+  variantId: z.string().optional(),
+  variation: z.string().optional(),
 })
+
+interface ShippingConfigProps {
+  originCity?: string | null
+  flatRateInner?: number | null
+  flatRateOuter?: number | null
+  freeThreshold?: number | null
+  biteshipEnabled?: boolean | null
+  originPostalCode?: string | null
+}
+
+export interface CourierOption {
+  courierCode: string
+  courierName: string
+  serviceCode: string
+  serviceName: string
+  description?: string
+  cost: number
+  etd: string
+  type?: string
+  isFreeShipping?: boolean
+}
 
 interface CartPageProps {
   storeId: string
   storeDomain: string
+  shippingConfig?: ShippingConfigProps
 }
 
-const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
+const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'MANUAL' | 'MIDTRANS'>('MANUAL')
+  const [shippingZone, setShippingZone] = useState<'INNER' | 'OUTER'>('INNER')
+  const [shippingAddress, setShippingAddress] = useState('')
+  const [postalCode, setPostalCode] = useState('')
+  const [courierRates, setCourierRates] = useState<CourierOption[]>([])
+  const [selectedCourier, setSelectedCourier] = useState<CourierOption | null>(null)
+  const [loadingRates, setLoadingRates] = useState(false)
   const [voucherInput, setVoucherInput] = useState('')
   const [appliedVoucher, setAppliedVoucher] = useState<{ code: string; discount: number } | null>(null)
   const [voucherMessage, setVoucherMessage] = useState<string | null>(null)
@@ -90,10 +123,10 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     setVoucherMessage('Keranjang berubah — pakai ulang voucher untuk melihat potongan barunya.')
   }
 
-  const updateQuantity = (productId: string, newQuantity: number) => {
+  const updateQuantity = (productId: string, newQuantity: number, variantId?: string) => {
     if (newQuantity < 1) return
 
-    const { cart } = updateCartQuantity(storeDomain, productId, newQuantity)
+    const { cart } = updateCartQuantity(storeDomain, productId, newQuantity, variantId)
     setCartItems(cart)
     forgetVoucher()
     if (problematicProduct?.productId === productId) {
@@ -102,8 +135,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     }
   }
 
-  const removeItem = (productId: string) => {
-    const { cart } = removeFromCart(storeDomain, productId)
+  const removeItem = (productId: string, variantId?: string) => {
+    const { cart } = removeFromCart(storeDomain, productId, variantId)
     setCartItems(cart)
     forgetVoucher()
     if (problematicProduct?.productId === productId) {
@@ -116,7 +149,64 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
   }
 
-  const calculatePayable = () => Math.max(0, calculateTotal() - (appliedVoucher?.discount ?? 0))
+  const hasPhysicalItems = cartItems.some(
+    (item) => !item.productType || item.productType === 'PHYSICAL'
+  )
+
+  const subtotal = calculateTotal()
+  const freeThreshold = shippingConfig?.freeThreshold
+  const isFreeShippingQualified = Boolean(
+    hasPhysicalItems && freeThreshold && freeThreshold > 0 && subtotal >= freeThreshold
+  )
+
+  const calculateShippingFee = () => {
+    if (!hasPhysicalItems) return 0
+    if (isFreeShippingQualified) return 0
+    if (selectedCourier) {
+      return Math.max(0, selectedCourier.cost)
+    }
+    if (shippingZone === 'INNER') {
+      return Math.max(0, shippingConfig?.flatRateInner ?? 0)
+    }
+    return Math.max(0, shippingConfig?.flatRateOuter ?? 0)
+  }
+
+  const fetchShippingRates = async (destPostal?: string) => {
+    if (!hasPhysicalItems || cartItems.length === 0) return
+    setLoadingRates(true)
+    try {
+      const res = await fetch('/api/shipping/rates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storeId,
+          destinationPostalCode: destPostal || postalCode || undefined,
+          destinationAddress: shippingAddress,
+          items: cartItems.map((i) => ({
+            productId: i.productId,
+            name: i.name,
+            quantity: i.quantity,
+            price: i.price,
+            productType: i.productType || 'PHYSICAL',
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (data.success && Array.isArray(data.rates)) {
+        setCourierRates(data.rates)
+        if (data.rates.length > 0) {
+          setSelectedCourier((prev) => prev || data.rates[0])
+        }
+      }
+    } catch {
+      // Ignore fetch errors
+    } finally {
+      setLoadingRates(false)
+    }
+  }
+
+  const shippingCost = calculateShippingFee()
+  const calculatePayable = () => Math.max(0, subtotal - (appliedVoucher?.discount ?? 0)) + shippingCost
 
   /**
    * The voucher rules are per-customer (a claim belongs to a person), so the
@@ -181,6 +271,11 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
       return
     }
 
+    if (hasPhysicalItems && !shippingAddress.trim()) {
+      setError('Harap masukkan alamat lengkap pengiriman untuk pengiriman pesanan fisik Anda.')
+      return
+    }
+
     // Every line gets its own row, so a product that is carried to checkout and
     // then abandoned is distinguishable from one that never got that far. An
     // order that follows also counts here; the report subtracts nothing.
@@ -203,6 +298,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
             productId: item.productId,
             quantity: item.quantity,
             name: item.name,
+            variantId: item.variantId,
+            variation: item.variation,
           })),
           // First-touch campaign, so an order can be traced back to the ad that
           // paid for the click.
@@ -214,6 +311,19 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
           expectedUnitPrices: Object.fromEntries(
             cartItems.map(item => [item.productId, item.price])
           ),
+          shippingZone: hasPhysicalItems ? (selectedCourier ? 'INNER' : shippingZone) : undefined,
+          shippingAddress: hasPhysicalItems
+            ? postalCode
+              ? `${shippingAddress.trim()} (Kode Pos: ${postalCode.trim()})`
+              : shippingAddress.trim()
+            : undefined,
+          courierCode: selectedCourier?.courierCode,
+          courierService: selectedCourier?.serviceCode,
+          courierServiceName: selectedCourier
+            ? `${selectedCourier.courierName} ${selectedCourier.serviceName} (${selectedCourier.etd})`
+            : undefined,
+          courierEtd: selectedCourier?.etd,
+          shippingCost: hasPhysicalItems ? shippingCost : 0,
         }),
       })
 
@@ -356,8 +466,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
         )}
 
         {cartItems.length === 0 ? (
-          <div className="bg-white rounded-lg shadow border px-4 py-16 text-center">
-            <p className="text-gray-500 mb-4">Keranjang Anda masih kosong.</p>
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow border border-gray-200 dark:border-slate-800 px-4 py-16 text-center">
+            <p className="text-gray-500 dark:text-slate-400 mb-4">Keranjang Anda masih kosong.</p>
             <Link
               href="/"
               className="inline-block bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -368,7 +478,7 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
         ) : (
           <div className="space-y-4">
             {cartItems.some(item => item.productType === 'DIGITAL' || item.productType === 'EVENT') && (
-              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-lg text-xs flex items-center gap-2">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-4 py-2.5 rounded-lg text-xs flex items-center gap-2">
                 <span>⚡</span>
                 <span>
                   <strong>Pengiriman Instan Elektronik:</strong> Produk digital / Tiket seminar otomatis dapat diakses dan diunduh langsung setelah pembayaran Anda lunas (Bebas Ongkir).
@@ -381,8 +491,8 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
               return (
                 <div
                   key={item.productId}
-                  className={`bg-white rounded-lg shadow border p-4 flex items-center transition-colors ${
-                    isProblematic ? 'border-red-400 bg-red-50/30 ring-2 ring-red-200' : ''
+                  className={`bg-white dark:bg-slate-900 rounded-lg shadow border border-gray-200 dark:border-slate-800 p-4 flex items-center transition-colors ${
+                    isProblematic ? 'border-red-400 bg-red-50/30 dark:bg-red-950/20 ring-2 ring-red-200' : ''
                   }`}
                 >
                   {item.imageUrl && (
@@ -396,7 +506,12 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900">{item.name}</h3>
+                      <h3 className="font-medium text-gray-900 dark:text-white">{item.name}</h3>
+                      {item.variation && (
+                        <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                          🏷️ {item.variation}
+                        </span>
+                      )}
                       {isProblematic && (
                         <span className="bg-red-100 text-red-800 text-[10px] font-semibold px-2 py-0.5 rounded border border-red-200">
                           ⚠️ Perlu Diperbaiki
@@ -418,26 +533,36 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-600">Rp {item.price.toLocaleString()}</p>
+                    <p className="text-gray-600 dark:text-slate-300">Rp {item.price.toLocaleString()}</p>
                   </div>
-                  <div className="flex items-center">
+                  <div 
+                    data-quantity-stepper
+                    className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-gray-300 dark:border-slate-700 overflow-hidden shadow-xs transition-colors"
+                  >
                     <button
-                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      className="px-2 py-1 border rounded-l"
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantId)}
+                      aria-label="Kurangi jumlah item"
+                      className="px-2.5 py-1 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition disabled:opacity-40"
                       disabled={item.quantity <= 1}
                     >
                       -
                     </button>
-                    <span className="px-4 py-1 border-t border-b">{item.quantity}</span>
+                    <span 
+                      data-quantity-counter
+                      className="px-3.5 py-1 border-l border-r border-gray-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold text-sm select-none"
+                    >
+                      {item.quantity}
+                    </span>
                     <button
-                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      className="px-2 py-1 border rounded-r"
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantId)}
+                      aria-label="Tambah jumlah item"
+                      className="px-2.5 py-1 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition"
                     >
                       +
                     </button>
                   </div>
                   <button
-                    onClick={() => removeItem(item.productId)}
+                    onClick={() => removeItem(item.productId, item.variantId)}
                     className="ml-4 text-red-500 hover:text-red-700 font-medium text-sm"
                   >
                     Hapus
@@ -446,11 +571,199 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
               )
             })}
 
-            <div className="bg-white rounded-lg shadow border p-4">
-              <div className="flex justify-between text-gray-700">
-                <span>Subtotal</span>
-                <span>Rp {calculateTotal().toLocaleString('id-ID')}</span>
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow border border-gray-200 dark:border-slate-800 p-4 sm:p-6 space-y-4">
+              <div className="flex justify-between text-gray-700 dark:text-slate-200 text-sm sm:text-base">
+                <span>Subtotal Produk</span>
+                <span>Rp {subtotal.toLocaleString('id-ID')}</span>
               </div>
+
+              {/* SHIPPING SELECTION (if physical products present) */}
+              {hasPhysicalItems && (
+                <div className="pt-4 border-t space-y-4">
+                  <AddressLocationSelector
+                    initialPostalCode={postalCode}
+                    initialStreetAddress={shippingAddress}
+                    onChange={(loc: SelectedLocationData) => {
+                      setPostalCode(loc.postalCode);
+                      setShippingAddress(loc.fullFormattedAddress);
+                      if (loc.postalCode && loc.postalCode.length === 5) {
+                        fetchShippingRates(loc.postalCode);
+                      }
+                    }}
+                  />
+
+                  {/* Manual trigger / status indicator */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      {postalCode ? `Wilayah tujuan: ${postalCode}` : 'Silakan tentukan wilayah tujuan di atas.'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => fetchShippingRates(postalCode)}
+                      disabled={loadingRates || !postalCode}
+                      className="px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {loadingRates ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          <span>Menghitung Tarif...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          <span>Perbarui Pilihan Kurir</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* COURIER RATES (BITESHIP OR FLAT RATE) */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-1.5 flex items-center justify-between">
+                      <span>Pilihan Ekspedisi & Kurir</span>
+                      {shippingConfig?.biteshipEnabled && (
+                        <span className="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                          Biteship Live Rates
+                        </span>
+                      )}
+                    </label>
+
+                    {courierRates.length > 0 ? (
+                      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                        {courierRates.map((courier) => {
+                          const isSelected =
+                            selectedCourier?.courierCode === courier.courierCode &&
+                            selectedCourier?.serviceCode === courier.serviceCode;
+                          return (
+                            <label
+                              key={`${courier.courierCode}_${courier.serviceCode}`}
+                              className={`flex items-center justify-between p-3.5 border rounded-xl cursor-pointer transition ${
+                                isSelected
+                                  ? 'border-indigo-600 bg-indigo-50/60 ring-2 ring-indigo-600'
+                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="courierSelection"
+                                  checked={isSelected}
+                                  onChange={() => setSelectedCourier(courier)}
+                                  className="text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm text-gray-900">{courier.courierName}</span>
+                                    <span className="text-xs font-semibold px-2 py-0.5 bg-gray-100 rounded text-gray-700">
+                                      {courier.serviceName}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    Estimasi tiba: <strong>{courier.etd}</strong>
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-sm font-bold text-right shrink-0">
+                                {isFreeShippingQualified ? (
+                                  <span className="text-emerald-600">GRATIS</span>
+                                ) : (
+                                  <span className="text-indigo-600">Rp {courier.cost.toLocaleString('id-ID')}</span>
+                                )}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Flat Rate Fallback */
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <label
+                          className={`flex flex-col p-3.5 border rounded-xl cursor-pointer transition ${
+                            shippingZone === 'INNER'
+                              ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm text-gray-900 flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="shippingZone"
+                                value="INNER"
+                                checked={shippingZone === 'INNER' && !selectedCourier}
+                                onChange={() => {
+                                  setSelectedCourier(null);
+                                  setShippingZone('INNER');
+                                }}
+                                className="text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span>Dalam Kota</span>
+                            </span>
+                            <span className="text-sm font-bold">
+                              {isFreeShippingQualified ? (
+                                <span className="text-emerald-600">GRATIS</span>
+                              ) : (
+                                <span className="text-gray-900">
+                                  Rp {(shippingConfig?.flatRateInner ?? 0).toLocaleString('id-ID')}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1 pl-6">
+                            Area pengiriman lokal {shippingConfig?.originCity || 'toko'}
+                          </span>
+                        </label>
+
+                        <label
+                          className={`flex flex-col p-3.5 border rounded-xl cursor-pointer transition ${
+                            shippingZone === 'OUTER'
+                              ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm text-gray-900 flex items-center gap-2">
+                              <input
+                                type="radio"
+                                name="shippingZone"
+                                value="OUTER"
+                                checked={shippingZone === 'OUTER' && !selectedCourier}
+                                onChange={() => {
+                                  setSelectedCourier(null);
+                                  setShippingZone('OUTER');
+                                }}
+                                className="text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span>Luar Kota</span>
+                            </span>
+                            <span className="text-sm font-bold">
+                              {isFreeShippingQualified ? (
+                                <span className="text-emerald-600">GRATIS</span>
+                              ) : (
+                                <span className="text-gray-900">
+                                  Rp {(shippingConfig?.flatRateOuter ?? 0).toLocaleString('id-ID')}
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-xs text-gray-500 mt-1 pl-6">
+                            Antar kota / luar daerah toko
+                          </span>
+                        </label>
+                      </div>
+                    )}
+
+                    {isFreeShippingQualified && (
+                      <div className="mt-2.5 px-3.5 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                        <span>🎉</span>
+                        <span>
+                          Selamat! Total belanja Anda memenuhi syarat <strong>Bebas Ongkir</strong> (Minimal Rp {(shippingConfig?.freeThreshold ?? 0).toLocaleString('id-ID')}).
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 pt-4 border-t">
                 <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="voucherCode">
@@ -495,18 +808,42 @@ const CartPage = ({ storeId, storeDomain }: CartPageProps) => {
                 {voucherMessage && <p className="mt-2 text-sm text-red-600">{voucherMessage}</p>}
               </div>
 
-              {appliedVoucher && (
-                <div className="mt-4 flex justify-between text-gray-700">
-                  <span>Potongan voucher</span>
-                  <span className="text-green-700">
-                    - Rp {appliedVoucher.discount.toLocaleString('id-ID')}
-                  </span>
+              {/* RINGKASAN BIAYA & TOTAL */}
+              <div className="pt-4 border-t space-y-2 text-sm text-gray-700">
+                <div className="flex justify-between">
+                  <span>Subtotal Produk</span>
+                  <span>Rp {subtotal.toLocaleString('id-ID')}</span>
                 </div>
-              )}
 
-              <div className="mt-4 pt-4 border-t flex justify-between font-bold text-lg text-gray-900">
-                <span>Total</span>
-                <span>Rp {calculatePayable().toLocaleString('id-ID')}</span>
+                {appliedVoucher && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Potongan voucher</span>
+                    <span>- Rp {appliedVoucher.discount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+
+                {hasPhysicalItems && (
+                  <div className="flex justify-between">
+                    <span>
+                      Ongkos Kirim{' '}
+                      {selectedCourier
+                        ? `(${selectedCourier.courierName} ${selectedCourier.serviceName})`
+                        : `(${shippingZone === 'INNER' ? 'Dalam Kota' : 'Luar Kota'})`}
+                    </span>
+                    <span className="font-medium">
+                      {shippingCost === 0 ? (
+                        <span className="text-emerald-600 font-semibold">GRATIS</span>
+                      ) : (
+                        `Rp ${shippingCost.toLocaleString('id-ID')}`
+                      )}
+                    </span>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t flex justify-between font-bold text-lg text-gray-900">
+                  <span>Total Pembayaran</span>
+                  <span className="text-indigo-600">Rp {calculatePayable().toLocaleString('id-ID')}</span>
+                </div>
               </div>
 
               <fieldset className="mt-4 pt-4 border-t">
