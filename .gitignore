@@ -50,6 +50,10 @@ prisma/migrations/**/migration_lock.toml
 public/uploads/*
 !public/uploads/.gitkeep
 
+# Private Storage (tenant-isolated storage)
+storage/proofs/*
+!storage/proofs/.gitkeep
+
 # Logs
 logs
 *.log

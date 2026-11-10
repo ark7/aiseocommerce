@@ -12,6 +12,7 @@ import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import { isSaleActive, resolveUnitPrice, saleRemaining } from '@/lib/pricing';
 import ProductImageGallery from './ProductImageGallery';
+import ProductMarketplaceLinks from '@/components/ProductMarketplaceLinks';
 
 interface ProductPageProps {
   params: { slug: string };
@@ -72,7 +73,12 @@ async function loadProductPage(slug: string) {
 
   const product = await prisma.product.findUnique({
     where: { storeId_slug: { storeId: store.id, slug } },
-    include: { images: { orderBy: { order: 'asc' } }, category: true, store: true },
+    include: {
+      images: { orderBy: { order: 'asc' } },
+      category: true,
+      store: true,
+      variants: { orderBy: { createdAt: 'asc' } },
+    },
   });
   if (!product || !product.isPublished) return null;
 
@@ -236,6 +242,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 stock={product.stock} 
                 isPreOrder={product.isPreOrder}
                 preOrderDays={product.preOrderDays}
+                productType={product.productType}
+                variants={product.variants}
+              />
+              <ProductMarketplaceLinks
+                shopeeUrl={product.shopeeUrl}
+                tokopediaUrl={product.tokopediaUrl}
+                tiktokShopUrl={product.tiktokShopUrl}
+                blibliUrl={product.blibliUrl}
+                customMarketplaceName={product.customMarketplaceName}
+                customMarketplaceUrl={product.customMarketplaceUrl}
+                productName={product.name}
               />
             </div>
             

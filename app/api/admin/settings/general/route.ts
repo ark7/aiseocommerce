@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireUser } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
@@ -74,6 +75,37 @@ const GeneralSettingsUpdateSchema = z.object({
   notifyOnPaymentProof: z.boolean().optional(),
   notifyOnPaymentSuccess: z.boolean().optional(),
   notifyOnLowStock: z.boolean().optional(),
+
+  // Manual Shipping Flat Rates (Dalam & Luar Kota)
+  shippingOriginCity: z.string().max(100).optional().nullable(),
+  shippingFlatRateInner: z.coerce.number().min(0, 'Tarif dalam kota tidak boleh negatif').optional(),
+  shippingFlatRateOuter: z.coerce.number().min(0, 'Tarif luar kota tidak boleh negatif').optional(),
+  shippingFreeThreshold: z.coerce.number().min(0).optional().nullable(),
+
+  // Ekspedisi & Kurir Otomatis (Biteship API)
+  biteshipEnabled: z.boolean().optional(),
+  biteshipApiKey: z.string().optional().nullable(),
+  biteshipSandbox: z.boolean().optional(),
+  biteshipOriginAreaId: z.string().optional().nullable(),
+  biteshipOriginAddress: z.string().optional().nullable(),
+  biteshipOriginPostalCode: z.string().optional().nullable(),
+  biteshipOriginContactName: z.string().optional().nullable(),
+  biteshipOriginContactPhone: z.string().optional().nullable(),
+  biteshipEnabledCouriers: z.union([
+    z.string(),
+    z.array(z.string()).transform((arr) => arr.join(',')),
+  ]).optional().nullable(),
+
+  // SMTP & Email Notifications
+  smtpEnabled: z.boolean().optional(),
+  smtpHost: z.string().optional().nullable(),
+  smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
+  smtpSecure: z.boolean().optional(),
+  smtpUser: z.string().optional().nullable(),
+  smtpPass: z.string().optional().nullable(),
+  smtpFromName: z.string().optional().nullable(),
+  smtpFromEmail: z.string().email('Format email pengirim tidak valid').optional().nullable().or(z.literal('')),
+  smtpReplyTo: z.string().email('Format email reply-to tidak valid').optional().nullable().or(z.literal('')),
 });
 
 export async function GET(request: Request) {
@@ -140,7 +172,7 @@ export async function GET(request: Request) {
         // AI Assistant (BYOK)
         aiProvider: s?.aiProvider ?? 'GEMINI',
         aiApiKey: s?.aiApiKey ? '********' : null,
-        aiModel: s?.aiModel ?? 'gemini-1.5-flash',
+        aiModel: s?.aiModel ?? 'gemini-2.5-flash',
         aiCustomPrompt: s?.aiCustomPrompt ?? null,
 
         // Order Notifications (Telegram & WhatsApp)
@@ -156,6 +188,36 @@ export async function GET(request: Request) {
         notifyOnPaymentProof: s?.notifyOnPaymentProof ?? true,
         notifyOnPaymentSuccess: s?.notifyOnPaymentSuccess ?? true,
         notifyOnLowStock: s?.notifyOnLowStock ?? true,
+
+        // Manual Shipping Flat Rates
+        shippingOriginCity: s?.shippingOriginCity ?? null,
+        shippingFlatRateInner: s?.shippingFlatRateInner ?? 0,
+        shippingFlatRateOuter: s?.shippingFlatRateOuter ?? 0,
+        shippingFreeThreshold: s?.shippingFreeThreshold ?? null,
+
+        // Ekspedisi & Kurir Otomatis (Biteship API)
+        biteshipEnabled: s?.biteshipEnabled ?? false,
+        biteshipApiKey: s?.biteshipApiKey ? '********' : null,
+        biteshipSandbox: s?.biteshipSandbox ?? true,
+        biteshipOriginAreaId: s?.biteshipOriginAreaId ?? null,
+        biteshipOriginAddress: s?.biteshipOriginAddress ?? null,
+        biteshipOriginPostalCode: s?.biteshipOriginPostalCode ?? null,
+        biteshipOriginContactName: s?.biteshipOriginContactName ?? null,
+        biteshipOriginContactPhone: s?.biteshipOriginContactPhone ?? null,
+        biteshipEnabledCouriers: s?.biteshipEnabledCouriers ?? 'jne,sicepat,jnt,anteraja,tiki,pos',
+
+        // SMTP & Email Notifications
+        smtpEnabled: s?.smtpEnabled ?? false,
+        smtpHost: s?.smtpHost ?? null,
+        smtpPort: s?.smtpPort ?? 587,
+        smtpSecure: s?.smtpSecure ?? false,
+        smtpUser: s?.smtpUser ?? null,
+        smtpPass: s?.smtpPass ? '********' : null,
+        smtpFromName: s?.smtpFromName ?? null,
+        smtpFromEmail: s?.smtpFromEmail ?? null,
+        smtpReplyTo: s?.smtpReplyTo ?? null,
+        smtpVerified: s?.smtpVerified ?? false,
+        smtpVerifiedAt: s?.smtpVerifiedAt ?? null,
       },
     });
   } catch (error) {
@@ -174,6 +236,10 @@ export async function PUT(request: Request) {
 
     if (user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
     }
 
     const body = await request.json();
@@ -241,7 +307,7 @@ export async function PUT(request: Request) {
     if (data.aiApiKey !== undefined && data.aiApiKey !== '********') {
       settingsUpdateData.aiApiKey = data.aiApiKey ? data.aiApiKey.trim() : null;
     }
-    if (data.aiModel !== undefined) settingsUpdateData.aiModel = data.aiModel ? data.aiModel.trim() : 'gemini-1.5-flash';
+    if (data.aiModel !== undefined) settingsUpdateData.aiModel = data.aiModel ? data.aiModel.trim() : 'gemini-2.5-flash';
     if (data.aiCustomPrompt !== undefined) settingsUpdateData.aiCustomPrompt = data.aiCustomPrompt ? data.aiCustomPrompt.trim() : null;
 
     // Order Notifications (Telegram & WhatsApp)
@@ -261,6 +327,49 @@ export async function PUT(request: Request) {
     if (data.notifyOnPaymentProof !== undefined) settingsUpdateData.notifyOnPaymentProof = data.notifyOnPaymentProof;
     if (data.notifyOnPaymentSuccess !== undefined) settingsUpdateData.notifyOnPaymentSuccess = data.notifyOnPaymentSuccess;
     if (data.notifyOnLowStock !== undefined) settingsUpdateData.notifyOnLowStock = data.notifyOnLowStock;
+
+    // Manual Shipping Flat Rates
+    if (data.shippingOriginCity !== undefined) settingsUpdateData.shippingOriginCity = data.shippingOriginCity ? data.shippingOriginCity.trim() : null;
+    if (data.shippingFlatRateInner !== undefined) settingsUpdateData.shippingFlatRateInner = data.shippingFlatRateInner;
+    if (data.shippingFlatRateOuter !== undefined) settingsUpdateData.shippingFlatRateOuter = data.shippingFlatRateOuter;
+    if (data.shippingFreeThreshold !== undefined) settingsUpdateData.shippingFreeThreshold = data.shippingFreeThreshold;
+
+    // Ekspedisi & Kurir Otomatis (Biteship API)
+    if (data.biteshipEnabled !== undefined) settingsUpdateData.biteshipEnabled = data.biteshipEnabled;
+    if (data.biteshipApiKey !== undefined && data.biteshipApiKey !== '********') {
+      settingsUpdateData.biteshipApiKey = data.biteshipApiKey ? data.biteshipApiKey.trim() : null;
+    }
+    if (data.biteshipSandbox !== undefined) settingsUpdateData.biteshipSandbox = data.biteshipSandbox;
+    if (data.biteshipOriginAreaId !== undefined) settingsUpdateData.biteshipOriginAreaId = data.biteshipOriginAreaId ? data.biteshipOriginAreaId.trim() : null;
+    if (data.biteshipOriginAddress !== undefined) settingsUpdateData.biteshipOriginAddress = data.biteshipOriginAddress ? data.biteshipOriginAddress.trim() : null;
+    if (data.biteshipOriginPostalCode !== undefined) settingsUpdateData.biteshipOriginPostalCode = data.biteshipOriginPostalCode ? data.biteshipOriginPostalCode.trim() : null;
+    if (data.biteshipOriginContactName !== undefined) settingsUpdateData.biteshipOriginContactName = data.biteshipOriginContactName ? data.biteshipOriginContactName.trim() : null;
+    if (data.biteshipOriginContactPhone !== undefined) settingsUpdateData.biteshipOriginContactPhone = data.biteshipOriginContactPhone ? data.biteshipOriginContactPhone.trim() : null;
+    if (data.biteshipEnabledCouriers !== undefined) settingsUpdateData.biteshipEnabledCouriers = data.biteshipEnabledCouriers ? data.biteshipEnabledCouriers.trim() : null;
+
+    // SMTP & Email Notifications
+    if (data.smtpEnabled !== undefined) settingsUpdateData.smtpEnabled = data.smtpEnabled;
+    if (data.smtpHost !== undefined) settingsUpdateData.smtpHost = data.smtpHost ? data.smtpHost.trim() : null;
+    if (data.smtpPort !== undefined) settingsUpdateData.smtpPort = data.smtpPort;
+    if (data.smtpSecure !== undefined) settingsUpdateData.smtpSecure = data.smtpSecure;
+    if (data.smtpUser !== undefined) settingsUpdateData.smtpUser = data.smtpUser ? data.smtpUser.trim() : null;
+    if (data.smtpPass !== undefined && data.smtpPass !== '********') {
+      settingsUpdateData.smtpPass = data.smtpPass ? data.smtpPass.trim() : null;
+    }
+    if (data.smtpFromName !== undefined) settingsUpdateData.smtpFromName = data.smtpFromName ? data.smtpFromName.trim() : null;
+    if (data.smtpFromEmail !== undefined) {
+      const trimmedEmail = data.smtpFromEmail ? data.smtpFromEmail.trim() : null;
+      settingsUpdateData.smtpFromEmail = trimmedEmail;
+      const currentStore = await prisma.store.findUnique({
+        where: { id: user.storeId },
+        include: { settings: true },
+      });
+      if (currentStore?.settings?.smtpFromEmail !== trimmedEmail) {
+        settingsUpdateData.smtpVerified = false;
+        settingsUpdateData.smtpVerifiedAt = null;
+      }
+    }
+    if (data.smtpReplyTo !== undefined) settingsUpdateData.smtpReplyTo = data.smtpReplyTo ? data.smtpReplyTo.trim() : null;
 
     if (Object.keys(settingsUpdateData).length > 0) {
       await prisma.storeSettings.upsert({

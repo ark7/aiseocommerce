@@ -4,8 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { nextStatuses, STATUS_LABELS } from '@/lib/orderStatus';
-import type { OrderStatus } from '@prisma/client';
+import { nextStatuses, STATUS_LABELS, type OrderStatus } from '@/lib/orderStatus';
 
 interface OrderItem {
   id: string;
@@ -26,6 +25,7 @@ interface PaymentInfo {
   status: string;
   amount: number;
   proofFile: string | null;
+  proofUrl?: string | null;
   verifiedAt: string | null;
 }
 
@@ -37,12 +37,23 @@ interface OrderDetail {
   customerEmail: string | null;
   customerPhone: string | null;
   shippingAddress: string | null;
+  shippingCost?: number;
+  shippingZone?: string | null;
+  discount?: number;
   subtotal: number;
   totalAmount: number;
   trackingUrl: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   completedAt: string | null;
+  courierCode?: string | null;
+  courierService?: string | null;
+  courierServiceName?: string | null;
+  courierEtd?: string | null;
+  waybillNumber?: string | null;
+  biteshipOrderId?: string | null;
+  biteshipTrackingId?: string | null;
+  biteshipStatus?: string | null;
   createdAt: string;
   /** Campaign that brought this order in; null for direct or organic traffic. */
   attribution: Attribution | null;
@@ -94,6 +105,11 @@ export default function AdminOrderDetailPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [trackingUrl, setTrackingUrl] = useState('');
   const [proofDataUri, setProofDataUri] = useState<string | null>(null);
+  const [loadingProof, setLoadingProof] = useState(false);
+  const [proofFileName, setProofFileName] = useState<string | null>(null);
+  const [isDispatchingBiteship, setIsDispatchingBiteship] = useState(false);
+  const [trackingInfo, setTrackingInfo] = useState<any | null>(null);
+  const [isLoadingTracking, setIsLoadingTracking] = useState(false);
 
   const authHeaders = () => {
     const token = localStorage.getItem('token');
@@ -195,6 +211,46 @@ export default function AdminOrderDetailPage() {
     );
   };
 
+  const handleDispatchBiteship = async () => {
+    if (!order) return;
+    setIsDispatchingBiteship(true);
+    setError(null);
+    try {
+      const headers = authHeaders();
+      const res = await fetch(`/api/admin/orders/${order.id}/dispatch-biteship`, {
+        method: 'POST',
+        headers: { ...(headers || {}) },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal memproses pengiriman Biteship');
+      }
+      setNotice('Pesanan berhasil di-booking via Biteship! Nomor resi telah diterbitkan.');
+      await fetchOrder();
+    } catch (err: any) {
+      setError(err.message || 'Gagal memproses pengiriman Biteship');
+    } finally {
+      setIsDispatchingBiteship(false);
+    }
+  };
+
+  const handleFetchTracking = async () => {
+    if (!order) return;
+    setIsLoadingTracking(true);
+    try {
+      const headers = authHeaders();
+      const res = await fetch(`/api/shipping/track?orderId=${order.id}`, { headers: headers || {} });
+      const data = await res.json();
+      if (res.ok && data.tracking) {
+        setTrackingInfo(data.tracking);
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setIsLoadingTracking(false);
+    }
+  };
+
   /** Cancelling or refunding puts stock back and writes a reversing ledger entry. */
   const REVERSING: OrderStatus[] = ['CANCELLED', 'REFUNDED'];
 
@@ -223,7 +279,13 @@ export default function AdminOrderDetailPage() {
   };
 
   const loadProof = async (paymentId: string) => {
+    if (proofDataUri) {
+      setProofDataUri(null);
+      return;
+    }
+
     try {
+      setLoadingProof(true);
       setError(null);
       const headers = authHeaders();
       if (!headers) return;
@@ -234,10 +296,20 @@ export default function AdminOrderDetailPage() {
         throw new Error(data.error || 'Bukti bayar tidak tersedia');
       }
       const data = await response.json();
-      const mime = data.fileInfo?.type || 'image/jpeg';
-      setProofDataUri(`data:${mime};base64,${data.proofData}`);
+      setProofFileName(data.fileInfo?.name || null);
+
+      if (data.proofData) {
+        const mime = data.fileInfo?.type || 'image/jpeg';
+        setProofDataUri(`data:${mime};base64,${data.proofData}`);
+      } else if (data.proofUrl) {
+        setProofDataUri(data.proofUrl);
+      } else {
+        throw new Error('File bukti bayar tidak ditemukan');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat bukti bayar');
+    } finally {
+      setLoadingProof(false);
     }
   };
 
@@ -326,9 +398,36 @@ export default function AdminOrderDetailPage() {
                 ))}
               </tbody>
             </table>
-            <div className="mt-4 pt-4 border-t flex justify-between text-base font-semibold text-gray-900">
-              <span>Total</span>
-              <span>{formatIDR(order.totalAmount)}</span>
+            <div className="mt-4 pt-4 border-t space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Subtotal Produk</span>
+                <span>{formatIDR(order.subtotal)}</span>
+              </div>
+              {Boolean(order.discount && order.discount > 0) && (
+                <div className="flex justify-between text-emerald-600">
+                  <span>Diskon Voucher</span>
+                  <span>- {formatIDR(order.discount!)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span>
+                  Ongkos Kirim
+                  {order.shippingZone === 'INNER'
+                    ? ' (Dalam Kota)'
+                    : order.shippingZone === 'OUTER'
+                    ? ' (Luar Kota)'
+                    : order.shippingZone === 'FREE'
+                    ? ' (Bebas Ongkir)'
+                    : order.shippingZone === 'DIGITAL'
+                    ? ' (Digital)'
+                    : ''}
+                </span>
+                <span>{order.shippingCost ? formatIDR(order.shippingCost) : 'Rp 0'}</span>
+              </div>
+              <div className="pt-2 border-t flex justify-between text-base font-semibold text-gray-900">
+                <span>Total Pesanan</span>
+                <span className="text-indigo-600">{formatIDR(order.totalAmount)}</span>
+              </div>
             </div>
           </div>
 
@@ -356,24 +455,55 @@ export default function AdminOrderDetailPage() {
                     </span>
                   </div>
                 )}
-                {payment.proofFile && (
+                {(payment.proofFile || payment.proofUrl) && (
                   <button
                     onClick={() => loadProof(payment.id)}
-                    className="mt-2 text-indigo-600 hover:text-indigo-900 font-medium"
+                    disabled={loadingProof}
+                    className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-900 font-medium transition disabled:opacity-50"
                   >
-                    Lihat bukti bayar
+                    {loadingProof ? (
+                      <>
+                        <span className="inline-block animate-spin">⏳</span> Memuat bukti bayar...
+                      </>
+                    ) : proofDataUri ? (
+                      'Sembunyikan bukti bayar'
+                    ) : (
+                      'Lihat bukti bayar'
+                    )}
                   </button>
                 )}
                 {proofDataUri && (
-                  <div className="mt-4 border rounded-lg p-2">
-                    <Image
-                      src={proofDataUri}
-                      alt="Bukti pembayaran"
-                      width={600}
-                      height={800}
-                      unoptimized
-                      className="w-full h-auto object-contain"
-                    />
+                  <div className="mt-4 border border-indigo-100 rounded-xl p-3 bg-slate-50 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-gray-600">
+                      <span className="font-semibold text-gray-800">
+                        📎 {proofFileName || 'Bukti Pembayaran'}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={proofDataUri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:underline font-medium"
+                        >
+                          Buka tab baru ↗
+                        </a>
+                        <button
+                          onClick={() => setProofDataUri(null)}
+                          className="text-gray-400 hover:text-gray-700 font-semibold"
+                          title="Tutup pratinjau"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <div className="relative max-h-96 overflow-auto rounded-lg bg-white border border-gray-200 flex items-center justify-center p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={proofDataUri}
+                        alt="Bukti pembayaran"
+                        className="max-w-full h-auto max-h-96 object-contain rounded"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -419,7 +549,46 @@ export default function AdminOrderDetailPage() {
               <p className="text-gray-500">{order.customerEmail || '-'}</p>
               <p className="text-gray-500">{order.customerPhone || '-'}</p>
               {order.shippingAddress && (
-                <p className="text-gray-600 pt-2 border-t">{order.shippingAddress}</p>
+                <div className="pt-2 border-t space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-700">Alamat Pengiriman:</span>
+                    {order.shippingZone && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase">
+                        {order.shippingZone === 'INNER'
+                          ? 'Dalam Kota'
+                          : order.shippingZone === 'OUTER'
+                          ? 'Luar Kota'
+                          : order.shippingZone === 'FREE'
+                          ? 'Bebas Ongkir'
+                          : order.shippingZone}
+                      </span>
+                    )}
+                  </div>
+                  {order.courierServiceName && (
+                    <div className="flex items-center gap-1.5 text-xs text-indigo-700 bg-indigo-50 p-2 rounded-lg font-medium">
+                      <span>🚚</span>
+                      <span>Kurir: <strong>{order.courierServiceName}</strong></span>
+                    </div>
+                  )}
+                  {order.waybillNumber && (
+                    <div className="flex items-center justify-between text-xs bg-gray-50 p-2 rounded-lg border border-gray-200">
+                      <span className="text-gray-600">No. Resi: <strong className="font-mono text-gray-900">{order.waybillNumber}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (order.waybillNumber) {
+                            navigator.clipboard.writeText(order.waybillNumber);
+                            alert('Nomor resi disalin ke clipboard!');
+                          }
+                        }}
+                        className="text-[11px] text-indigo-600 hover:underline font-semibold"
+                      >
+                        Salin
+                      </button>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-600 whitespace-pre-line leading-relaxed">{order.shippingAddress}</p>
+                </div>
               )}
             </div>
           </div>
@@ -447,44 +616,115 @@ export default function AdminOrderDetailPage() {
             )}
 
             {order.status === 'PROCESSING' && (
-              <div className="space-y-3">
-                <label className="block">
-                  <span className="text-gray-700 text-sm">URL Tracking Pengiriman</span>
-                  <input
-                    type="url"
-                    value={trackingUrl}
-                    onChange={(e) => setTrackingUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                  />
-                </label>
-                <button
-                  onClick={markShipped}
-                  disabled={busy || !trackingUrl}
-                  className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                >
-                  Tandai Dikirim
-                </button>
+              <div className="space-y-4">
+                <div className="p-3.5 bg-indigo-50 rounded-xl border border-indigo-200 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚡</span>
+                    <span className="text-xs font-bold text-indigo-900">Biteship Automated Dispatch</span>
+                  </div>
+                  <p className="text-xs text-indigo-700">
+                    Panggil kurir pick-up otomatis dan terbitkan nomor resi resmi via Biteship API.
+                  </p>
+                  <button
+                    onClick={handleDispatchBiteship}
+                    disabled={isDispatchingBiteship || busy}
+                    className="w-full bg-indigo-600 text-white py-2 px-3 rounded-lg text-xs font-bold hover:bg-indigo-700 transition disabled:opacity-50 shadow-xs flex items-center justify-center gap-2"
+                  >
+                    {isDispatchingBiteship ? (
+                      <>
+                        <span className="animate-spin">⏳</span>
+                        <span>Memproses Booking Biteship...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🚚</span>
+                        <span>Request Pickup via Biteship</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="border-t pt-3 space-y-2">
+                  <span className="text-xs font-semibold text-gray-700 block">Atau Tandai Manual:</span>
+                  <label className="block">
+                    <span className="text-gray-500 text-xs">Nomor Resi / URL Tracking Pengiriman</span>
+                    <input
+                      type="text"
+                      value={trackingUrl}
+                      onChange={(e) => setTrackingUrl(e.target.value)}
+                      placeholder="Contoh: JNE123456789 atau https://..."
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-xs focus:border-indigo-300 focus:ring focus:ring-indigo-200"
+                    />
+                  </label>
+                  <button
+                    onClick={markShipped}
+                    disabled={busy || !trackingUrl}
+                    className="w-full bg-gray-100 text-gray-800 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-200 transition disabled:opacity-50 border border-gray-300"
+                  >
+                    Tandai Dikirim Manual
+                  </button>
+                </div>
               </div>
             )}
 
-            {order.status === 'SHIPPED' && (
-              <div className="text-sm text-gray-600">
-                <p>Menunggu pelanggan mengonfirmasi penerimaan.</p>
-                {order.trackingUrl && (
-                  <a
-                    href={order.trackingUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block text-indigo-600 hover:text-indigo-900"
-                  >
-                    Buka halaman tracking
-                  </a>
+            {['SHIPPED', 'DELIVERED', 'COMPLETED'].includes(order.status) && (
+              <div className="space-y-3">
+                <div className="text-xs text-gray-600 space-y-2">
+                  <p className="font-semibold text-gray-900 flex items-center gap-1.5">
+                    <span>📦 Status Pengiriman:</span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[11px] font-bold">
+                      {order.status === 'DELIVERED' || order.status === 'COMPLETED' ? 'Paket Telah Tiba' : 'Sedang Dikirim'}
+                    </span>
+                  </p>
+                  {order.waybillNumber && (
+                    <p className="text-gray-700">
+                      No. Resi: <strong className="font-mono text-indigo-700">{order.waybillNumber}</strong>
+                    </p>
+                  )}
+                  {order.trackingUrl && (
+                    <a
+                      href={order.trackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-900 font-semibold"
+                    >
+                      <span>Buka Halaman Lacak Biteship</span>
+                      <span>↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleFetchTracking}
+                  disabled={isLoadingTracking}
+                  className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-300 py-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isLoadingTracking ? 'Memuat Posisi...' : '📍 Lacak Live Status Kurir'}
+                </button>
+
+                {trackingInfo && (
+                  <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                    <p className="text-xs font-bold text-gray-900">
+                      Posisi Terkini: <span className="text-indigo-600">{trackingInfo.statusLabel}</span>
+                    </p>
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {trackingInfo.history?.map((h: any, idx: number) => (
+                        <div key={idx} className="text-[11px] border-l-2 border-indigo-400 pl-2.5 py-1">
+                          <p className="font-semibold text-gray-800">{h.note}</p>
+                          <p className="text-[10px] text-gray-500 mt-0.5">
+                            {new Date(h.updatedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                            {h.location ? ` • ${h.location}` : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
 
-            {['DELIVERED', 'COMPLETED', 'CANCELLED', 'PENDING', 'PAID'].includes(order.status) && (
+            {['CANCELLED', 'PENDING', 'PAID'].includes(order.status) && (
               <p className="text-sm text-gray-500">Tidak ada aksi yang tersedia untuk status ini.</p>
             )}
           </div>

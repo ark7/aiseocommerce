@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getCartCount, CART_UPDATED_EVENT } from '@/lib/cart';
+import ThemeToggle from './ThemeToggle';
 
 interface StoreHeaderProps {
   storeDomain?: string;
@@ -117,7 +118,7 @@ export default function StoreHeader({
   }, [storeDomain, storeName]);
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
+    <header className="bg-white dark:bg-slate-900 shadow-sm border-b border-gray-100 dark:border-slate-800 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
           <Link href="/" className="flex items-center space-x-2">
@@ -127,7 +128,7 @@ export default function StoreHeader({
                 alt={name || 'Logo toko'}
                 width={40}
                 height={40}
-                className="w-10 h-10 rounded object-contain"
+                className="w-10 h-10 rounded object-contain bg-white dark:bg-slate-800 p-0.5 border border-gray-100 dark:border-slate-700 shadow-xs"
                 unoptimized
               />
             ) : (
@@ -139,28 +140,31 @@ export default function StoreHeader({
               </div>
             )}
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{name || 'Toko Online'}</h1>
-              {address && <p className="text-sm text-gray-500 truncate max-w-md">{address}</p>}
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{name || 'Toko Online'}</h1>
+              {address && <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-md">{address}</p>}
             </div>
           </Link>
 
           <nav className="hidden md:flex items-center space-x-6">
-            <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium">Beranda</Link>
-            <Link href="/products" className="text-gray-600 hover:text-gray-900 font-medium">Produk</Link>
-            <Link href="/categories" className="text-gray-600 hover:text-gray-900 font-medium">Kategori</Link>
-            <Link href="/articles" className="text-gray-600 hover:text-gray-900 font-medium">Artikel</Link>
-            <Link href="/penawaran" className="font-semibold text-orange-600 hover:text-orange-700">Penawaran</Link>
-            <Link href="/orders" className="text-gray-600 hover:text-gray-900 font-medium">Pesanan Saya</Link>
+            <Link href="/" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors">Beranda</Link>
+            <Link href="/products" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors">Produk</Link>
+            <Link href="/categories" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors">Kategori</Link>
+            <Link href="/articles" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors">Artikel</Link>
+            <Link href="/penawaran" className="font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 transition-colors">Penawaran</Link>
+            <Link href="/orders" className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white font-medium transition-colors">Pesanan Saya</Link>
           </nav>
 
-          <div className="flex items-center space-x-3 sm:space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* Dark Mode Toggle */}
+            <ThemeToggle />
+
             {/* Real-time Cart Icon with Dynamic Count Badge */}
             <Link
               href="/cart"
-              className="relative p-2.5 rounded-full hover:bg-gray-100 transition-colors group"
+              className="relative p-2.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors group"
               title="Keranjang Belanja"
             >
-              <svg className="w-6 h-6 text-gray-600 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               {cartItemCount > 0 && (

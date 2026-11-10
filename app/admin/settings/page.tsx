@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import ImageUploader from '@/components/ImageUploader';
+import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector';
 import { getDefaultTerms, getDefaultPrivacy, DEFAULT_COOKIE_TITLE, DEFAULT_COOKIE_TEXT } from '@/lib/legalDefaults';
 
 interface SocialLinks {
@@ -172,9 +173,32 @@ interface AiForm {
 const EMPTY_AI_FORM: AiForm = {
   aiProvider: 'GEMINI',
   aiApiKey: '',
-  aiModel: 'gemini-1.5-flash',
+  aiModel: 'gemini-2.5-flash',
   aiCustomPrompt: '',
 };
+
+interface AvailableAiModel {
+  id: string;
+  name: string;
+  description?: string;
+  isRecommended?: boolean;
+}
+
+const DEFAULT_GEMINI_MODELS: AvailableAiModel[] = [
+  { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash (Generasi Terbaru - Super Cepat & Cerdas)', isRecommended: true },
+  { id: 'gemini-2.5-pro', name: 'gemini-2.5-pro (Penalaran Kompleks & Analisis Mendalam)' },
+  { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash (Multimodal Kecepatan Tinggi)' },
+  { id: 'gemini-1.5-flash', name: 'gemini-1.5-flash (Model Cepat Stabil, Kuota Gratis)' },
+  { id: 'gemini-1.5-pro', name: 'gemini-1.5-pro (Penalaran Panjang 1M Token)' },
+];
+
+const DEFAULT_OPENAI_MODELS: AvailableAiModel[] = [
+  { id: 'gpt-4o-mini', name: 'gpt-4o-mini (Cepat, Ringan & Hemat Biaya)', isRecommended: true },
+  { id: 'gpt-4o', name: 'gpt-4o (Model Flagship Cerdas Multimodal)' },
+  { id: 'o3-mini', name: 'o3-mini (Model Penalaran Reasoning Terbaru)' },
+  { id: 'o1-mini', name: 'o1-mini (Model Penalaran Cepat STEM)' },
+  { id: 'gpt-4-turbo', name: 'gpt-4-turbo (Model GPT-4 Konteks 128k)' },
+];
 
 interface NotificationForm {
   notifyTelegramEnabled: boolean;
@@ -206,7 +230,68 @@ const EMPTY_NOTIFICATION_FORM: NotificationForm = {
   notifyOnLowStock: true,
 };
 
-type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications';
+interface ShippingForm {
+  shippingOriginCity: string;
+  shippingFlatRateInner: number;
+  shippingFlatRateOuter: number;
+  shippingFreeThreshold: number | '';
+  // Ekspedisi Otomatis Biteship API
+  biteshipEnabled: boolean;
+  biteshipApiKey: string;
+  biteshipSandbox: boolean;
+  biteshipOriginAreaId: string;
+  biteshipOriginAddress: string;
+  biteshipOriginPostalCode: string;
+  biteshipOriginContactName: string;
+  biteshipOriginContactPhone: string;
+  biteshipEnabledCouriers: string;
+}
+
+const EMPTY_SHIPPING_FORM: ShippingForm = {
+  shippingOriginCity: '',
+  shippingFlatRateInner: 0,
+  shippingFlatRateOuter: 0,
+  shippingFreeThreshold: '',
+  biteshipEnabled: false,
+  biteshipApiKey: '',
+  biteshipSandbox: true,
+  biteshipOriginAreaId: '',
+  biteshipOriginAddress: '',
+  biteshipOriginPostalCode: '',
+  biteshipOriginContactName: '',
+  biteshipOriginContactPhone: '',
+  biteshipEnabledCouriers: 'jne,sicepat,jnt,anteraja,tiki,pos',
+};
+
+interface EmailForm {
+  smtpEnabled: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFromName: string;
+  smtpFromEmail: string;
+  smtpReplyTo: string;
+  smtpVerified: boolean;
+  smtpVerifiedAt: string | null;
+}
+
+const EMPTY_EMAIL_FORM: EmailForm = {
+  smtpEnabled: false,
+  smtpHost: '',
+  smtpPort: 587,
+  smtpSecure: false,
+  smtpUser: '',
+  smtpPass: '',
+  smtpFromName: '',
+  smtpFromEmail: '',
+  smtpReplyTo: '',
+  smtpVerified: false,
+  smtpVerifiedAt: null,
+};
+
+type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications' | 'shipping' | 'email';
 
 interface SettingsCategory {
   id: SettingsTab;
@@ -236,6 +321,13 @@ const SETTINGS_CATEGORIES: SettingsCategory[] = [
     icon: '🎨',
   },
   {
+    id: 'shipping',
+    title: 'Tarif Ongkir Manual',
+    subtitle: 'Biaya kirim dalam & luar kota',
+    icon: '🚚',
+    badge: 'Baru',
+  },
+  {
     id: 'integrations',
     title: 'Pixel & Keamanan',
     subtitle: 'Meta Pixel, Turnstile, & Sandbox',
@@ -259,6 +351,13 @@ const SETTINGS_CATEGORIES: SettingsCategory[] = [
     title: 'Notifikasi Otomatis',
     subtitle: 'Alert pesanan WhatsApp & Telegram',
     icon: '📲',
+    badge: 'Baru',
+  },
+  {
+    id: 'email',
+    title: 'Email & SMTP',
+    subtitle: 'Server SMTP, verifikasi domain & DNS',
+    icon: '✉️',
     badge: 'Baru',
   },
 ];
@@ -292,13 +391,41 @@ function AdminSettingsContent() {
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(EMPTY_PAYMENT_FORM);
   const [legalForm, setLegalForm] = useState<LegalForm>(EMPTY_LEGAL_FORM);
   const [aiForm, setAiForm] = useState<AiForm>(EMPTY_AI_FORM);
+  const [showAiApiKey, setShowAiApiKey] = useState(false);
+  const [fetchingAiModels, setFetchingAiModels] = useState(false);
+  const [aiModelsNotice, setAiModelsNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [fetchedAiModels, setFetchedAiModels] = useState<Record<'GEMINI' | 'OPENAI', AvailableAiModel[]>>({
+    GEMINI: DEFAULT_GEMINI_MODELS,
+    OPENAI: DEFAULT_OPENAI_MODELS,
+  });
+  const [isCustomAiModel, setIsCustomAiModel] = useState(false);
   const [notificationForm, setNotificationForm] = useState<NotificationForm>(EMPTY_NOTIFICATION_FORM);
+  const [shippingForm, setShippingForm] = useState<ShippingForm>(EMPTY_SHIPPING_FORM);
+  const [emailForm, setEmailForm] = useState<EmailForm>(EMPTY_EMAIL_FORM);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingVerification, setSendingVerification] = useState(false);
+  const [confirmingCode, setConfirmingCode] = useState(false);
+  const [verificationNotice, setVerificationNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [testRecipient, setTestRecipient] = useState('');
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [checkingDns, setCheckingDns] = useState(false);
+  const [dnsResult, setDnsResult] = useState<any | null>(null);
 
   const [testingAi, setTestingAi] = useState(false);
   const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const [testingNotify, setTestingNotify] = useState<'TELEGRAM' | 'WHATSAPP' | null>(null);
   const [notifyTestResult, setNotifyTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordChangeNotice, setPasswordChangeNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -369,12 +496,20 @@ function AdminSettingsContent() {
           flipSandboxApiKey: s.flipSandboxApiKey || '',
         });
 
+        const savedProvider = (s.aiProvider as 'GEMINI' | 'OPENAI') || 'GEMINI';
+        const defaultModel = savedProvider === 'OPENAI' ? 'gpt-4o-mini' : 'gemini-2.5-flash';
+        const savedModel = s.aiModel || defaultModel;
         setAiForm({
-          aiProvider: s.aiProvider || 'GEMINI',
+          aiProvider: savedProvider,
           aiApiKey: s.aiApiKey || '',
-          aiModel: s.aiModel || 'gemini-1.5-flash',
+          aiModel: savedModel,
           aiCustomPrompt: s.aiCustomPrompt || '',
         });
+        const currentList = savedProvider === 'OPENAI' ? DEFAULT_OPENAI_MODELS : DEFAULT_GEMINI_MODELS;
+        const existsInList = currentList.some((m) => m.id === savedModel);
+        if (!existsInList && savedModel) {
+          setIsCustomAiModel(true);
+        }
 
         setNotificationForm({
           notifyTelegramEnabled: s.notifyTelegramEnabled ?? false,
@@ -389,6 +524,36 @@ function AdminSettingsContent() {
           notifyOnPaymentProof: s.notifyOnPaymentProof ?? true,
           notifyOnPaymentSuccess: s.notifyOnPaymentSuccess ?? true,
           notifyOnLowStock: s.notifyOnLowStock ?? true,
+        });
+
+        setShippingForm({
+          shippingOriginCity: s.shippingOriginCity || '',
+          shippingFlatRateInner: typeof s.shippingFlatRateInner === 'number' ? s.shippingFlatRateInner : 0,
+          shippingFlatRateOuter: typeof s.shippingFlatRateOuter === 'number' ? s.shippingFlatRateOuter : 0,
+          shippingFreeThreshold: typeof s.shippingFreeThreshold === 'number' ? s.shippingFreeThreshold : '',
+          biteshipEnabled: Boolean(s.biteshipEnabled),
+          biteshipApiKey: s.biteshipApiKey || '',
+          biteshipSandbox: s.biteshipSandbox ?? true,
+          biteshipOriginAreaId: s.biteshipOriginAreaId || '',
+          biteshipOriginAddress: s.biteshipOriginAddress || '',
+          biteshipOriginPostalCode: s.biteshipOriginPostalCode || '',
+          biteshipOriginContactName: s.biteshipOriginContactName || '',
+          biteshipOriginContactPhone: s.biteshipOriginContactPhone || '',
+          biteshipEnabledCouriers: s.biteshipEnabledCouriers || 'jne,sicepat,jnt,anteraja,tiki,pos',
+        });
+
+        setEmailForm({
+          smtpEnabled: Boolean(s.smtpEnabled),
+          smtpHost: s.smtpHost || '',
+          smtpPort: s.smtpPort || 587,
+          smtpSecure: Boolean(s.smtpSecure),
+          smtpUser: s.smtpUser || '',
+          smtpPass: s.smtpPass || '',
+          smtpFromName: s.smtpFromName || '',
+          smtpFromEmail: s.smtpFromEmail || '',
+          smtpReplyTo: s.smtpReplyTo || '',
+          smtpVerified: Boolean(s.smtpVerified),
+          smtpVerifiedAt: s.smtpVerifiedAt || null,
         });
       }
 
@@ -461,6 +626,49 @@ function AdminSettingsContent() {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordChangeNotice(null);
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordChangeNotice({ type: 'error', text: 'Password baru minimal 6 karakter.' });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordChangeNotice({ type: 'error', text: 'Konfirmasi password baru tidak cocok.' });
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const headers = authHeaders();
+      if (!headers) {
+        setPasswordChangeNotice({ type: 'error', text: 'Anda harus login terlebih dahulu.' });
+        return;
+      }
+
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(passwordForm),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordChangeNotice({ type: 'error', text: data.error || 'Gagal memperbarui password.' });
+        return;
+      }
+
+      setPasswordChangeNotice({ type: 'success', text: data.message || 'Password berhasil diperbarui!' });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch {
+      setPasswordChangeNotice({ type: 'error', text: 'Terjadi gangguan jaringan saat mengubah password.' });
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -562,6 +770,211 @@ function AdminSettingsContent() {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveShipping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const payload = {
+        shippingOriginCity: shippingForm.shippingOriginCity ? shippingForm.shippingOriginCity.trim() : null,
+        shippingFlatRateInner: Number(shippingForm.shippingFlatRateInner) || 0,
+        shippingFlatRateOuter: Number(shippingForm.shippingFlatRateOuter) || 0,
+        shippingFreeThreshold:
+          shippingForm.shippingFreeThreshold !== '' && Number(shippingForm.shippingFreeThreshold) > 0
+            ? Number(shippingForm.shippingFreeThreshold)
+            : null,
+        biteshipEnabled: Boolean(shippingForm.biteshipEnabled),
+        biteshipApiKey: shippingForm.biteshipApiKey ? shippingForm.biteshipApiKey.trim() : null,
+        biteshipSandbox: Boolean(shippingForm.biteshipSandbox),
+        biteshipOriginAreaId: shippingForm.biteshipOriginAreaId ? shippingForm.biteshipOriginAreaId.trim() : null,
+        biteshipOriginAddress: shippingForm.biteshipOriginAddress ? shippingForm.biteshipOriginAddress.trim() : null,
+        biteshipOriginPostalCode: shippingForm.biteshipOriginPostalCode ? shippingForm.biteshipOriginPostalCode.trim() : null,
+        biteshipOriginContactName: shippingForm.biteshipOriginContactName ? shippingForm.biteshipOriginContactName.trim() : null,
+        biteshipOriginContactPhone: shippingForm.biteshipOriginContactPhone ? shippingForm.biteshipOriginContactPhone.trim() : null,
+        biteshipEnabledCouriers: shippingForm.biteshipEnabledCouriers ? shippingForm.biteshipEnabledCouriers.trim() : 'jne,sicepat,jnt,anteraja,tiki,pos',
+      };
+
+      const res = await fetch('/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan pengaturan tarif ongkir.');
+      }
+
+      setNotice('Pengaturan tarif ongkir manual berhasil disimpan.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan pengaturan ongkir.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const payload = {
+        smtpEnabled: Boolean(emailForm.smtpEnabled),
+        smtpHost: emailForm.smtpHost ? emailForm.smtpHost.trim() : null,
+        smtpPort: Number(emailForm.smtpPort) || 587,
+        smtpSecure: Boolean(emailForm.smtpSecure),
+        smtpUser: emailForm.smtpUser ? emailForm.smtpUser.trim() : null,
+        smtpPass: emailForm.smtpPass ? emailForm.smtpPass.trim() : null,
+        smtpFromName: emailForm.smtpFromName ? emailForm.smtpFromName.trim() : null,
+        smtpFromEmail: emailForm.smtpFromEmail ? emailForm.smtpFromEmail.trim() : null,
+        smtpReplyTo: emailForm.smtpReplyTo ? emailForm.smtpReplyTo.trim() : null,
+      };
+
+      const res = await fetch('/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Gagal menyimpan konfigurasi server SMTP.');
+      }
+
+      setNotice('Konfigurasi server SMTP berhasil disimpan!');
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan pengaturan email.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendVerificationCode = async () => {
+    if (!emailForm.smtpFromEmail) {
+      setVerificationNotice({ type: 'error', text: 'Masukkan alamat email pengirim terlebih dahulu' });
+      return;
+    }
+    setSendingVerification(true);
+    setVerificationNotice(null);
+    try {
+      const headers = authHeaders();
+      const res = await fetch('/api/admin/settings/email/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          email: emailForm.smtpFromEmail,
+          host: emailForm.smtpHost,
+          port: Number(emailForm.smtpPort),
+          secure: emailForm.smtpSecure,
+          user: emailForm.smtpUser,
+          pass: emailForm.smtpPass,
+          fromName: emailForm.smtpFromName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal mengirim kode verifikasi');
+      setVerificationNotice({ type: 'success', text: data.message });
+    } catch (err: any) {
+      setVerificationNotice({ type: 'error', text: err.message || 'Gagal mengirim kode verifikasi' });
+    } finally {
+      setSendingVerification(false);
+    }
+  };
+
+  const handleConfirmVerificationCode = async () => {
+    if (!verificationCode) {
+      setVerificationNotice({ type: 'error', text: 'Masukkan 6-digit kode verifikasi' });
+      return;
+    }
+    setConfirmingCode(true);
+    setVerificationNotice(null);
+    try {
+      const headers = authHeaders();
+      const res = await fetch('/api/admin/settings/email/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ code: verificationCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Kode verifikasi tidak valid');
+      setVerificationNotice({ type: 'success', text: data.message });
+      setEmailForm((prev) => ({ ...prev, smtpVerified: true, smtpVerifiedAt: new Date().toISOString() }));
+      setVerificationCode('');
+    } catch (err: any) {
+      setVerificationNotice({ type: 'error', text: err.message || 'Gagal memverifikasi kode' });
+    } finally {
+      setConfirmingCode(false);
+    }
+  };
+
+  const handleCheckDns = async () => {
+    const domain = emailForm.smtpFromEmail ? emailForm.smtpFromEmail.split('@')[1] : '';
+    if (!domain) {
+      setError('Masukkan alamat email pengirim yang valid untuk memeriksa DNS domain');
+      return;
+    }
+    setCheckingDns(true);
+    setError(null);
+    try {
+      const headers = authHeaders();
+      const res = await fetch('/api/admin/settings/email/check-dns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ domain }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal memeriksa DNS domain');
+      setDnsResult(data.dns);
+    } catch (err: any) {
+      setError(err.message || 'Gagal memeriksa DNS domain');
+    } finally {
+      setCheckingDns(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!testRecipient) {
+      setEmailTestResult({ success: false, message: 'Masukkan alamat email penerima uji coba' });
+      return;
+    }
+    setTestingEmail(true);
+    setEmailTestResult(null);
+    try {
+      const headers = authHeaders();
+      const res = await fetch('/api/admin/settings/email/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({
+          recipient: testRecipient,
+          host: emailForm.smtpHost,
+          port: Number(emailForm.smtpPort),
+          secure: emailForm.smtpSecure,
+          user: emailForm.smtpUser,
+          pass: emailForm.smtpPass,
+          fromName: emailForm.smtpFromName,
+          fromEmail: emailForm.smtpFromEmail,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal mengirim email uji coba');
+      setEmailTestResult({ success: true, message: data.message });
+    } catch (err: any) {
+      setEmailTestResult({ success: false, message: err.message || 'Error pengiriman email uji coba' });
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -717,6 +1130,62 @@ function AdminSettingsContent() {
       });
     } finally {
       setTestingAi(false);
+    }
+  };
+
+  const handleFetchAiModels = async () => {
+    setFetchingAiModels(true);
+    setAiModelsNotice(null);
+    try {
+      const headers = authHeaders();
+      if (!headers) throw new Error('Anda harus login terlebih dahulu.');
+
+      const res = await fetch('/api/admin/ai/models', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: aiForm.aiProvider,
+          apiKey: aiForm.aiApiKey,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setAiModelsNotice({
+          type: 'error',
+          text: data.error || 'Gagal memuat daftar model dari provider. Menampilkan daftar standar.',
+        });
+        if (data.models && data.models.length > 0) {
+          setFetchedAiModels((prev) => ({
+            ...prev,
+            [aiForm.aiProvider]: data.models,
+          }));
+        }
+      } else {
+        const models: AvailableAiModel[] = data.models || [];
+        setFetchedAiModels((prev) => ({
+          ...prev,
+          [aiForm.aiProvider]: models,
+        }));
+        setAiModelsNotice({
+          type: 'success',
+          text: `Berhasil memuat ${models.length} model aktif dari ${aiForm.aiProvider === 'GEMINI' ? 'Google Gemini' : 'OpenAI'}!`,
+        });
+
+        // If current model is not found in fetched models and not custom, switch to recommended or first
+        const exists = models.some((m) => m.id === aiForm.aiModel);
+        if (!exists && models.length > 0 && !isCustomAiModel) {
+          const rec = models.find((m) => m.isRecommended) || models[0];
+          setAiForm((prev) => ({ ...prev, aiModel: rec.id }));
+        }
+      }
+    } catch (err: any) {
+      setAiModelsNotice({
+        type: 'error',
+        text: err.message || 'Terjadi kesalahan saat memuat model AI.',
+      });
+    } finally {
+      setFetchingAiModels(false);
     }
   };
 
@@ -896,6 +1365,7 @@ function AdminSettingsContent() {
 
       {/* TAB 1: IDENTITAS TOKO */}
       {activeTab === 'general' && (
+        <>
         <form onSubmit={saveGeneral} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
           <div className="border-b border-gray-100 pb-4">
             <h2 className="text-lg font-semibold text-gray-900">Profil & Branding</h2>
@@ -1118,6 +1588,90 @@ function AdminSettingsContent() {
             </button>
           </div>
         </form>
+
+        {/* KARTU KEAMANAN AKUN & GANTI PASSWORD ADMIN */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+          <div className="border-b border-gray-100 pb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <span>🔐</span> Keamanan Akun & Ganti Password Admin
+            </h2>
+            <p className="text-xs text-gray-500 mt-1">
+              Perbarui kata sandi akun administrator Anda secara mandiri untuk menjaga keamanan akses toko.
+            </p>
+          </div>
+
+          {passwordChangeNotice && (
+            <div
+              className={`p-3 text-sm rounded-lg ${
+                passwordChangeNotice.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}
+            >
+              {passwordChangeNotice.text}
+            </div>
+          )}
+
+          <form onSubmit={handleChangePassword} className="space-y-4 max-w-xl">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kata Sandi Saat Ini
+              </label>
+              <input
+                type="password"
+                required
+                value={passwordForm.currentPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                placeholder="Ketik kata sandi Anda saat ini"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                disabled={changingPassword}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kata Sandi Baru
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="Minimal 6 karakter"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  disabled={changingPassword}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Konfirmasi Kata Sandi Baru
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="Ulangi kata sandi baru"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  disabled={changingPassword}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={changingPassword || !passwordForm.currentPassword || !passwordForm.newPassword}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2 rounded-lg text-sm font-medium disabled:opacity-50 transition-colors shadow-xs"
+            >
+              {changingPassword ? 'Memperbarui...' : 'Perbarui Password Admin'}
+            </button>
+          </form>
+        </div>
+        </>
       )}
 
       {/* TAB 2: HERO SECTION BUILDER */}
@@ -1920,17 +2474,31 @@ function AdminSettingsContent() {
                 Hubungkan API Key AI toko Anda untuk mengaktifkan AI Copilot di panel kanan, generator copywriting, dan analisa penjualan.
               </p>
             </div>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition shrink-0"
-            >
-              <span>🔑 Dapatkan Gemini API Key Gratis</span>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
+            {aiForm.aiProvider === 'GEMINI' ? (
+              <a
+                href="https://aistudio.google.com/app/apikey"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-lg hover:bg-blue-100 transition shrink-0"
+              >
+                <span>🔑 Dapatkan Gemini API Key Gratis di Google AI Studio</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            ) : (
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium rounded-lg hover:bg-emerald-100 transition shrink-0"
+              >
+                <span>🔑 Dapatkan OpenAI API Key di OpenAI Platform</span>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1942,44 +2510,111 @@ function AdminSettingsContent() {
                 value={aiForm.aiProvider}
                 onChange={(e) => {
                   const prov = e.target.value as 'GEMINI' | 'OPENAI';
+                  const defaultModel = prov === 'GEMINI' ? 'gemini-2.5-flash' : 'gpt-4o-mini';
                   setAiForm({
                     ...aiForm,
                     aiProvider: prov,
-                    aiModel: prov === 'GEMINI' ? 'gemini-1.5-flash' : 'gpt-4o-mini',
+                    aiModel: defaultModel,
                   });
+                  setIsCustomAiModel(false);
+                  setAiTestResult(null);
+                  setAiModelsNotice(null);
                 }}
                 className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="GEMINI">Google Gemini (Disarankan - Cepat, Cerdas & Kuota Gratis)</option>
-                <option value="OPENAI">OpenAI (ChatGPT)</option>
+                <option value="GEMINI">Google Gemini (Disarankan - Model Generasi Terbaru & Kuota Gratis)</option>
+                <option value="OPENAI">OpenAI (ChatGPT / GPT-4o / Reasoning)</option>
               </select>
               <p className="text-xs text-gray-400 mt-1.5">
-                Google Gemini 1.5 Flash menyediakan kuota Free Tier resmi tanpa biaya per bulan.
+                {aiForm.aiProvider === 'GEMINI'
+                  ? 'Google Gemini menyediakan kuota Free Tier resmi yang sangat besar tanpa biaya langganan bulanan.'
+                  : 'OpenAI memerlukan akun OpenAI Platform dengan saldo kredit aktif untuk penggunaan API.'}
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">
-                Pilihan Model AI
-              </label>
-              <select
-                value={aiForm.aiModel}
-                onChange={(e) => setAiForm({ ...aiForm, aiModel: e.target.value })}
-                className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {aiForm.aiProvider === 'GEMINI' ? (
-                  <>
-                    <option value="gemini-1.5-flash">gemini-1.5-flash (Paling Cepat, Hemat Biaya)</option>
-                    <option value="gemini-2.0-flash">gemini-2.0-flash (Generasi Terbaru)</option>
-                    <option value="gemini-1.5-pro">gemini-1.5-pro (Penalaran Kompleks)</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="gpt-4o-mini">gpt-4o-mini (Cepat & Ringan)</option>
-                    <option value="gpt-4o">gpt-4o (Kemampuan Tertinggi)</option>
-                  </>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Pilihan Model AI
+                </label>
+                <button
+                  type="button"
+                  onClick={handleFetchAiModels}
+                  disabled={fetchingAiModels || !aiForm.aiApiKey}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:opacity-40 flex items-center space-x-1"
+                  title="Ambil daftar model aktif langsung dari API provider"
+                >
+                  {fetchingAiModels ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      <span>Memuat Model...</span>
+                    </>
+                  ) : (
+                    <span>🔄 Tarik Model Tersedia</span>
+                  )}
+                </button>
+              </div>
+
+              {!isCustomAiModel ? (
+                <select
+                  value={aiForm.aiModel}
+                  onChange={(e) => {
+                    if (e.target.value === '__custom__') {
+                      setIsCustomAiModel(true);
+                    } else {
+                      setAiForm({ ...aiForm, aiModel: e.target.value });
+                    }
+                  }}
+                  className="w-full text-sm border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {(fetchedAiModels[aiForm.aiProvider] || []).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name || m.id} {m.isRecommended ? '⭐ (Rekomendasi)' : ''}
+                    </option>
+                  ))}
+                  <option value="__custom__">➕ Ketik ID Model Manual / Eksperimental...</option>
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={aiForm.aiModel}
+                      onChange={(e) => setAiForm({ ...aiForm, aiModel: e.target.value.trim() })}
+                      placeholder="Contoh: gemini-2.5-flash atau gpt-4o-mini"
+                      className="flex-1 text-sm font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomAiModel(false);
+                        const firstModel =
+                          (fetchedAiModels[aiForm.aiProvider] || [])[0]?.id ||
+                          (aiForm.aiProvider === 'GEMINI' ? 'gemini-2.5-flash' : 'gpt-4o-mini');
+                        setAiForm({ ...aiForm, aiModel: firstModel });
+                      }}
+                      className="text-xs px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
+                    >
+                      Kembali ke Pilihan
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Mode input manual aktif. Anda dapat memasukkan ID model eksperimental atau fine-tuned model Anda.
+                  </p>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-1.5 flex items-center justify-between">
+                <span>
+                  Model aktif:{' '}
+                  <span className="font-mono text-indigo-600 font-semibold">{aiForm.aiModel}</span>
+                </span>
+                {aiForm.aiApiKey && (
+                  <span className="text-[11px] text-gray-400">
+                    Klik &quot;Tarik Model Tersedia&quot; untuk sinkronisasi daftar API
+                  </span>
                 )}
-              </select>
+              </p>
             </div>
           </div>
 
@@ -1997,20 +2632,80 @@ function AdminSettingsContent() {
                 {testingAi ? (
                   <>
                     <div className="w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                    <span>Menguji...</span>
+                    <span>Menguji Koneksi...</span>
                   </>
                 ) : (
                   <span>⚡ Uji Koneksi API Key</span>
                 )}
               </button>
             </div>
-            <input
-              type="password"
-              value={aiForm.aiApiKey}
-              onChange={(e) => setAiForm({ ...aiForm, aiApiKey: e.target.value })}
-              placeholder={aiForm.aiProvider === 'GEMINI' ? 'AIzaSy...' : 'sk-...'}
-              className="w-full text-sm font-mono border-gray-300 rounded-lg shadow-2xs focus:ring-indigo-500 focus:border-indigo-500"
-            />
+
+            <div className="relative">
+              <input
+                type={showAiApiKey ? 'text' : 'password'}
+                value={aiForm.aiApiKey}
+                onChange={(e) => setAiForm({ ...aiForm, aiApiKey: e.target.value.trim() })}
+                placeholder={aiForm.aiProvider === 'GEMINI' ? 'AIzaSy...' : 'sk-...'}
+                className="w-full text-sm font-mono border-gray-300 rounded-lg shadow-2xs pr-10 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAiApiKey(!showAiApiKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-hidden p-1"
+                title={showAiApiKey ? 'Sembunyikan API Key' : 'Tampilkan API Key'}
+              >
+                {showAiApiKey ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"
+                    />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {aiForm.aiApiKey === '********' ? (
+              <p className="text-xs text-emerald-600 mt-1.5 flex items-center space-x-1">
+                <span>🔒</span>
+                <span>API Key tersimpan dengan aman di database. Ketik atau tempel kunci baru jika Anda ingin menggantinya.</span>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1.5">
+                API Key disimpan terenkripsi di database toko Anda dan tidak dibagikan ke toko lain (Multi-Tenant BYOK).
+              </p>
+            )}
+
+            {aiModelsNotice && (
+              <div
+                className={`mt-2 p-2.5 rounded-lg text-xs flex items-center space-x-2 ${
+                  aiModelsNotice.type === 'success'
+                    ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200'
+                }`}
+              >
+                <span>{aiModelsNotice.type === 'success' ? 'ℹ️' : '⚠️'}</span>
+                <span>{aiModelsNotice.text}</span>
+              </div>
+            )}
+
             {aiTestResult && (
               <div
                 className={`mt-2 p-2.5 rounded-lg text-xs flex items-center space-x-2 ${
@@ -2367,6 +3062,716 @@ function AdminSettingsContent() {
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB 8: PENGATURAN PENGIRIMAN & EKSPEDISI (BITESHIP & FLAT RATE) */}
+      {activeTab === 'shipping' && (
+        <form onSubmit={saveShipping} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-8">
+          <div className="border-b border-gray-100 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                  <span>🚚 Pengaturan Pengiriman & Ekspedisi (Biteship API)</span>
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Kelola tarif ongkos kirim otomatis multi-kurir (JNE, SiCepat, J&T, dll.) via Biteship API atau gunakan tarif flat manual.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                <span className="text-xs font-semibold text-gray-700">Integrasi Biteship:</span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={shippingForm.biteshipEnabled}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${shippingForm.biteshipEnabled ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'}`}>
+                  {shippingForm.biteshipEnabled ? 'AKTIF' : 'NONAKTIF'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION: BITESHIP CONFIGURATION */}
+          {shippingForm.biteshipEnabled && (
+            <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-6">
+              <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+                <h3 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                  <span>⚡ Kredensial & Lokasi Asal Biteship</span>
+                </h3>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-900">
+                  <input
+                    type="checkbox"
+                    checked={shippingForm.biteshipSandbox}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipSandbox: e.target.checked })}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>Mode Sandbox / Uji Coba (Biteship Simulator)</span>
+                </label>
+              </div>
+
+              {/* SMART ORIGIN SELECTOR (EMSIFA WILAYAH INDONESIA) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-gray-700">
+                  📍 Bantuan Penentuan Lokasi Gudang / Toko Asal (EMSIFA Wilayah Indonesia)
+                </label>
+                <AddressLocationSelector
+                  compact={true}
+                  initialPostalCode={shippingForm.biteshipOriginPostalCode}
+                  initialStreetAddress={shippingForm.biteshipOriginAddress}
+                  required={false}
+                  onChange={(loc: SelectedLocationData) => {
+                    setShippingForm((prev) => ({
+                      ...prev,
+                      biteshipOriginPostalCode: loc.postalCode,
+                      biteshipOriginAddress: loc.fullFormattedAddress,
+                      shippingOriginCity: loc.regencyName,
+                    }));
+                  }}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Biteship API Secret Key
+                  </label>
+                  <input
+                    type="password"
+                    value={shippingForm.biteshipApiKey}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipApiKey: e.target.value })}
+                    placeholder="biteship_test.xxx... atau biteship_live.xxx..."
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Dapatkan API Key di <a href="https://biteship.com/dashboard/api-keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">Dashboard Biteship</a>. Kosongkan jika ingin menggunakan simulator lokal otomatis.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Biteship Area ID Asal Pengirim (Origin Area ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingForm.biteshipOriginAreaId}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipOriginAreaId: e.target.value })}
+                    placeholder="Contoh: IDNP9IDNC167IDND5120"
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    ID Area Biteship untuk tingkat akurasi tarif maksimal.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Nama Kontak Pengirim / Gudang
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingForm.biteshipOriginContactName}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipOriginContactName: e.target.value })}
+                    placeholder="Nama Toko / Petugas Dispatch"
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    No. Telepon / WhatsApp Pengirim (Pickup)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingForm.biteshipOriginContactPhone}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipOriginContactPhone: e.target.value })}
+                    placeholder="081234567890"
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Kode Pos Asal Toko
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingForm.biteshipOriginPostalCode}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipOriginPostalCode: e.target.value })}
+                    placeholder="Contoh: 40132"
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    Alamat Lengkap Gudang / Toko Asal (Pick-up)
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingForm.biteshipOriginAddress}
+                    onChange={(e) => setShippingForm({ ...shippingForm, biteshipOriginAddress: e.target.value })}
+                    placeholder="Jl. Sukajadi No. 123, Sukajadi, Kota Bandung"
+                    className="w-full px-3.5 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Kurir yang Diaktifkan */}
+              <div className="pt-2">
+                <label className="block text-xs font-bold text-gray-700 mb-2">
+                  Pilihan Ekspedisi Kurir yang Ditawarkan ke Pelanggan:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {[
+                    { code: 'jne', label: 'JNE Express' },
+                    { code: 'sicepat', label: 'SiCepat Ekspres' },
+                    { code: 'jnt', label: 'J&T Express' },
+                    { code: 'anteraja', label: 'Anteraja' },
+                    { code: 'tiki', label: 'TIKI' },
+                    { code: 'pos', label: 'POS Indonesia' },
+                    { code: 'gojek', label: 'GoSend (Instant)' },
+                    { code: 'grab', label: 'GrabExpress' },
+                  ].map((courier) => {
+                    const activeList = (shippingForm.biteshipEnabledCouriers || '').split(',').map((c) => c.trim().toLowerCase());
+                    const isChecked = activeList.includes(courier.code);
+                    return (
+                      <label
+                        key={courier.code}
+                        className={`flex items-center gap-2.5 p-3 rounded-xl border text-xs font-semibold cursor-pointer transition ${
+                          isChecked
+                            ? 'bg-white border-indigo-600 text-indigo-900 shadow-xs ring-1 ring-indigo-500'
+                            : 'bg-white/60 border-gray-200 text-gray-600 hover:bg-white'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            let updated: string[];
+                            if (e.target.checked) {
+                              updated = [...activeList, courier.code];
+                            } else {
+                              updated = activeList.filter((c) => c !== courier.code);
+                            }
+                            setShippingForm({ ...shippingForm, biteshipEnabledCouriers: updated.filter(Boolean).join(',') });
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>{courier.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SECTION: FLAT RATE & FALLBACK */}
+          <div className="space-y-6 pt-2">
+            <div className="border-b border-gray-100 pb-2">
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <span>📦 Tarif Ongkir Flat Manual {shippingForm.biteshipEnabled ? '(Sebagai Cadangan / Fallback)' : ''}</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {shippingForm.biteshipEnabled
+                  ? 'Tarif ini akan otomatis digunakan bila layanan kurir Biteship tidak menjangkau lokasi pelanggan atau dinonaktifkan.'
+                  : 'Tarif flat yang akan ditagihkan ke pelanggan berdasarkan pilihan zona Dalam Kota atau Luar Kota.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Kota / Kabupaten Asal Pengiriman Toko
+              </label>
+              <input
+                type="text"
+                value={shippingForm.shippingOriginCity}
+                onChange={(e) => setShippingForm({ ...shippingForm, shippingOriginCity: e.target.value })}
+                placeholder="Contoh: Bandung, Jawa Barat"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Akan ditampilkan pada halaman keranjang pelanggan sebagai acuan wilayah lokal toko.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label className="block text-sm font-semibold text-gray-900 mb-1">
+                  Tarif Ongkir Dalam Kota (Rp)
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Biaya kirim flat untuk pelanggan di dalam kota / area lokal toko.
+                </p>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-semibold text-gray-500">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={shippingForm.shippingFlatRateInner}
+                    onChange={(e) => setShippingForm({ ...shippingForm, shippingFlatRateInner: Number(e.target.value) || 0 })}
+                    placeholder="10000"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <label className="block text-sm font-semibold text-gray-900 mb-1">
+                  Tarif Ongkir Luar Kota (Rp)
+                </label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Biaya kirim flat untuk pengiriman antar kota atau luar provinsi.
+                </p>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-semibold text-gray-500">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    value={shippingForm.shippingFlatRateOuter}
+                    onChange={(e) => setShippingForm({ ...shippingForm, shippingFlatRateOuter: Number(e.target.value) || 0 })}
+                    placeholder="25000"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Minimal Belanja untuk Bebas Ongkir (Gratis Ongkir) — Opsional
+              </label>
+              <div className="relative max-w-md">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-sm font-semibold text-gray-500">
+                  Rp
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="10000"
+                  value={shippingForm.shippingFreeThreshold}
+                  onChange={(e) => setShippingForm({ ...shippingForm, shippingFreeThreshold: e.target.value === '' ? '' : Number(e.target.value) })}
+                  placeholder="Kosongkan jika tidak ada gratis ongkir (misal: 200000)"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Jika subtotal pesanan pelanggan mencapai nominal ini, ongkos kirim akan otomatis menjadi Rp 0 (Gratis Ongkir).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-4 border-t border-gray-100">
+            <button
+              type="submit"
+              disabled={saving}
+              className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
+            >
+              {saving ? 'Menyimpan...' : 'Simpan Pengaturan Pengiriman'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* TAB 9: EMAIL & SMTP SERVER */}
+      {activeTab === 'email' && (
+        <div className="space-y-8">
+          {/* Bagian 1: Konfigurasi Server SMTP */}
+          <form onSubmit={saveEmail} className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-6 space-y-6">
+            <div className="border-b border-gray-100 dark:border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                  <span>✉️ Konfigurasi Server SMTP & Pengiriman Email</span>
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400">
+                  Gunakan server SMTP Anda sendiri (Gmail Workspace, Zoho, cPanel, Brevo, Mailgun, AWS SES) untuk mengirimkan invoice dan notifikasi pesanan.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={emailForm.smtpEnabled}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 dark:bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                <span className="ml-3 text-sm font-semibold text-gray-800 dark:text-slate-200">
+                  {emailForm.smtpEnabled ? 'Aktif' : 'Nonaktif'}
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Host Server SMTP <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={emailForm.smtpHost}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpHost: e.target.value })}
+                  placeholder="smtp.gmail.com atau mail.domainanda.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Contoh: <code>smtp.gmail.com</code> (Google), <code>smtp.zoho.com</code>, <code>smtp-relay.brevo.com</code>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Port Server <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={emailForm.smtpPort}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpPort: Number(e.target.value) || 587 })}
+                  placeholder="587"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Standar: <strong>587</strong> (STARTTLS) atau <strong>465</strong> (SSL)</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="smtpSecure"
+                checked={emailForm.smtpSecure}
+                onChange={(e) => setEmailForm({ ...emailForm, smtpSecure: e.target.checked })}
+                className="h-4 w-4 text-indigo-600 rounded border-gray-300 dark:border-slate-700 focus:ring-indigo-500"
+              />
+              <label htmlFor="smtpSecure" className="text-sm font-medium text-gray-700 dark:text-slate-200 cursor-pointer">
+                Gunakan enkripsi SSL/TLS langsung (Centang jika menggunakan port 465)
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Username SMTP / Akun Email
+                </label>
+                <input
+                  type="text"
+                  value={emailForm.smtpUser}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpUser: e.target.value })}
+                  placeholder="admin@domainanda.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-200">
+                    Password / App Password SMTP
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition"
+                  >
+                    {showSmtpPass ? 'Sembunyikan' : 'Tampilkan'}
+                  </button>
+                </div>
+                <input
+                  type={showSmtpPass ? 'text' : 'password'}
+                  value={emailForm.smtpPass}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpPass: e.target.value })}
+                  placeholder={emailForm.smtpPass === '********' ? '******** (Tersimpan)' : 'Masukkan password atau app password'}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-mono text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                  Untuk Gmail pastikan menggunakan <em>App Password 16-digit</em> dari Google Account Security.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Nama Pengirim Toko
+                </label>
+                <input
+                  type="text"
+                  value={emailForm.smtpFromName}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpFromName: e.target.value })}
+                  placeholder="AI SEO Demo Store"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Alamat Email Pengirim (From Email) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={emailForm.smtpFromEmail}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpFromEmail: e.target.value })}
+                  placeholder="halo@domainanda.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                  Alamat Reply-To (Opsional)
+                </label>
+                <input
+                  type="email"
+                  value={emailForm.smtpReplyTo}
+                  onChange={(e) => setEmailForm({ ...emailForm, smtpReplyTo: e.target.value })}
+                  placeholder="support@domainanda.com"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-800">
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
+              >
+                {saving ? 'Menyimpan...' : 'Simpan Konfigurasi SMTP'}
+              </button>
+            </div>
+          </form>
+
+          {/* Bagian 2: Verifikasi Kepemilikan Email Pengirim */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-6 space-y-5">
+            <div className="border-b border-gray-100 dark:border-slate-800 pb-4">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                <span>🔐 Verifikasi Kepemilikan Alamat Email (Ownership Challenge)</span>
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                Pastikan Anda benar-benar memiliki akses ke kotak masuk email pengirim ini untuk mencegah penyalahgunaan alamat (anti-spoofing).
+              </p>
+            </div>
+
+            {/* Status Badge */}
+            {emailForm.smtpVerified ? (
+              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl flex items-start gap-3 text-emerald-900 dark:text-emerald-200">
+                <span className="text-2xl shrink-0">✅</span>
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-200">Kepemilikan Email Telah Terverifikasi</h4>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
+                    Alamat <strong>{emailForm.smtpFromEmail}</strong> sah dan terhubung dengan toko ini.
+                    {emailForm.smtpVerifiedAt && ` (Diverifikasi pada: ${new Date(emailForm.smtpVerifiedAt).toLocaleString('id-ID')})`}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-3 text-amber-900 dark:text-amber-200">
+                <span className="text-2xl shrink-0">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">Alamat Email Belum Diverifikasi</h4>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-0.5 leading-relaxed">
+                    Sistem mewajibkan konfirmasi kepemilikan sebelum alamat ini digunakan untuk mengirimkan email resmi ke pelanggan.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleSendVerificationCode}
+                      disabled={sendingVerification || !emailForm.smtpFromEmail}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition shadow-xs"
+                    >
+                      {sendingVerification ? 'Mengirim Kode...' : `Kirim Kode Verifikasi ke ${emailForm.smtpFromEmail || 'Email'}`}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Form Input Kode Verifikasi */}
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-slate-700">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Konfirmasi Kode 6-Digit OTP
+              </label>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="Contoh: 849201"
+                  className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-mono tracking-widest text-center sm:text-left focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 max-w-xs text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleConfirmVerificationCode}
+                  disabled={confirmingCode || verificationCode.length < 4}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition shadow-xs"
+                >
+                  {confirmingCode ? 'Memverifikasi...' : 'Konfirmasi Kode'}
+                </button>
+              </div>
+
+              {verificationNotice && (
+                <p className={`text-xs mt-2 font-medium ${verificationNotice.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {verificationNotice.text}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Bagian 3: Asisten Konfigurasi DNS & Petunjuk Provider Email */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-6 space-y-6">
+            <div className="border-b border-gray-100 dark:border-slate-800 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                  <span>🛡️ Asisten DNS Deliverability (SPF, DKIM, DMARC, MX)</span>
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Panduan konfigurasi DNS Record di Cloudflare / DNS Manager untuk memastikan email masuk ke kotak masuk (Inbox), bukan folder Spam.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCheckDns}
+                disabled={checkingDns || !emailForm.smtpFromEmail}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition shadow-xs shrink-0"
+              >
+                <span>🔍</span>
+                <span>{checkingDns ? 'Memeriksa DNS...' : 'Periksa Record DNS'}</span>
+              </button>
+            </div>
+
+            {/* DNS Records Table / Guidance Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* SPF Card */}
+              <div className="p-4 border rounded-xl bg-gray-50/70 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-900 dark:text-white uppercase">1. Record SPF (Sender Policy)</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dnsResult?.spf?.valid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
+                    {dnsResult ? (dnsResult.spf.valid ? 'Aktif ✓' : 'Belum Terdeteksi') : 'Status: Siap Dicek'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-slate-300">
+                  Otorisasi server yang berhak mengirim email atas nama domain Anda.
+                </p>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded border border-gray-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 break-all select-all">
+                  Type: TXT | Name: @ | Value: v=spf1 include:_spf.google.com ~all
+                </div>
+                {dnsResult?.spf?.record && (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400">Ditemukan di DNS: <code>{dnsResult.spf.record}</code></p>
+                )}
+              </div>
+
+              {/* DMARC Card */}
+              <div className="p-4 border rounded-xl bg-gray-50/70 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-900 dark:text-white uppercase">2. Record DMARC</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dnsResult?.dmarc?.valid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'}`}>
+                    {dnsResult ? (dnsResult.dmarc.valid ? 'Aktif ✓' : 'Belum Terdeteksi') : 'Status: Siap Dicek'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-slate-300">
+                  Melindungi domain dari pemalsuan email (phishing & email spoofing).
+                </p>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded border border-gray-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 break-all select-all">
+                  Type: TXT | Name: _dmarc | Value: v=DMARC1; p=none;
+                </div>
+                {dnsResult?.dmarc?.record && (
+                  <p className="text-[11px] text-emerald-700 dark:text-emerald-400">Ditemukan di DNS: <code>{dnsResult.dmarc.record}</code></p>
+                )}
+              </div>
+
+              {/* DKIM Card */}
+              <div className="p-4 border rounded-xl bg-gray-50/70 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-900 dark:text-white uppercase">3. Record DKIM (Signature)</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                    Dari Provider
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-slate-300">
+                  Tanda tangan kriptografi pada email. Dapatkan TXT record DKIM dari dashboard penyedia email Anda (Google Workspace / Zoho / Brevo).
+                </p>
+                <div className="bg-white dark:bg-slate-900 p-2.5 rounded border border-gray-200 dark:border-slate-700 text-xs font-mono text-slate-600 dark:text-slate-400">
+                  Type: TXT | Name: [selector]._domainkey | Value: [kunci_publik_dkim]
+                </div>
+              </div>
+
+              {/* MX Card */}
+              <div className="p-4 border rounded-xl bg-gray-50/70 dark:bg-slate-800/50 border-gray-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-900 dark:text-white uppercase">4. Record MX (Mail Exchange)</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${dnsResult?.mx?.valid ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-400'}`}>
+                    {dnsResult ? (dnsResult.mx.valid ? 'Terhubung ✓' : 'Belum Ada') : 'Status: Siap Dicek'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-slate-300">
+                  Menentukan server yang menangani penerimaan email pada domain toko Anda.
+                </p>
+                {dnsResult?.mx?.records && dnsResult.mx.records.length > 0 ? (
+                  <div className="bg-white dark:bg-slate-900 p-2.5 rounded border border-gray-200 dark:border-slate-700 text-xs font-mono text-slate-800 dark:text-slate-200 space-y-1">
+                    {dnsResult.mx.records.map((r: string, idx: number) => (
+                      <div key={idx}>• {r}</div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-slate-900 p-2.5 rounded border border-gray-200 dark:border-slate-700 text-xs font-mono text-slate-500 dark:text-slate-400">
+                    Klik tombol &quot;Periksa Record DNS&quot; untuk melihat server MX aktif domain.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Bagian 4: Uji Coba Pengiriman Email (Test Email) */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-6 space-y-4">
+            <div className="border-b border-gray-100 dark:border-slate-800 pb-3">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                <span>🚀 Uji Coba Pengiriman Email (Test Connection)</span>
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                Kirimkan email uji coba ke alamat email Anda untuk memastikan pesan berhasil masuk ke inbox.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <input
+                type="email"
+                value={testRecipient}
+                onChange={(e) => setTestRecipient(e.target.value)}
+                placeholder="Masukkan email penerima uji coba (misal: namaanda@gmail.com)"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                disabled={testingEmail || !testRecipient}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition shadow-xs shrink-0"
+              >
+                {testingEmail ? 'Mengirim...' : 'Kirim Email Uji Coba'}
+              </button>
+            </div>
+
+            {emailTestResult && (
+              <div
+                className={`p-3.5 rounded-lg text-xs leading-relaxed ${
+                  emailTestResult.success
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+                }`}
+              >
+                <strong>{emailTestResult.success ? 'Berhasil: ' : 'Gagal: '}</strong>
+                {emailTestResult.message}
+              </div>
+            )}
+          </div>
+        </div>
       )}
         </div>
       </div>

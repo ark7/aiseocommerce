@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import AdminAiDrawer from '@/components/AdminAiDrawer';
+import AdminGuideDrawer from '@/components/AdminGuideDrawer';
+import ThemeToggle from '@/components/ThemeToggle';
 import { hasPermission, canAccessPath, PermissionKey } from '@/lib/rbac';
 
 interface User {
@@ -15,6 +17,7 @@ interface User {
   role: string;
   title?: string | null;
   permissions?: string[];
+  isDemo?: boolean;
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -79,6 +83,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const allNavigation = [
     { name: 'Dashboard', href: '/admin', icon: 'HomeIcon', permission: 'dashboard' as PermissionKey },
     { name: 'Produk', href: '/admin/products', icon: 'PackageIcon', permission: 'products' as PermissionKey },
+    { name: 'AI Studio', href: '/admin/ai', icon: 'SparklesIcon', permission: 'products' as PermissionKey },
     { name: 'Kategori', href: '/admin/categories', icon: 'FolderIcon', permission: 'categories' as PermissionKey },
     { name: 'CMS & Konten', href: '/admin/cms', icon: 'TemplateIcon', permission: 'cms' as PermissionKey },
     { name: 'Artikel', href: '/admin/articles', icon: 'DocumentTextIcon', permission: 'articles' as PermissionKey },
@@ -99,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { id: 'legal', name: 'Legal & Cookie', icon: '📄' },
     { id: 'ai', name: 'AI Assistant', icon: '✨' },
     { id: 'notifications', name: 'Notifikasi (WA/TG)', icon: '📲' },
+    { id: 'email', name: 'Email & SMTP', icon: '✉️' },
   ];
 
   // Filter navigation items based on user role and permissions
@@ -119,6 +125,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     PackageIcon: () => (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+      </svg>
+    ),
+    SparklesIcon: () => (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.286L13 21l-2.286-6.857L5 12l5.714-2.286L13 3z" />
       </svg>
     ),
     FolderIcon: () => (
@@ -187,15 +198,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const IconComponent = Icons as any;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors">
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-md transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="flex items-center justify-between h-16 px-4 border-b">
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 shadow-md transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-slate-800">
           <Link href="/admin" className="flex items-center space-x-2">
             <div className="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
               <span className="text-white font-bold text-sm">A</span>
             </div>
-            <span className="text-xl font-semibold text-gray-800">Admin Panel</span>
+            <span className="text-xl font-semibold text-gray-800 dark:text-white">Admin Panel</span>
           </Link>
         </div>
         
@@ -271,23 +282,33 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main content */}
       <div className="flex-1 ml-0 md:ml-64">
         {/* Header */}
-        <header className="fixed top-0 right-0 left-0 md:left-64 z-40 bg-white shadow-sm">
+        <header className="fixed top-0 right-0 left-0 md:left-64 z-40 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm transition-colors">
           <div className="flex items-center justify-between h-16 px-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+              className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-600 dark:text-gray-300"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2.5 sm:space-x-3">
+              <button
+                onClick={() => setGuideOpen(!guideOpen)}
+                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition shadow-xs cursor-pointer"
+                title="Buka panduan penggunaan untuk menu ini"
+                aria-label="Panduan Menu"
+              >
+                <span>📖</span>
+                <span className="hidden sm:inline">Panduan Menu</span>
+              </button>
+              <ThemeToggle />
               <Link
                 href="/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition shadow-xs"
                 title="Buka etalase toko di tab baru"
               >
                 <span>🏪</span>
@@ -296,8 +317,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </Link>
-              <span className="text-xs text-gray-500 hidden sm:inline-block">
-                Toko: <span className="font-semibold text-gray-700">{user.email}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline-block">
+                Toko: <span className="font-semibold text-gray-700 dark:text-gray-200">{user.email}</span>
               </span>
             </div>
           </div>
@@ -305,6 +326,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Page content */}
         <main className="pt-16 px-4 pb-4 md:px-6 md:pb-6">
+          {user.isDemo && (
+            <div className="mt-4 mb-2 p-3.5 bg-amber-500/10 dark:bg-amber-950/30 border-l-4 border-amber-500 rounded-r-xl shadow-xs">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-xl">🛡️</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                      Mode Pratinjau Demo (Read-Only)
+                    </h3>
+                    <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
+                      Anda sedang menjelajahi akun demo <strong>LarisManis.online</strong>. Semua menu, analitik, dan AI Studio dapat dicoba bebas, namun fungsi penambahan, pengubahan, dan penghapusan data (CRUD) dibatasi agar pratinjau tetap bersih.
+                      <span className="font-semibold ml-1">Pada website toko Anda, seluruh fungsi CRUD beroperasi normal 100%.</span>
+                    </p>
+                  </div>
+                </div>
+                <span className="bg-amber-500/20 text-amber-900 dark:text-amber-300 font-bold px-2 py-0.5 rounded text-[10px] tracking-wide uppercase shrink-0">
+                  DEMO MODE
+                </span>
+              </div>
+            </div>
+          )}
           {isPageAuthorized ? (
             children
           ) : (
@@ -351,6 +393,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Slide-Over AI Copilot Assistant Drawer */}
       <AdminAiDrawer />
+
+      {/* Contextual User Guide Right-Side Drawer */}
+      <AdminGuideDrawer
+        isOpen={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        onOpen={() => setGuideOpen(true)}
+      />
     </div>
   );
 }

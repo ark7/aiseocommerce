@@ -148,6 +148,7 @@ export function dispatchOrderCreatedNotification(orderId: string): void {
   // Execute in background
   Promise.resolve().then(async () => {
     try {
+      if (!prisma?.order?.findUnique) return;
       const order = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
@@ -303,6 +304,7 @@ Harap verifikasi di admin: ${orderAdminUrl}`;
 export function dispatchPaymentVerifiedNotification(orderId: string): void {
   Promise.resolve().then(async () => {
     try {
+      if (!prisma?.order?.findUnique) return;
       const order = await prisma.order.findUnique({
         where: { id: orderId },
         include: {
@@ -358,6 +360,51 @@ Detail: ${orderAdminUrl}`;
       }
     } catch (error) {
       logger.error('Failed to dispatch payment verified notification', { orderId }, error as any);
+    }
+  });
+}
+
+/**
+ * Trigger order shipped notification (Non-blocking async).
+ */
+export function dispatchOrderShippedNotification(orderId: string): void {
+  setImmediate(async () => {
+    try {
+      if (!prisma?.order?.findUnique) return;
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          store: { include: { settings: true } },
+          user: true,
+        },
+      });
+
+      if (!order || !order.store?.settings) return;
+      const s = order.store.settings;
+      const trackingUrl = order.trackingUrl || `https://biteship.com/tracking/${order.waybillNumber || ''}`;
+      const courierName = order.courierServiceName || (order.courierCode ? order.courierCode.toUpperCase() : 'Ekspedisi');
+
+      // WhatsApp to customer if available, or store
+      const targetPhone = order.customerPhone || order.user?.phone || s.notifyWhatsappTargetPhone;
+      if (s.notifyWhatsappEnabled && s.notifyWhatsappToken && targetPhone) {
+        const waText = `🚚 *[PESANAN SEDANG DIKIRIM]* - ${order.store.name}
+Halo ${order.customerName || 'Pelanggan'}, pesanan Anda *#${order.orderNumber}* sedang dalam perjalanan!
+
+📦 *Kurir:* ${courierName}
+🔖 *No. Resi:* ${order.waybillNumber || '-'}
+🔗 *Lacak Paket:* ${trackingUrl}
+
+Terima kasih telah berbelanja di toko kami!`;
+
+        sendWhatsappMessage({
+          provider: (s.notifyWhatsappProvider as any) || 'FONNTE',
+          token: s.notifyWhatsappToken,
+          targetPhone,
+          text: waText,
+        }).catch((err) => logger.warn('WhatsApp order shipped notification failed', { error: err }));
+      }
+    } catch (error) {
+      logger.error('Failed to dispatch order shipped notification', { orderId }, error as any);
     }
   });
 }

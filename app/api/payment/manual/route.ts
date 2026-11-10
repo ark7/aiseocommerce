@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { isDemoStore, createDemoUploadBlockedResponse } from '@/lib/demoGuard';
 import { dispatchPaymentProofNotification } from '@/lib/orderNotificationService';
+import { savePaymentProofFile } from '@/lib/paymentStorage';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -49,6 +52,13 @@ export async function POST(request: Request) {
     if (user.role === 'CUSTOMER' && order.userId && order.userId !== user.id) {
       return NextResponse.json({ error: 'Unauthorized: Pesanan bukan milik akun Anda' }, { status: 403 });
     }
+
+    // Demo store guard: block physical file uploads on demo stores
+    if (await isDemoStore(order.storeId)) {
+      return createDemoUploadBlockedResponse(
+        'Unggah bukti transfer dinonaktifkan pada Akun Demo untuk menjaga penyimpanan server. Pesanan demo Anda tetap tersimpan dan tercatat di sistem.'
+      );
+    }
     
     if (order.status !== 'PENDING' && order.status !== 'MANUAL_VERIFICATION') {
       return NextResponse.json(
@@ -59,15 +69,29 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await proofFile.arrayBuffer());
     const proofData = buffer.toString('base64');
-    const fileInfo = {
-      name: proofFile.name,
-      type: proofFile.type,
-      size: proofFile.size,
-    };
 
     // /api/checkout already created a PENDING payment for this order, so attach
     // the proof to it instead of trying to create a second one.
     const existingPayment = await prisma.payment.findFirst({ where: { orderId } });
+    const paymentId = existingPayment?.id || randomUUID();
+
+    // Save proof to local filesystem in store-isolated directory (storage/proofs/{storeId}/)
+    const savedFile = await savePaymentProofFile({
+      storeId: order.storeId,
+      paymentId,
+      buffer,
+      originalFilename: proofFile.name,
+      mimeType: proofFile.type,
+    });
+
+    const fileInfo = {
+      name: proofFile.name,
+      type: proofFile.type,
+      size: proofFile.size,
+      filename: savedFile.filename,
+      storagePath: savedFile.relativePath,
+      storeId: order.storeId,
+    };
 
     const paymentData = {
       method: 'MANUAL' as const,
@@ -80,7 +104,7 @@ export async function POST(request: Request) {
     const [savedPayment] = await prisma.$transaction([
       existingPayment
         ? prisma.payment.update({ where: { id: existingPayment.id }, data: paymentData })
-        : prisma.payment.create({ data: { orderId, ...paymentData } }),
+        : prisma.payment.create({ data: { id: paymentId, orderId, ...paymentData } }),
       prisma.order.update({
         where: { id: orderId },
         data: { status: 'MANUAL_VERIFICATION' },

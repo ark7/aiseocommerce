@@ -18,6 +18,7 @@ model Store {
   address   String?
   phone     String?
   email     String?
+  isDemo    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -101,6 +102,35 @@ model StoreSettings {
   notifyOnPaymentProof     Boolean   @default(true)
   notifyOnPaymentSuccess   Boolean   @default(true)
   notifyOnLowStock         Boolean   @default(true)
+  // === Tarif Ongkos Kirim Manual (Flat Rate) ===
+  shippingOriginCity       String?
+  shippingFlatRateInner    Float?    @default(0)
+  shippingFlatRateOuter    Float?    @default(0)
+  shippingFreeThreshold    Float?
+  shippingCalculationType  String?   @default("FLAT_MANUAL")
+  // === Ekspedisi & Kurir Otomatis (Biteship API) ===
+  biteshipEnabled          Boolean   @default(false)
+  biteshipApiKey           String?
+  biteshipSandbox          Boolean   @default(true)
+  biteshipOriginAreaId     String?
+  biteshipOriginAddress    String?   @db.Text
+  biteshipOriginPostalCode String?
+  biteshipOriginContactName String?
+  biteshipOriginContactPhone String?
+  biteshipEnabledCouriers  String?   @default("jne,sicepat,jnt,anteraja,tiki,pos")
+  // === SMTP & Email Notifications ===
+  smtpEnabled              Boolean   @default(false)
+  smtpHost                 String?
+  smtpPort                 Int?      @default(587)
+  smtpSecure               Boolean   @default(false)
+  smtpUser                 String?
+  smtpPass                 String?
+  smtpFromName             String?
+  smtpFromEmail            String?
+  smtpReplyTo              String?
+  smtpVerified             Boolean   @default(false)
+  smtpVerifiedAt           DateTime?
+  smtpVerificationToken    String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -195,6 +225,15 @@ model Product {
   isPublished      Boolean        @default(true)
   isFeatured       Boolean        @default(false)
   sandboxEnabled   Boolean        @default(false)
+
+  // Link Marketplace & Saluran Penjualan Eksternal
+  shopeeUrl             String?
+  tokopediaUrl          String?
+  tiktokShopUrl         String?
+  blibliUrl             String?
+  customMarketplaceName String?
+  customMarketplaceUrl  String?
+
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
@@ -203,9 +242,27 @@ model Product {
   productEvents ProductEvent[]
   articles      ArticleProduct[]
   landingPages  LandingPage[]
+  variants      ProductVariant[]
 
   @@unique([storeId, slug])
   @@map("products")
+}
+
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String   @default("")
+  optionType  String   @default("CUSTOM")
+  optionValue String   @default("")
+  sku         String?
+  price       Float?
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@map("product_variants")
 }
 
 model ProductImage {
@@ -279,11 +336,22 @@ model Order {
   subtotal        Float
   taxAmount       Float       @default(0)
   shippingCost    Float       @default(0)
+  shippingZone    String?
   discount        Float       @default(0)
   status          OrderStatus @default(PENDING)
   attribution     Json?
   notes           String?     @db.Text
   shippingAddress String?     @db.Text
+  // === Ekspedisi & Biteship Fulfillment ===
+  courierCode          String?
+  courierService       String?
+  courierServiceName   String?
+  courierEtd           String?
+  waybillNumber        String?
+  biteshipOrderId      String?
+  biteshipTrackingId   String?
+  biteshipStatus       String?
+  shippingTrackingHistory Json?
   reservationExpiresAt DateTime?
   trackingUrl     String?
   shippedAt       DateTime?
@@ -322,6 +390,7 @@ model OrderItem {
   unitPrice  Float
   totalPrice Float
   variation  String?
+  variantId  String?
   saleQuotaUsed Boolean @default(false)
   createdAt  DateTime @default(now())
 

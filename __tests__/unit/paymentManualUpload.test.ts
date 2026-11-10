@@ -203,6 +203,11 @@ describe('POST /api/payment/manual — Customer Payment Proof Upload', () => {
 
     // Verify transaction executed
     expect(prisma.$transaction).toHaveBeenCalled();
+    const paymentUpdateCall = (prisma.payment.update as jest.Mock).mock.calls[0][0];
+    const parsedProofFile = JSON.parse(paymentUpdateCall.data.proofFile);
+    expect(parsedProofFile.filename).toBeDefined();
+    expect(parsedProofFile.storagePath).toContain(`storage/proofs/${STORE_ID}`);
+    expect(parsedProofFile.storeId).toBe(STORE_ID);
 
     // Verify WhatsApp/Telegram notification dispatched
     expect(dispatchPaymentProofNotification).toHaveBeenCalledWith('pay-1');

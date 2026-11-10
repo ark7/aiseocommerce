@@ -48,8 +48,11 @@ function voucher(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeTx(products: unknown[], options: { voucher?: unknown; claim?: unknown } = {}) {
+function makeTx(products: unknown[], options: { voucher?: unknown; claim?: unknown; storeSettings?: unknown } = {}) {
   const tx = {
+    storeSettings: {
+      findUnique: jest.fn().mockResolvedValue(options.storeSettings ?? null),
+    },
     product: {
       findMany: jest.fn().mockResolvedValue(products),
       // Default: the sale quota reservation wins.
@@ -379,5 +382,83 @@ describe('createOrder — pagar transaksi', () => {
 
     expect(error).toBeInstanceOf(VoucherError);
     expect(error.message).toBe('Kode voucher tidak ditemukan');
+  });
+});
+
+describe('createOrder — kalkulasi ongkir manual', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const shippingSettings = {
+    shippingOriginCity: 'Bandung',
+    shippingFlatRateInner: 10000,
+    shippingFlatRateOuter: 25000,
+    shippingFreeThreshold: 300000,
+  };
+
+  test('menghitung ongkir dalam kota dan menyimpan alamat pengiriman', async () => {
+    const tx = makeTx([product({ sellingPrice: 100000 })], { storeSettings: shippingSettings });
+
+    const order = await createOrder(
+      STORE,
+      [{ productId: 'product-1', quantity: 1 }],
+      CUSTOMER,
+      undefined,
+      undefined,
+      undefined,
+      {
+        shippingZone: 'INNER',
+        shippingAddress: 'Jl. Dago No. 12, Bandung',
+      }
+    );
+
+    expect(order.subtotal).toBe(100000);
+    expect(order.shippingCost).toBe(10000);
+    expect(order.shippingZone).toBe('INNER');
+    expect(order.shippingAddress).toBe('Jl. Dago No. 12, Bandung');
+    expect(order.totalAmount).toBe(110000);
+  });
+
+  test('menghitung ongkir luar kota saat dipilih', async () => {
+    const tx = makeTx([product({ sellingPrice: 100000 })], { storeSettings: shippingSettings });
+
+    const order = await createOrder(
+      STORE,
+      [{ productId: 'product-1', quantity: 1 }],
+      CUSTOMER,
+      undefined,
+      undefined,
+      undefined,
+      {
+        shippingZone: 'OUTER',
+        shippingAddress: 'Jl. Sudirman No. 45, Surabaya',
+      }
+    );
+
+    expect(order.subtotal).toBe(100000);
+    expect(order.shippingCost).toBe(25000);
+    expect(order.shippingZone).toBe('OUTER');
+    expect(order.totalAmount).toBe(125000);
+  });
+
+  test('memberikan gratis ongkir jika subtotal mencapai freeThreshold', async () => {
+    const tx = makeTx([product({ sellingPrice: 350000 })], { storeSettings: shippingSettings });
+
+    const order = await createOrder(
+      STORE,
+      [{ productId: 'product-1', quantity: 1 }],
+      CUSTOMER,
+      undefined,
+      undefined,
+      undefined,
+      {
+        shippingZone: 'OUTER',
+        shippingAddress: 'Jl. Gatot Subroto No. 8, Medan',
+      }
+    );
+
+    expect(order.subtotal).toBe(350000);
+    expect(order.shippingCost).toBe(0);
+    expect(order.shippingZone).toBe('FREE');
+    expect(order.totalAmount).toBe(350000);
   });
 });

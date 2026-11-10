@@ -266,6 +266,27 @@ export default function StaffManagementPage() {
         </div>
       )}
 
+      {/* RBAC Architecture & Guidance Card */}
+      <div className="bg-gradient-to-r from-indigo-50/70 via-blue-50/50 to-purple-50/70 p-5 rounded-2xl border border-indigo-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-bold text-indigo-900">💡 Cara Kerja Hak Akses Staf (RBAC):</span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-semibold">
+              Isolasi Multi-Tenant
+            </span>
+          </div>
+          <p className="text-xs text-indigo-800/80 leading-relaxed max-w-3xl">
+            Setiap staf memiliki email dan password unik untuk login. Saat staf masuk, sidebar navigasi admin otomatis disesuaikan secara real-time hanya menampilkan modul yang dicentang. Bila staf mencoba mengakses rute langsung tanpa izin, akses akan langsung diblokir (403).
+          </p>
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="shrink-0 px-3.5 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-xs font-semibold shadow-sm transition"
+        >
+          + Tambah Staf Baru
+        </button>
+      </div>
+
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center space-x-4">
@@ -616,21 +637,42 @@ export default function StaffManagementPage() {
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {ROLE_PRESETS.map((preset) => (
-                    <button
-                      type="button"
-                      key={preset.id}
-                      onClick={() => handleApplyPreset(preset.permissions)}
-                      className="p-2.5 border border-gray-200 rounded-xl text-left hover:border-indigo-400 hover:bg-indigo-50/40 transition group"
-                    >
-                      <div className="font-semibold text-xs text-gray-800 group-hover:text-indigo-600">
-                        {preset.name}
-                      </div>
-                      <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
-                        {preset.description}
-                      </div>
-                    </button>
-                  ))}
+                  {ROLE_PRESETS.map((preset) => {
+                    const isPresetActive =
+                      preset.permissions.length === formPermissions.length &&
+                      preset.permissions.every((p) => formPermissions.includes(p));
+
+                    return (
+                      <button
+                        type="button"
+                        key={preset.id}
+                        onClick={() => handleApplyPreset(preset.permissions)}
+                        className={`p-2.5 border rounded-xl text-left transition group ${
+                          isPresetActive
+                            ? 'border-indigo-500 bg-indigo-50/70 shadow-xs ring-1 ring-indigo-400'
+                            : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/40'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`font-semibold text-xs ${
+                              isPresetActive ? 'text-indigo-700' : 'text-gray-800 group-hover:text-indigo-600'
+                            }`}
+                          >
+                            {preset.name}
+                          </span>
+                          {isPresetActive && (
+                            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-100 px-1 rounded">
+                              Aktif
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-gray-500 mt-0.5 line-clamp-1">
+                          {preset.description}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

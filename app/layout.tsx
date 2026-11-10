@@ -3,6 +3,7 @@ import './globals.css';
 import { getActiveStore } from '@/lib/store';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 import MasterThirdPartyTracker from '@/components/MasterThirdPartyTracker';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
@@ -61,46 +62,65 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <html lang="id">
+    <html lang="id" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var stored = localStorage.getItem('theme');
+                  var isDark = stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
         <style
           dangerouslySetInnerHTML={{
             __html: `:root { --brand-primary: ${primaryColor}; }`,
           }}
         />
       </head>
-      <body className={`font-${fontFamily} antialiased`}>
-        {previewDomain && (
-          <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-semibold flex items-center justify-between sticky top-0 z-50 shadow-md">
-            <div className="flex items-center gap-2">
-              <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                PREVIEW MODE
-              </span>
-              <span>
-                Sedang mempratinjau Toko: <strong>{store?.name || previewDomain}</strong> (domain:{' '}
-                {previewDomain})
-              </span>
+      <body className={`font-${fontFamily} antialiased bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-150`}>
+        <ThemeProvider>
+          {previewDomain && (
+            <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-semibold flex items-center justify-between sticky top-0 z-50 shadow-md">
+              <div className="flex items-center gap-2">
+                <span className="bg-slate-950 text-amber-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                  PREVIEW MODE
+                </span>
+                <span>
+                  Sedang mempratinjau Toko: <strong>{store?.name || previewDomain}</strong> (domain:{' '}
+                  {previewDomain})
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link href="/super-admin" className="underline hover:text-slate-900">
+                  Panel Super-Admin &rarr;
+                </Link>
+                <a
+                  href="/api/super-admin/preview?clear=true"
+                  className="bg-slate-950 text-white px-2.5 py-1 rounded hover:bg-slate-800 text-[11px]"
+                >
+                  Tutup Preview &times;
+                </a>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Link href="/super-admin" className="underline hover:text-slate-900">
-                Panel Super-Admin &rarr;
-              </Link>
-              <a
-                href="/api/super-admin/preview?clear=true"
-                className="bg-slate-950 text-white px-2.5 py-1 rounded hover:bg-slate-800 text-[11px]"
-              >
-                Tutup Preview &times;
-              </a>
-            </div>
-          </div>
-        )}
-        {children}
-        <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
-        <CookieConsentBanner
-          enabled={store?.settings?.cookieConsentEnabled ?? true}
-          title={store?.settings?.cookieConsentTitle}
-          text={store?.settings?.cookieConsentText}
-        />
+          )}
+          {children}
+          <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
+          <CookieConsentBanner
+            enabled={store?.settings?.cookieConsentEnabled ?? true}
+            title={store?.settings?.cookieConsentTitle}
+            text={store?.settings?.cookieConsentText}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

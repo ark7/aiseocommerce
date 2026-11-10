@@ -337,3 +337,95 @@ export async function PUT(request: Request, { params }: Context) {
   }
 }
 
+export async function DELETE(request: Request, { params }: Context) {
+  if (!isControlPlaneEnabled(request)) {
+    return NextResponse.json(
+      { error: 'Portal Super-Admin Control Plane dinonaktifkan pada instance ini.' },
+      { status: 404 }
+    );
+  }
+
+  const owner = requireSuperAdminOwner(request);
+  if (!owner) {
+    return NextResponse.json(
+      { error: 'Akses Ditolak (403): Hanya akun tunggal pemilik (Super-Admin) yang diizinkan.' },
+      { status: 403 }
+    );
+  }
+
+  if (params.id === 'demo-store-001') {
+    return NextResponse.json(
+      { error: 'Toko demo utama (demo-store-001) dilindungi dan tidak boleh dihapus.' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const store = await prisma.store.findUnique({
+      where: { id: params.id },
+      select: { id: true, name: true, domain: true },
+    });
+
+    if (!store) {
+      return NextResponse.json({ error: 'Toko pelanggan tidak ditemukan' }, { status: 404 });
+    }
+
+    const storeId = store.id;
+
+    // Clean up dependent child records in topological order to prevent foreign key restrict violations
+    await prisma.voucherClaim.deleteMany({
+      where: {
+        OR: [
+          { storeId },
+          { voucher: { storeId } },
+          { order: { storeId } },
+        ],
+      },
+    });
+
+    await prisma.orderItem.deleteMany({
+      where: { order: { storeId } },
+    });
+
+    await prisma.payment.deleteMany({
+      where: { order: { storeId } },
+    });
+
+    await prisma.order.deleteMany({
+      where: { storeId },
+    });
+
+    // Delete the store (cascade will delete products, categories, articles, users, settings, etc.)
+    await prisma.store.delete({
+      where: { id: storeId },
+    });
+
+    if (typeof (prisma as any).auditLog?.create === 'function') {
+      await prisma.auditLog.create({
+        data: {
+          storeId: 'demo-store-001',
+          action: 'SUPER_ADMIN_DELETE_STORE',
+          entityType: 'STORE',
+          entityId: storeId,
+          newValue: JSON.stringify({
+            deletedByOwner: owner.email,
+            storeName: store.name,
+            domain: store.domain,
+          }),
+        },
+      }).catch(() => {});
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Toko "${store.name}" (${store.domain}) berhasil dihapus sepenuhnya beserta seluruh datanya!`,
+    });
+  } catch (error) {
+    logger.error('Failed to delete tenant store in Super-Admin', {}, error instanceof Error ? error : new Error(String(error)));
+    return NextResponse.json(
+      { error: 'Terjadi kesalahan saat menghapus data toko pelanggan' },
+      { status: 500 }
+    );
+  }
+}
+

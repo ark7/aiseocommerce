@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import type { OrderStatus } from '@prisma/client';
-import { REVENUE_STATUSES, STATUS_LABELS } from '@/lib/orderStatus';
+import { REVENUE_STATUSES, STATUS_LABELS, type OrderStatus } from '@/lib/orderStatus';
 import DateRangeFilter from '@/components/common/DateRangeFilter';
 import Pagination from '@/components/common/Pagination';
 
