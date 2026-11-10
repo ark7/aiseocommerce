@@ -5,6 +5,18 @@ import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
 const safeCache = typeof cache === 'function' ? cache : <T extends (...args: any[]) => any>(fn: T) => fn;
 
+export const DEMO_HOST_ALIASES = ['demo.larismanis.online', 'demo-store.local'];
+
+async function findDemoAliasStore() {
+  return prisma.store.findFirst({
+    where: {
+      OR: [{ domain: { in: DEMO_HOST_ALIASES } }, { isDemo: true }],
+    },
+    include: { settings: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 /**
  * Resolves the primary store for this standalone e-commerce deployment.
  * Supports override via:
@@ -23,6 +35,11 @@ export const getActiveStore = safeCache(async (domainHint?: string) => {
         include: { settings: true },
       });
       if (store) return store;
+
+      if (DEMO_HOST_ALIASES.includes(domainHint.trim().toLowerCase())) {
+        const demoAlias = await findDemoAliasStore();
+        if (demoAlias) return demoAlias;
+      }
     }
 
     // 2. Check Host / x-forwarded-host header from incoming request
@@ -36,6 +53,11 @@ export const getActiveStore = safeCache(async (domainHint?: string) => {
           include: { settings: true },
         });
         if (storeByHost) return storeByHost;
+
+        if (DEMO_HOST_ALIASES.includes(rawDomain)) {
+          const demoAlias = await findDemoAliasStore();
+          if (demoAlias) return demoAlias;
+        }
       }
     } catch {
       // headers() might not be available in non-request contexts or unit tests
@@ -66,11 +88,16 @@ export const getActiveStore = safeCache(async (domainHint?: string) => {
         include: { settings: true },
       });
       if (store) return store;
+
+      if (DEMO_HOST_ALIASES.includes(defaultDomain.trim().toLowerCase())) {
+        const demoAlias = await findDemoAliasStore();
+        if (demoAlias) return demoAlias;
+      }
     }
 
     // 5. In multi-tenant database without domain hint, prefer non-demo store
     const nonDemoStore = await prisma.store.findFirst({
-      where: { domain: { not: 'demo-store.local' } },
+      where: { domain: { notIn: DEMO_HOST_ALIASES } },
       orderBy: { createdAt: 'desc' },
       include: { settings: true },
     });
@@ -85,7 +112,7 @@ export const getActiveStore = safeCache(async (domainHint?: string) => {
     console.error('[getActiveStore] Primary query failed, attempting minimal store fallback:', error);
     try {
       const fallbackNonDemo = await prisma.store.findFirst({
-        where: { domain: { not: 'demo-store.local' } },
+        where: { domain: { notIn: DEMO_HOST_ALIASES } },
         orderBy: { createdAt: 'desc' },
       });
       if (fallbackNonDemo) {
