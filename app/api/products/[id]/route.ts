@@ -20,6 +20,7 @@ export async function GET(request: Request, { params }: RouteContext) {
       include: {
         images: { orderBy: { order: 'asc' } },
         category: true,
+        variants: { orderBy: { createdAt: 'asc' } },
       },
     });
 

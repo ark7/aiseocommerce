@@ -1,4 +1,13 @@
-import type { OrderStatus } from '@prisma/client';
+export type OrderStatus =
+  | 'PENDING'
+  | 'MANUAL_VERIFICATION'
+  | 'PAID'
+  | 'PROCESSING'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUNDED';
 
 /**
  * Allowed order status transitions, kept free of any database import so both the
@@ -23,6 +32,19 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
 export function nextStatuses(from: OrderStatus): OrderStatus[] {
   return ALLOWED_TRANSITIONS[from] ?? [];
 }
+
+/**
+ * Statuses where the customer's money has landed and is staying landed. This is
+ * what the sales totals count; PENDING and MANUAL_VERIFICATION have not been
+ * paid yet, CANCELLED and REFUNDED gave it back.
+ */
+export const REVENUE_STATUSES: OrderStatus[] = [
+  'PAID',
+  'PROCESSING',
+  'SHIPPED',
+  'DELIVERED',
+  'COMPLETED',
+];
 
 /** Indonesian labels for the admin UI. */
 export const STATUS_LABELS: Record<OrderStatus, string> = {

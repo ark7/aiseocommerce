@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getIPAddress } from '@/lib/ip';
 import { auditLedgerCreated, auditLedgerDeleted } from '@/services/auditService';
+import { isConfiguredCategory } from '@/lib/ledgerCategory';
 
 export async function GET(request: Request) {
   try {
@@ -23,8 +24,15 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const category = searchParams.get('category');
     const search = searchParams.get('search');
+    const includeSandbox = searchParams.get('includeSandbox') === 'true';
+    const sandboxOnly = searchParams.get('sandbox') === 'true';
     
     const where: any = { storeId: user.storeId };
+    if (sandboxOnly) {
+      where.isSandbox = true;
+    } else if (!includeSandbox) {
+      where.isSandbox = false;
+    }
     if (type) where.type = type;
     if (category) where.category = category;
     if (search) where.OR = [
@@ -87,7 +95,16 @@ export async function POST(request: Request) {
     
     const validTypes = ['INCOME', 'EXPENSE', 'PETTY_CASH', 'CAPITAL', 'LOAN', 'REFUND'];
     if (!validTypes.includes(type)) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-    
+
+    // A category is optional, but a named one has to be on the configured list
+    // for this type — otherwise the per-category report is back to free text.
+    if (typeof category === 'string' && category.trim() !== '') {
+      const configured = await isConfiguredCategory(prisma, user.storeId, type, category);
+      if (!configured) {
+        return NextResponse.json({ error: 'Kategori tidak terdaftar' }, { status: 400 });
+      }
+    }
+
     const ledger = await prisma.ledger.create({
       data: {
         storeId: user.storeId,

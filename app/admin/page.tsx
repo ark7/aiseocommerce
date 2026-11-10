@@ -29,9 +29,18 @@ export default function AdminDashboard() {
           headers: { Authorization: `Bearer ${token}` },
         });
         
+        if (statsResponse.status === 401) {
+          localStorage.removeItem('token');
+          setError('Sesi login telah berakhir, silakan login kembali.');
+          setLoading(false);
+          return;
+        }
+
         if (statsResponse.ok) {
           const data = await statsResponse.json();
-          setStats(data.stats);
+          if (data.stats) {
+            setStats(data.stats);
+          }
         }
 
         // Fetch recent orders
@@ -46,7 +55,7 @@ export default function AdminDashboard() {
 
         setLoading(false);
       } catch (err) {
-        setError('Gagal memuat data dashboard');
+        setError('Gagal memuat data dashboard. Silakan refresh halaman.');
         setLoading(false);
       }
     };
@@ -101,81 +110,143 @@ export default function AdminDashboard() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        {/* Total Produk */}
+        <Link
+          href="/admin/products"
+          className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 hover:shadow-md hover:border-indigo-400 transition-all duration-200 group block relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
+                <svg className="w-6 h-6 text-indigo-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{stats.products}</div>
+                <div className="text-sm text-gray-500">Total Produk</div>
+              </div>
+            </div>
+            <div className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{stats.products}</div>
-              <div className="text-sm text-gray-500">Total Produk</div>
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+        {/* Total Pesanan */}
+        <Link
+          href="/admin/orders"
+          className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 hover:shadow-md hover:border-green-400 transition-all duration-200 group block relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-600 transition-colors">
+                <svg className="w-6 h-6 text-green-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors">{stats.orders}</div>
+                <div className="text-sm text-gray-500">Total Pesanan</div>
+              </div>
+            </div>
+            <div className="text-gray-300 group-hover:text-green-600 group-hover:translate-x-1 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{stats.orders}</div>
-              <div className="text-sm text-gray-500">Total Pesanan</div>
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        {/* Total Pelanggan */}
+        <Link
+          href="/admin/customers"
+          className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 hover:shadow-md hover:border-blue-400 transition-all duration-200 group block relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-600 transition-colors">
+                <svg className="w-6 h-6 text-blue-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{stats.customers}</div>
+                <div className="text-sm text-gray-500">Total Pelanggan</div>
+              </div>
+            </div>
+            <div className="text-gray-300 group-hover:text-blue-600 group-hover:translate-x-1 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{stats.customers}</div>
-              <div className="text-sm text-gray-500">Total Pelanggan</div>
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Pendapatan */}
+        <Link
+          href="/admin/finance"
+          className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 hover:shadow-md hover:border-purple-400 transition-all duration-200 group block relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
+                <svg className="w-6 h-6 text-purple-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <div className="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors truncate">
+                  Rp {stats.revenue.toLocaleString('id-ID')}
+                </div>
+                <div className="text-sm text-gray-500">Pendapatan</div>
+              </div>
+            </div>
+            <div className="text-gray-300 group-hover:text-purple-600 group-hover:translate-x-1 transition-all shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">Rp {stats.revenue.toLocaleString('id-ID')}</div>
-              <div className="text-sm text-gray-500">Pendapatan</div>
-            </div>
           </div>
-        </div>
+        </Link>
 
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Pesanan Tertunda */}
+        <Link
+          href="/admin/orders?status=PENDING"
+          className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 hover:shadow-md hover:border-amber-400 transition-all duration-200 group block relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-500 transition-colors">
+                <svg className="w-6 h-6 text-amber-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900 group-hover:text-amber-600 transition-colors">{stats.pendingOrders}</div>
+                <div className="text-sm text-gray-500 flex items-center gap-1.5">
+                  <span>Pesanan Tertunda</span>
+                  {stats.pendingOrders > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-gray-300 group-hover:text-amber-600 group-hover:translate-x-1 transition-all">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-900">{stats.pendingOrders}</div>
-              <div className="text-sm text-gray-500">Pesanan Tertunda</div>
-            </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Quick Actions */}
       <div className="bg-white p-6 rounded-lg shadow border">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Aksi Cepat</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Link
             href="/admin/products/add"
             className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
@@ -185,7 +256,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Tambah Produk</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Tambah Produk</span>
           </Link>
           
           <Link
@@ -197,7 +268,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Daftar Produk</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Daftar Produk</span>
           </Link>
           
           <Link
@@ -209,7 +280,7 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Kelola Pesanan</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Kelola Pesanan</span>
           </Link>
           
           <Link
@@ -221,7 +292,27 @@ export default function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
-            <span className="text-sm font-medium text-gray-700">Kelola Kategori</span>
+            <span className="text-sm font-medium text-gray-700 text-center">Kelola Kategori</span>
+          </Link>
+
+          <Link
+            href="/admin/cms"
+            className="flex flex-col items-center p-4 bg-indigo-50/60 rounded-lg hover:bg-indigo-100/70 border border-indigo-100 transition-colors"
+          >
+            <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center mb-2 text-white">
+              <span className="text-xl">📝</span>
+            </div>
+            <span className="text-sm font-bold text-indigo-900 text-center">CMS & Konten</span>
+          </Link>
+
+          <Link
+            href="/admin/articles"
+            className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mb-2">
+              <span className="text-xl">📰</span>
+            </div>
+            <span className="text-sm font-medium text-gray-700 text-center">Tulis Artikel</span>
           </Link>
         </div>
       </div>
@@ -252,28 +343,49 @@ export default function AdminDashboard() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {recentOrders.map((order: any) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">#{order.id.substring(0, 8)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{order.customerName || 'Anonymous'}</td>
+                  <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 text-sm">
+                      <Link
+                        href={`/admin/orders/${order.id}`}
+                        className="font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                        title="Lihat detail pesanan"
+                      >
+                        #{order.orderNumber || order.id.substring(0, 8)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {order.customerName || (order.user ? `${order.user.firstName || ''} ${order.user.lastName || ''}`.trim() : null) || 'Pelanggan'}
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(order.createdAt).toLocaleDateString('id-ID')}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      Rp {order.total?.toLocaleString('id-ID') || '0'}
+                    <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                      Rp {(order.totalAmount ?? order.total ?? 0).toLocaleString('id-ID')}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'PAID' ? 'bg-green-100 text-green-800' :
-                        order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                        order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {order.status}
-                      </span>
+                      <Link href={`/admin/orders/${order.id}`}>
+                        <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-opacity hover:opacity-80 ${
+                          order.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                          order.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status}
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      <Link
+                        href={`/admin/orders/${order.id}`}
+                        className="text-indigo-600 hover:text-indigo-900 font-medium text-xs hover:underline"
+                      >
+                        Detail →
+                      </Link>
                     </td>
                   </tr>
                 ))}

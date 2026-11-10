@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # 1. Aplikasi E-Commerce SaaS (Next.js 14 Standalone Engine)
+  # Melayani: demo.larismanis.online dan subdomain multi-tenant klien
+  # ==============================================================================
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aiseocommerce-app:latest
+    container_name: aiseocommerce-web
+    restart: unless-stopped
+    ports:
+      # Bind ke localhost port 3000 agar traffic hanya masuk lewat Nginx reverse proxy
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      - DEFAULT_STORE_DOMAIN=demo.larismanis.online
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # ==============================================================================
+  # 2. Database MariaDB untuk WordPress Landing Page (Ringan & Hemat RAM)
+  # Menggunakan buffer pool 128M agar server VPS 2GB/4GB IDCloudHost tetap lapang
+  # ==============================================================================
+  marketing-db:
+    image: mariadb:10.11-alpine
+    container_name: marketing-mariadb
+    restart: unless-stopped
+    command: [
+      'mysqld',
+      '--character-set-server=utf8mb4',
+      '--collation-server=utf8mb4_unicode_ci',
+      '--innodb-buffer-pool-size=128M',
+      '--max-connections=50'
+    ]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${WP_DB_ROOT_PASSWORD:-larismanis_db_root_2026}
+      MYSQL_DATABASE: larismanis_wp
+      MYSQL_USER: larismanis_user
+      MYSQL_PASSWORD: ${WP_DB_PASSWORD:-larismanis_pass_2026}
+    volumes:
+      - wp_db_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==============================================================================
+  # 3. WordPress Marketing Landing Page
+  # Melayani: https://larismanis.online dan https://www.larismanis.online
+  # ==============================================================================
+  marketing-wp:
+    image: wordpress:6.7-apache
+    container_name: marketing-wordpress
+    restart: unless-stopped
+    depends_on:
+      - marketing-db
+    ports:
+      # Bind ke localhost port 8080 untuk diteruskan oleh Nginx reverse proxy
+      - "127.0.0.1:8080:80"
+    environment:
+      WORDPRESS_DB_HOST: marketing-db:3306
+      WORDPRESS_DB_USER: larismanis_user
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD:-larismanis_pass_2026}
+      WORDPRESS_DB_NAME: larismanis_wp
+      WORDPRESS_TABLE_PREFIX: lm_
+    volumes:
+      - wp_content_data:/var/www/html/wp-content
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  wp_db_data:
+    driver: local
+  wp_content_data:
+    driver: local

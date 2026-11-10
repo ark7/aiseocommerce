@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { auditPaymentVerified } from '@/services/auditService';
+import { recordOrderIncome } from '@/services/transactionService';
 import { getIPAddress } from '@/lib/ip';
+import { dispatchPaymentVerifiedNotification } from '@/lib/orderNotificationService';
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +47,11 @@ export async function POST(request: Request) {
           data: { status: 'PAID' },
         }),
       ]);
-      
+
+      // Approving a manual payment is a sale: it belongs in the books next to
+      // the gateway paths. Idempotent per order.
+      await recordOrderIncome(prisma, payment.order);
+
       // Log audit
       await auditPaymentVerified(
         paymentId,
@@ -57,6 +63,8 @@ export async function POST(request: Request) {
         ip
       );
       
+      dispatchPaymentVerifiedNotification(payment.orderId);
+
       return NextResponse.json({ success: true, message: 'Payment approved', payment: { id: payment.id, status: 'PAID' } });
     } else {
       await prisma.payment.update({

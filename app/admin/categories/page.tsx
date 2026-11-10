@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 interface Category {
   id: string;
@@ -8,6 +10,7 @@ interface Category {
   slug: string;
   description: string | null;
   parentId: string | null;
+  createdAt?: string;
 }
 
 const EMPTY_FORM = { name: '', slug: '', description: '', parentId: '' };
@@ -23,6 +26,7 @@ function toSlug(name: string): string {
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,10 +34,50 @@ export default function CategoriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Pagination & Filter state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const authHeaders = useCallback(() => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : null;
   }, []);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
+
+  const loadAll = useCallback(async () => {
+    const headers = authHeaders();
+    if (!headers) return;
+    try {
+      const response = await fetch('/api/categories', { headers });
+      if (response.ok) {
+        const data = await response.json();
+        setAllCategories(data.categories ?? []);
+      }
+    } catch {}
+  }, [authHeaders]);
 
   const load = useCallback(async () => {
     const headers = authHeaders();
@@ -47,21 +91,34 @@ export default function CategoriesPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/categories', { headers });
+      const params = new URLSearchParams({
+        paginate: 'true',
+        page: String(page),
+        limit: String(limit),
+        parentId: 'all',
+      });
+      if (search) params.set('search', search);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+
+      const response = await fetch(`/api/categories?${params.toString()}`, { headers });
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.error || 'Gagal memuat kategori');
       setCategories(data.categories ?? []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotal(data.pagination?.total || 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat kategori');
     } finally {
       setLoading(false);
     }
-  }, [authHeaders]);
+  }, [page, limit, search, startDate, endDate, authHeaders]);
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadAll();
+  }, [load, loadAll]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -148,12 +205,12 @@ export default function CategoriesPage() {
   };
 
   const parentName = (parentId: string | null) =>
-    categories.find((category) => category.id === parentId)?.name ?? '—';
+    allCategories.find((category) => category.id === parentId)?.name ?? '—';
 
   // ponytail: only blocks a category from being its own parent. Deeper cycles
   // are already allowed by the API; add a chain walk when a cycle actually
   // breaks the storefront.
-  const parentOptions = categories.filter((category) => category.id !== editingId);
+  const parentOptions = allCategories.filter((category) => category.id !== editingId);
 
   return (
     <div className="space-y-6">
@@ -273,11 +330,34 @@ export default function CategoriesPage() {
       </form>
 
       <div className="bg-white rounded-lg shadow border">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-gray-900">
             Daftar Kategori{' '}
-            {categories.length > 0 && <span className="text-gray-400 font-normal">({categories.length})</span>}
+            {total > 0 && <span className="text-gray-400 font-normal">({total})</span>}
           </h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              placeholder="Cari kategori..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs border border-gray-300 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500 w-full sm:w-48"
+            />
+            <DateRangeFilter
+              compact
+              startDate={startDate}
+              endDate={endDate}
+              onFilterChange={({ startDate: s, endDate: e }) => {
+                setStartDate(s);
+                setEndDate(e);
+                setPage(1);
+              }}
+            />
+          </div>
         </div>
 
         {loading ? (
@@ -290,48 +370,64 @@ export default function CategoriesPage() {
           </div>
         ) : categories.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-gray-500">Belum ada kategori. Tambahkan yang pertama di form atas.</p>
+            <p className="text-gray-500">Belum ada kategori yang sesuai filter.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Nama</th>
-                  <th className="px-4 py-3 font-medium">Slug</th>
-                  <th className="px-4 py-3 font-medium">Induk</th>
-                  <th className="px-4 py-3 font-medium">Deskripsi</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.map((category) => (
-                  <tr key={category.id} className="border-t">
-                    <td className="px-4 py-3 font-medium text-gray-900">{category.name}</td>
-                    <td className="px-4 py-3 text-gray-500">{category.slug}</td>
-                    <td className="px-4 py-3 text-gray-500">{parentName(category.parentId)}</td>
-                    <td className="px-4 py-3 text-gray-500">{category.description || '—'}</td>
-                    <td className="px-4 py-3 text-right space-x-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(category)}
-                        className="text-indigo-600 hover:underline"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(category)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Hapus
-                      </button>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-left text-gray-500">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Nama</th>
+                    <th className="px-4 py-3 font-medium">Slug</th>
+                    <th className="px-4 py-3 font-medium">Induk</th>
+                    <th className="px-4 py-3 font-medium">Deskripsi</th>
+                    <th className="px-4 py-3 font-medium text-right">Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {categories.map((category) => (
+                    <tr key={category.id} className="border-t hover:bg-gray-50/50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{category.name}</td>
+                      <td className="px-4 py-3 text-gray-500">{category.slug}</td>
+                      <td className="px-4 py-3 text-gray-500">{parentName(category.parentId)}</td>
+                      <td className="px-4 py-3 text-gray-500">{category.description || '—'}</td>
+                      <td className="px-4 py-3 text-right space-x-3 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(category)}
+                          className="text-indigo-600 hover:underline"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(category)}
+                          className="text-red-600 hover:underline"
+                        >
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                totalItems={total}
+                limit={limit}
+                onPageChange={(p) => setPage(p)}
+                onLimitChange={(l) => {
+                  setLimit(l);
+                  setPage(1);
+                }}
+              />
+            </div>
+          </>
         )}
       </div>
     </div>
