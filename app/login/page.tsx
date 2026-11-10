@@ -22,8 +22,8 @@ export default async function LoginPage({
 
   const effectiveStore = store || {
     id: 'demo-store-001',
-    name: 'AI SEO E-Commerce Store',
-    domain: 'demo-store.local',
+    name: 'LarisManis Demo Store',
+    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online',
     isDemo: true,
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };

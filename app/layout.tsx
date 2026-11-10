@@ -4,7 +4,7 @@ import { getActiveStore } from '@/lib/store';
 import CookieConsentBanner from '@/components/CookieConsentBanner';
 import MasterThirdPartyTracker from '@/components/MasterThirdPartyTracker';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
 import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
@@ -14,8 +14,24 @@ export async function generateMetadata(): Promise<Metadata> {
 
   const title = s?.defaultSeoTitle || store?.name || 'AI SEO E-Commerce SaaS';
   const description = s?.defaultSeoDescription || s?.tagline || 'Platform E-Commerce SaaS dengan SEO Friendly, Keamanan Tinggi, dan Fitur Lengkap';
-  const domain = store?.domain || 'localhost:3000';
-  const siteUrl = `https://${domain}`;
+
+  let requestHost: string | null = null;
+  try {
+    const headerList = headers();
+    const rawHost = headerList.get('x-forwarded-host') || headerList.get('host');
+    const cleaned = rawHost?.split(':')[0]?.trim().toLowerCase();
+    if (cleaned && cleaned !== 'localhost' && cleaned !== '127.0.0.1') {
+      requestHost = cleaned;
+    }
+  } catch {
+    // Ignore outside request context
+  }
+
+  const rawDomain = store?.domain || process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online';
+  const domain = rawDomain.endsWith('.local') && requestHost ? requestHost : rawDomain;
+  const siteUrl = domain.startsWith('localhost') || domain.startsWith('127.0.0.1')
+    ? `http://${domain}`
+    : `https://${domain}`;
   const favicon = s?.favicon || '/favicon.ico';
 
   return {
