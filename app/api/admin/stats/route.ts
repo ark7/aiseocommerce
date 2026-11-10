@@ -18,24 +18,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
     }
     
+    // Every number on the dashboard describes the real business, so sandbox
+    // products and orders are excluded at the query rather than filtered after.
     const [
       productsCount,
       ordersCount,
       customersCount,
       pendingOrdersCount,
       paidOrders,
+      sandboxOrdersCount,
     ] = await Promise.all([
-      prisma.product.count({ where: { storeId: user.storeId } }),
-      prisma.order.count({ where: { storeId: user.storeId } }),
+      prisma.product.count({ where: { storeId: user.storeId, sandboxEnabled: false } }),
+      prisma.order.count({ where: { storeId: user.storeId, isSandbox: false } }),
       prisma.user.count({ 
         where: { storeId: user.storeId, role: 'CUSTOMER' } 
       }),
       prisma.order.count({ 
-        where: { storeId: user.storeId, status: 'PENDING' } 
+        where: { storeId: user.storeId, status: 'PENDING', isSandbox: false } 
       }),
       prisma.order.findMany({
-        where: { storeId: user.storeId, status: 'PAID' },
+        where: { storeId: user.storeId, status: 'PAID', isSandbox: false },
       }),
+      prisma.order.count({ where: { storeId: user.storeId, isSandbox: true } }),
     ]);
     
     // `totalAmount` is the column on Order; there is no `total`, so the old
@@ -48,6 +52,7 @@ export async function GET(request: Request) {
       customers: customersCount,
       revenue: revenue,
       pendingOrders: pendingOrdersCount,
+      sandboxOrders: sandboxOrdersCount,
     };
     
     return NextResponse.json({ success: true, stats });

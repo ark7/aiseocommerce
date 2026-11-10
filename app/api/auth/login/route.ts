@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { loginUser } from '@/lib/auth';
 import { getIPAddress } from '@/lib/ip';
 import { z } from 'zod';
+import { verifyTurnstile, isTurnstileRequired } from '@/lib/turnstile';
 
 // Simple rate limit tracking (in-memory, resets on each deploy)
 const loginAttempts = new Map<string, { count: number; resetTime: number }>();
@@ -14,7 +16,7 @@ async function incrementLoginAttempts(ip: string): Promise<void> {
   const key = `login_attempts:${ip}`;
   const existing = loginAttempts.get(key);
   const now = Date.now();
-  
+
   if (existing) {
     if (now > existing.resetTime) {
       loginAttempts.set(key, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
@@ -29,6 +31,8 @@ async function incrementLoginAttempts(ip: string): Promise<void> {
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  turnstileToken: z.string().optional(),
+  storeId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -38,45 +42,112 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: validation.error.format() }, { status: 400 });
     }
-    
-    const { email, password } = validation.data;
+
+    const { email, password, turnstileToken, storeId: bodyStoreId } = validation.data;
     const ip = getIPAddress(request);
-    
+
     const host = request.headers.get('host');
     const domain = host?.split(':')[0];
-    
+
     // Try to find store by domain, or use the first store for local development
-    let store = await prisma.store.findUnique({ where: { domain } });
-    
-    // Fallback: if no store found by domain, use the first available store (for local dev)
+    let store = await prisma.store.findUnique({
+      where: { domain },
+      include: { settings: true }
+    });
+
+    if (!store && bodyStoreId) {
+      store = await prisma.store.findUnique({
+        where: { id: bodyStoreId },
+        include: { settings: true }
+      });
+    }
+
     if (!store) {
-      store = await prisma.store.findFirst();
+      store = await getActiveStore(domain);
       if (!store) {
         return NextResponse.json({ error: 'No store configured' }, { status: 500 });
       }
     }
-    
-    const result = await loginUser(store.id, email, password, request);
+
+    // Turnstile verification
+    const { required, error: configError } = isTurnstileRequired(
+      store.settings?.turnstileEnabled ?? false,
+      store.settings?.turnstileSecretKey
+    );
+
+    if (required) {
+      if (configError) {
+        return NextResponse.json({ error: configError }, { status: 500 });
+      }
+      if (!turnstileToken) {
+        return NextResponse.json({ error: 'Turnstile verification required' }, { status: 400 });
+      }
+      const verified = await verifyTurnstile(
+        store.settings?.turnstileSecretKey || '',
+        turnstileToken,
+        ip
+      );
+      if (!verified) {
+        return NextResponse.json({ error: 'Turnstile verification failed' }, { status: 400 });
+      }
+    }
+
+    let result = await loginUser(store.id, email, password, request);
+
+    // Smart Localhost / Development fallback:
+    // When running locally on localhost/127.0.0.1, the incoming request does not have a tenant-specific domain.
+    // If the user is not found in the currently resolved active store, search across stores for a user with
+    // this email. If a matching active account with valid password exists, authenticate into that store
+    // and seamlessly update the active store session.
+    const isLocalhost = !domain || domain === 'localhost' || domain === '127.0.0.1';
+    if (!result && isLocalhost) {
+      const candidateUsers = await prisma.user.findMany({
+        where: { email, isActive: true },
+        include: { store: { include: { settings: true } } },
+      });
+      for (const candidate of candidateUsers) {
+        if (candidate.store && candidate.storeId !== store.id) {
+          const candidateResult = await loginUser(candidate.storeId, email, password, request);
+          if (candidateResult) {
+            result = candidateResult;
+            store = candidate.store;
+            break;
+          }
+        }
+      }
+    }
+
     if (!result) {
       await incrementLoginAttempts(ip);
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
-    
+
     const response = NextResponse.json({
       success: true,
-      user: { id: result.user.id, email: result.user.email, role: result.user.role, storeId: result.user.storeId, firstName: result.user.firstName, lastName: result.user.lastName },
+      user: {
+        id: result.user.id,
+        email: result.user.email,
+        role: result.user.role,
+        storeId: result.user.storeId,
+        firstName: result.user.firstName,
+        lastName: result.user.lastName,
+        title: result.user.title ?? null,
+        permissions: result.user.permissions ?? [],
+      },
       token: result.token,
       refreshToken: result.refreshToken,
     });
 
-    // middleware.ts gates /admin on a `token` cookie, so it has to be set here —
-    // the token in the body alone leaves every admin page bouncing to /login.
-    // ponytail: the client still reads localStorage for its Authorization
-    // headers; move those onto this cookie and drop localStorage the next time
-    // the admin pages are touched.
     const isProduction = process.env.NODE_ENV === 'production';
     response.cookies.set('token', result.token, {
       httpOnly: true,
+      sameSite: 'lax',
+      secure: isProduction,
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7,
+    });
+    response.cookies.set('active_store_domain', store.domain, {
+      httpOnly: false,
       sameSite: 'lax',
       secure: isProduction,
       path: '/',

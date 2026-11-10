@@ -1,4 +1,4 @@
-import { ALLOWED_TRANSITIONS, canTransition, nextStatuses } from '@/lib/orderStatus';
+import { ALLOWED_TRANSITIONS, REVENUE_STATUSES, canTransition, nextStatuses } from '@/lib/orderStatus';
 import type { OrderStatus } from '@prisma/client';
 
 const ALL_STATUSES = Object.keys(ALLOWED_TRANSITIONS) as OrderStatus[];
@@ -32,6 +32,15 @@ describe('order status transitions', () => {
   it('never lists a status as reachable from itself', () => {
     for (const status of ALL_STATUSES) {
       expect(ALLOWED_TRANSITIONS[status]).not.toContain(status);
+    }
+  });
+
+  it('counts paid-and-later orders as revenue, but not money owed or given back', () => {
+    expect(REVENUE_STATUSES).toEqual(
+      expect.arrayContaining(['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'COMPLETED'])
+    );
+    for (const unpaid of ['PENDING', 'MANUAL_VERIFICATION', 'CANCELLED', 'REFUNDED'] as OrderStatus[]) {
+      expect(REVENUE_STATUSES).not.toContain(unpaid);
     }
   });
 

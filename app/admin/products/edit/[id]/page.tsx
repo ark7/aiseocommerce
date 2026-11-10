@@ -16,28 +16,79 @@ interface Category {
   name: string;
 }
 
+interface FormVariant {
+  id: string;
+  optionType: 'SIZE' | 'COLOR' | 'CUSTOM';
+  optionValue: string;
+  name: string;
+  sku: string;
+  price: string;
+  stock: string;
+}
+
 const EMPTY_FORM = {
   name: '',
   slug: '',
   description: '',
   shortDescription: '',
+  productType: 'PHYSICAL',
+  digitalFileUrl: '',
+  digitalInstructions: '',
+  eventStartDate: '',
+  eventEndDate: '',
+  eventLocationType: 'ONLINE',
+  eventVenueName: '',
+  eventLocationAddress: '',
+  eventQuota: '',
+  eventBenefits: '',
   basePrice: '',
   sellingPrice: '',
   discountPrice: '',
+  saleStartsAt: '',
+  saleEndsAt: '',
+  saleQuota: '',
   sku: '',
   categoryId: '',
   stock: '',
   minStock: '',
+  isPreOrder: false,
+  preOrderDays: '7',
+  preOrderMessage: '',
   isPublished: true,
   isFeatured: false,
+  sandboxEnabled: false,
   seoTitle: '',
   seoDescription: '',
   seoKeywords: '',
+  shopeeUrl: '',
+  tokopediaUrl: '',
+  tiktokShopUrl: '',
+  blibliUrl: '',
+  customMarketplaceName: '',
+  customMarketplaceUrl: '',
 };
 
 /** null and undefined both mean "not set" in the API payload; the form only knows strings. */
 function asText(value: unknown): string {
   return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * `<input type="datetime-local">` hanya menerima `YYYY-MM-DDTHH:mm` waktu
+ * lokal. API mengirim ISO penuh dengan `Z`, dan menempelkannya apa adanya
+ * membuat kolomnya kosong — jendela diskon jadi terlihat hilang padahal ada.
+ */
+function toDateTimeInput(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '';
+
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return '';
+
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
 
 export default function EditProduct() {
@@ -54,6 +105,71 @@ export default function EditProduct() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variants, setVariants] = useState<FormVariant[]>([]);
+
+  const addVariant = (type: 'SIZE' | 'COLOR' | 'CUSTOM' = 'CUSTOM') => {
+    setVariants((prev) => [
+      ...prev,
+      {
+        id: 'var_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        optionType: type,
+        optionValue: '',
+        name: '',
+        sku: '',
+        price: formData.sellingPrice || '',
+        stock: '10',
+      },
+    ]);
+    setHasVariants(true);
+  };
+
+  const addPresetSizes = () => {
+    const sizes = ['S', 'M', 'L', 'XL', 'XXL'];
+    const newVars: FormVariant[] = sizes.map((s) => ({
+      id: 'var_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      optionType: 'SIZE',
+      optionValue: s,
+      name: `Ukuran: ${s}`,
+      sku: formData.sku ? `${formData.sku}-${s}` : '',
+      price: formData.sellingPrice || '',
+      stock: '10',
+    }));
+    setVariants((prev) => [...prev, ...newVars]);
+    setHasVariants(true);
+  };
+
+  const addPresetColors = () => {
+    const colors = ['Hitam', 'Putih', 'Merah', 'Navy'];
+    const newVars: FormVariant[] = colors.map((c) => ({
+      id: 'var_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      optionType: 'COLOR',
+      optionValue: c,
+      name: `Warna: ${c}`,
+      sku: formData.sku ? `${formData.sku}-${c.toUpperCase().substring(0, 3)}` : '',
+      price: formData.sellingPrice || '',
+      stock: '10',
+    }));
+    setVariants((prev) => [...prev, ...newVars]);
+    setHasVariants(true);
+  };
+
+  const updateVariant = (index: number, field: keyof FormVariant, value: string) => {
+    setVariants((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      if (field === 'optionValue' && !next[index].name) {
+        const typeLabel = next[index].optionType === 'SIZE' ? 'Ukuran' : next[index].optionType === 'COLOR' ? 'Warna' : 'Varian';
+        next[index].name = `${typeLabel}: ${value}`;
+      }
+      return next;
+    });
+  };
+
+  const removeVariant = (index: number) => {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const authHeaders = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -85,20 +201,58 @@ export default function EditProduct() {
         slug: asText(product.slug),
         description: asText(product.description),
         shortDescription: asText(product.shortDescription),
+        productType: product.productType || 'PHYSICAL',
+        digitalFileUrl: asText(product.digitalFileUrl),
+        digitalInstructions: asText(product.digitalInstructions),
+        eventStartDate: toDateTimeInput(product.eventStartDate),
+        eventEndDate: toDateTimeInput(product.eventEndDate),
+        eventLocationType: product.eventLocationType || 'ONLINE',
+        eventVenueName: asText(product.eventVenueName),
+        eventLocationAddress: asText(product.eventLocationAddress),
+        eventQuota: asText(product.eventQuota),
+        eventBenefits: Array.isArray(product.eventBenefits) ? product.eventBenefits.join('\n') : asText(product.eventBenefits),
         basePrice: asText(product.basePrice),
         sellingPrice: asText(product.sellingPrice),
         discountPrice: asText(product.discountPrice),
+        saleStartsAt: toDateTimeInput(product.saleStartsAt),
+        saleEndsAt: toDateTimeInput(product.saleEndsAt),
+        saleQuota: asText(product.saleQuota),
         sku: asText(product.sku),
         categoryId: asText(product.categoryId),
         stock: asText(product.stock),
         minStock: asText(product.minStock),
+        isPreOrder: Boolean(product.isPreOrder),
+        preOrderDays: asText(product.preOrderDays || '7'),
+        preOrderMessage: asText(product.preOrderMessage),
         isPublished: Boolean(product.isPublished),
         isFeatured: Boolean(product.isFeatured),
+        sandboxEnabled: Boolean(product.sandboxEnabled),
         seoTitle: asText(product.seoTitle),
         seoDescription: asText(product.seoDescription),
         seoKeywords: asText(product.seoKeywords),
+        shopeeUrl: asText(product.shopeeUrl),
+        tokopediaUrl: asText(product.tokopediaUrl),
+        tiktokShopUrl: asText(product.tiktokShopUrl),
+        blibliUrl: asText(product.blibliUrl),
+        customMarketplaceName: asText(product.customMarketplaceName),
+        customMarketplaceUrl: asText(product.customMarketplaceUrl),
       });
       setExistingImages(product.images ?? []);
+
+      const fetchedVariants: FormVariant[] = Array.isArray(product.variants) && product.variants.length > 0
+        ? product.variants.map((v: any) => ({
+            id: v.id || ('var_' + Math.random().toString(36).substring(2, 6)),
+            optionType: v.optionType || 'CUSTOM',
+            optionValue: asText(v.optionValue),
+            name: asText(v.name),
+            sku: asText(v.sku),
+            price: asText(v.price),
+            stock: asText(v.stock),
+          }))
+        : [];
+
+      setVariants(fetchedVariants);
+      setHasVariants(fetchedVariants.length > 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat produk');
     } finally {
@@ -178,6 +332,26 @@ export default function EditProduct() {
       deletedImageIds.forEach((imageId) => payload.append(`deleteImage_${imageId}`, imageId));
       images.forEach((image) => payload.append('images', image));
 
+      if (hasVariants && variants.length > 0) {
+        const totalVariantStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
+        payload.set('stock', String(totalVariantStock));
+        payload.append(
+          'variants',
+          JSON.stringify(
+            variants.map((v) => ({
+              optionType: v.optionType,
+              optionValue: v.optionValue.trim(),
+              name: v.name.trim() || `${v.optionType === 'SIZE' ? 'Ukuran' : v.optionType === 'COLOR' ? 'Warna' : 'Varian'}: ${v.optionValue.trim()}`,
+              sku: v.sku.trim() || null,
+              price: v.price ? Number(v.price) : null,
+              stock: Math.max(0, parseInt(v.stock) || 0),
+            }))
+          )
+        );
+      } else {
+        payload.append('variants', JSON.stringify([]));
+      }
+
       const response = await fetch('/api/products', {
         method: 'PATCH',
         headers,
@@ -248,6 +422,41 @@ export default function EditProduct() {
         {/* Product Information */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Informasi Produk</h2>
+
+          {/* Product Type Selector */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Produk / Komoditas *</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'PHYSICAL' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'PHYSICAL' ? 'bg-indigo-50 border-indigo-600 ring-2 ring-indigo-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">📦</div>
+                <div className="text-sm font-bold text-gray-900">Produk Fisik</div>
+                <div className="text-xs text-gray-500 mt-0.5">Barang fisik yang dikirim melalui kurir ekspedisi</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'DIGITAL' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'DIGITAL' ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">💻</div>
+                <div className="text-sm font-bold text-blue-900">Produk Digital / File</div>
+                <div className="text-xs text-blue-700 mt-0.5">E-book, template, software, file unduh langsung</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData((prev) => ({ ...prev, productType: 'EVENT' }))}
+                className={`p-3.5 rounded-xl border text-left transition ${formData.productType === 'EVENT' ? 'bg-purple-50 border-purple-600 ring-2 ring-purple-500/20' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
+              >
+                <div className="text-xl mb-1">🎟️</div>
+                <div className="text-sm font-bold text-purple-900">Event / Seminar</div>
+                <div className="text-xs text-purple-700 mt-0.5">Webinar online Zoom, seminar, tiket workshop</div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="name">
@@ -313,6 +522,163 @@ export default function EditProduct() {
           </div>
         </div>
 
+        {/* Digital Product Delivery Settings */}
+        {formData.productType === 'DIGITAL' && (
+          <div className="bg-blue-50/50 p-5 rounded-xl border border-blue-200 space-y-4">
+            <h2 className="text-base font-bold text-blue-900 flex items-center gap-2">
+              <span>💻</span>
+              <span>Pengaturan Pengiriman Produk Digital (Instant Access)</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="digitalFileUrl">
+                  Tautan / Link Unduhan File Digital (URL) *
+                </label>
+                <input
+                  id="digitalFileUrl"
+                  type="url"
+                  name="digitalFileUrl"
+                  value={formData.digitalFileUrl}
+                  onChange={handleChange}
+                  placeholder="https://drive.google.com/... atau https://dropbox.com/..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Tautan ini otomatis diberikan kepada pembeli di halaman rincian pesanan dan notifikasi WhatsApp/Telegram setelah pembayaran Lunas.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="digitalInstructions">
+                  Petunjuk Akses / Cara Menggunakan File
+                </label>
+                <textarea
+                  id="digitalInstructions"
+                  name="digitalInstructions"
+                  rows={2}
+                  value={formData.digitalInstructions}
+                  onChange={handleChange}
+                  placeholder="Contoh: Ekstrak file .zip, buka folder dokumen, gunakan password 'VIP2026'..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Event / Seminar Settings */}
+        {formData.productType === 'EVENT' && (
+          <div className="bg-purple-50/50 p-5 rounded-xl border border-purple-200 space-y-4">
+            <h2 className="text-base font-bold text-purple-900 flex items-center gap-2">
+              <span>🎟️</span>
+              <span>Pengaturan Detail Seminar & Event</span>
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventStartDate">
+                  Tanggal & Jam Mulai Acara *
+                </label>
+                <input
+                  id="eventStartDate"
+                  type="datetime-local"
+                  name="eventStartDate"
+                  value={formData.eventStartDate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventEndDate">
+                  Tanggal & Jam Selesai Acara
+                </label>
+                <input
+                  id="eventEndDate"
+                  type="datetime-local"
+                  name="eventEndDate"
+                  value={formData.eventEndDate}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventLocationType">
+                  Format Pelaksanaan Acara
+                </label>
+                <select
+                  id="eventLocationType"
+                  name="eventLocationType"
+                  value={formData.eventLocationType}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="ONLINE">💻 Online (Zoom / Webinar / Live)</option>
+                  <option value="OFFLINE">📍 Offline (Tatap Muka di Lokasi)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventVenueName">
+                  Nama Platform / Gedung
+                </label>
+                <input
+                  id="eventVenueName"
+                  type="text"
+                  name="eventVenueName"
+                  value={formData.eventVenueName}
+                  onChange={handleChange}
+                  placeholder="Misal: Zoom Cloud Meetings atau Hotel Mulia"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventQuota">
+                  Kuota Maksimal Peserta Tiket
+                </label>
+                <input
+                  id="eventQuota"
+                  type="number"
+                  name="eventQuota"
+                  value={formData.eventQuota}
+                  onChange={handleChange}
+                  placeholder="Misal: 100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventLocationAddress">
+                {formData.eventLocationType === 'ONLINE' ? 'Tautan Ruang Meeting (Zoom / GMeet / Webinar)' : 'Alamat Lengkap Venue'}
+              </label>
+              <input
+                id="eventLocationAddress"
+                type="text"
+                name="eventLocationAddress"
+                value={formData.eventLocationAddress}
+                onChange={handleChange}
+                placeholder={formData.eventLocationType === 'ONLINE' ? 'https://zoom.us/j/... (Diberikan ke pembeli setelah lunas)' : 'Jl. Gatot Subroto No. Kav 1...'}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="eventBenefits">
+                Fasilitas Peserta (Ketik satu per baris)
+              </label>
+              <textarea
+                id="eventBenefits"
+                name="eventBenefits"
+                rows={3}
+                value={formData.eventBenefits}
+                onChange={handleChange}
+                placeholder="E-Sertifikat Resmi Ber-SKP&#10;Rekaman Video Full HD&#10;Slide Materi PDF&#10;Grup Diskusi WhatsApp"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 font-mono text-xs"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Pricing */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Harga</h2>
@@ -365,47 +731,407 @@ export default function EditProduct() {
               />
             </div>
           </div>
-        </div>
 
-        {/* Inventory */}
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Persediaan</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p className="mt-4 text-xs text-gray-500">
+            Harga diskon tanpa jadwal dan tanpa kuota akan tayang terus. Isi salah satu di bawah
+            untuk menjadikannya penawaran berbatas waktu.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="stock">
-                Stok Tersedia *
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleStartsAt">
+                Mulai Berlaku
               </label>
               <input
-                id="stock"
-                type="number"
-                name="stock"
-                value={formData.stock}
+                type="datetime-local"
+                id="saleStartsAt"
+                name="saleStartsAt"
+                value={formData.saleStartsAt}
                 onChange={handleChange}
-                required
-                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minStock">
-                Stok Minimum
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleEndsAt">
+                Berakhir Pada
               </label>
               <input
-                id="minStock"
-                type="number"
-                name="minStock"
-                value={formData.minStock}
+                type="datetime-local"
+                id="saleEndsAt"
+                name="saleEndsAt"
+                value={formData.saleEndsAt}
                 onChange={handleChange}
-                min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleQuota">
+                Kuota Harga Diskon
+              </label>
+              <input
+                type="number"
+                id="saleQuota"
+                name="saleQuota"
+                value={formData.saleQuota}
+                onChange={handleChange}
+                min="1"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Tanpa batas"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Kosongkan untuk tanpa batas kuota.
+              </p>
             </div>
           </div>
+        </div>
+
+        {/* Inventory & Availability */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Persediaan &amp; Tipe Ketersediaan</h2>
+
+          {/* Tipe Ketersediaan: Ready Stock vs Pre-Order */}
+          <div className="mb-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              Status Ketersediaan Produk *
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                  !formData.isPreOrder
+                    ? 'border-indigo-600 bg-white ring-2 ring-indigo-500/20'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="isPreOrder"
+                  checked={!formData.isPreOrder}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPreOrder: false }))}
+                  className="mt-1 text-indigo-600 focus:ring-indigo-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-sm font-bold text-gray-900">🟢 Ready Stock</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Barang fisik siap kirim. Jumlah stok akan ditampilkan ke pelanggan.
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start p-3 rounded-lg border cursor-pointer transition-all ${
+                  formData.isPreOrder
+                    ? 'border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20'
+                    : 'border-gray-200 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="isPreOrder"
+                  checked={formData.isPreOrder}
+                  onChange={() => setFormData((prev) => ({ ...prev, isPreOrder: true }))}
+                  className="mt-1 text-amber-600 focus:ring-amber-500"
+                />
+                <div className="ml-3">
+                  <span className="block text-sm font-bold text-amber-900">⏳ Pre-Order (PO)</span>
+                  <span className="block text-xs text-amber-700 mt-0.5">
+                    Produk diproduksi/dipesan terlebih dahulu. Jumlah stok disembunyikan dari pembeli.
+                  </span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {!formData.isPreOrder ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="stock">
+                  Stok Tersedia * {hasVariants && variants.length > 0 && <span className="text-indigo-600 text-xs font-normal">(Dihitung otomatis dari {variants.length} varian)</span>}
+                </label>
+                <input
+                  id="stock"
+                  type="number"
+                  name="stock"
+                  value={hasVariants && variants.length > 0 ? variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0) : formData.stock}
+                  onChange={handleChange}
+                  readOnly={hasVariants && variants.length > 0}
+                  required
+                  min="0"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${hasVariants && variants.length > 0 ? 'bg-gray-100 text-gray-600 border-gray-200 cursor-not-allowed' : 'border-gray-300'}`}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="minStock">
+                  Stok Minimum (Peringatan Habis)
+                </label>
+                <input
+                  id="minStock"
+                  type="number"
+                  name="minStock"
+                  value={formData.minStock}
+                  onChange={handleChange}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 bg-amber-50/40 p-4 rounded-xl border border-amber-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="preOrderDays">
+                    Estimasi Pengerjaan / Pengiriman (Hari) *
+                  </label>
+                  <input
+                    id="preOrderDays"
+                    type="number"
+                    name="preOrderDays"
+                    value={formData.preOrderDays}
+                    onChange={handleChange}
+                    required
+                    min="1"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                    placeholder="7"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Contoh: 7 hari kerja atau 14 hari.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="stock">
+                    Batas Kuota Pemesanan PO (Opsional)
+                  </label>
+                  <input
+                    id="stock"
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                    placeholder="Tanpa batas"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Kosongkan jika kapasitas PO tidak dibatasi.</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1" htmlFor="preOrderMessage">
+                  Catatan Tambahan PO (Opsional)
+                </label>
+                <input
+                  id="preOrderMessage"
+                  type="text"
+                  name="preOrderMessage"
+                  value={formData.preOrderMessage}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+                  placeholder="Contoh: Estimasi pengiriman mulai tanggal 25 atau 7-10 hari kerja"
+                />
+              </div>
+            </div>
+          )}
           <p className="text-sm text-gray-400 mt-2">
             Perubahan stok di sini tidak tercatat di riwayat stok. Pakai menu stok untuk penyesuaian yang perlu tercatat.
           </p>
+        </div>
+
+        {/* Product Variants & Individual Stock */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-100 pb-4">
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-lg font-semibold text-gray-900">Varian Produk &amp; Stok Terpisah</h2>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Fisik &amp; Digital
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Gunakan varian jika produk memiliki opsi seperti Ukuran (S/M/L), Warna, atau Custom Form dengan stok dan harga masing-masing.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={hasVariants}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setHasVariants(checked);
+                  if (checked && variants.length === 0) {
+                    addVariant('SIZE');
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              <span className="ml-3 text-sm font-semibold text-gray-800">
+                {hasVariants ? 'Varian Aktif' : 'Tanpa Varian'}
+              </span>
+            </label>
+          </div>
+
+          {hasVariants && (
+            <div className="space-y-4 pt-2">
+              {/* Presets and Actions */}
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-gray-600">Template Cepat:</span>
+                  <button
+                    type="button"
+                    onClick={addPresetSizes}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 shadow-sm transition-colors"
+                  >
+                    + Ukuran (S, M, L, XL, XXL)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addPresetColors}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 shadow-sm transition-colors"
+                  >
+                    + Warna (Hitam, Putih, Merah, Navy)
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => addVariant('SIZE')}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  >
+                    + 1 Ukuran
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addVariant('COLOR')}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 transition-colors"
+                  >
+                    + 1 Warna
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addVariant('CUSTOM')}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  >
+                    + Varian Kustom
+                  </button>
+                </div>
+              </div>
+
+              {/* Variants List / Table */}
+              {variants.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                  <p className="text-sm text-gray-500">Belum ada varian yang ditambahkan.</p>
+                  <p className="text-xs text-gray-400 mt-1">Gunakan tombol template cepat di atas atau tambah varian manual.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 text-left text-xs">
+                      <thead className="bg-gray-50 text-gray-600 font-semibold uppercase tracking-wider">
+                        <tr>
+                          <th className="px-3 py-2.5">Tipe</th>
+                          <th className="px-3 py-2.5">Opsi / Nilai *</th>
+                          <th className="px-3 py-2.5">Nama Label</th>
+                          <th className="px-3 py-2.5">SKU Varian</th>
+                          <th className="px-3 py-2.5">Harga Khusus (Rp)</th>
+                          <th className="px-3 py-2.5">Stok *</th>
+                          <th className="px-3 py-2.5 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {variants.map((v, index) => (
+                          <tr key={v.id} className="hover:bg-gray-50/75">
+                            <td className="px-3 py-2">
+                              <select
+                                value={v.optionType}
+                                onChange={(e) => updateVariant(index, 'optionType', e.target.value as any)}
+                                className="w-28 px-2 py-1 border border-gray-300 rounded text-xs bg-white focus:ring-1 focus:ring-indigo-500"
+                              >
+                                <option value="SIZE">Ukuran / Size</option>
+                                <option value="COLOR">Warna / Color</option>
+                                <option value="CUSTOM">Custom Form</option>
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={v.optionValue}
+                                onChange={(e) => updateVariant(index, 'optionValue', e.target.value)}
+                                placeholder={v.optionType === 'SIZE' ? 'Misal: XL' : v.optionType === 'COLOR' ? 'Misal: Navy' : 'Misal: 1 Bulan'}
+                                required
+                                className="w-32 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={v.name}
+                                onChange={(e) => updateVariant(index, 'name', e.target.value)}
+                                placeholder={`${v.optionType === 'SIZE' ? 'Ukuran' : v.optionType === 'COLOR' ? 'Warna' : 'Varian'}: ${v.optionValue}`}
+                                className="w-36 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={v.sku}
+                                onChange={(e) => updateVariant(index, 'sku', e.target.value)}
+                                placeholder="Opsional"
+                                className="w-28 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                value={v.price}
+                                onChange={(e) => updateVariant(index, 'price', e.target.value)}
+                                placeholder={formData.sellingPrice || 'Sama dgn produk'}
+                                className="w-28 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                min="0"
+                                required
+                                value={v.stock}
+                                onChange={(e) => updateVariant(index, 'stock', e.target.value)}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded text-xs font-semibold focus:ring-1 focus:ring-indigo-500"
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => removeVariant(index)}
+                                className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50"
+                                title="Hapus Varian"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Summary Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-gray-600 bg-indigo-50/50 border border-indigo-100 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold text-indigo-900">Total Varian: {variants.length}</span>
+                      <span>•</span>
+                      <span className="font-semibold text-indigo-900">
+                        Total Akumulasi Stok: {variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0)} unit
+                      </span>
+                    </div>
+                    <span className="text-gray-500 mt-1 sm:mt-0">
+                      * Stok produk utama akan disinkronkan otomatis saat disimpan.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Description */}
@@ -446,7 +1172,16 @@ export default function EditProduct() {
 
         {/* Images */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Gambar Produk</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Gambar Produk</h2>
+            <Link
+              href={`/admin/ai?productId=${id}`}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-95 shadow-xs"
+            >
+              <span>✨</span>
+              <span>Buat Foto Jualan AI</span>
+            </Link>
+          </div>
           <div className="space-y-4">
             {visibleExistingImages.length > 0 && (
               <div>
@@ -494,8 +1229,8 @@ export default function EditProduct() {
                 <svg className="w-12 h-12 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                 </svg>
-                <p className="text-gray-500 mb-2">Drag & drop gambar atau klik untuk upload</p>
-                <p className="text-sm text-gray-400">Max 2MB per gambar. Format: JPG, PNG, WEBP</p>
+                <p className="text-gray-500 mb-1 font-medium">Drag & drop gambar atau klik untuk upload</p>
+                <p className="text-xs text-gray-400">JPG, PNG, WEBP hingga 10MB • Otomatis dikompresi ke WebP tajam & ringan</p>
               </label>
             </div>
 
@@ -579,6 +1314,115 @@ export default function EditProduct() {
           </div>
         </div>
 
+        {/* Link Marketplace & Saluran Penjualan Eksternal */}
+        <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800 shadow-xs space-y-5">
+          <div className="border-b border-gray-100 dark:border-slate-800 pb-3">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <span>🛍️</span>
+              <span>Link Marketplace & Saluran Penjualan Eksternal</span>
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+              Tambahkan tautan produk ke toko resmi Anda di marketplace agar calon pembeli dapat memilih kanal pembelian favorit mereka.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Shopee */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#EE4D2D]"></span>
+                Link Produk di Shopee
+              </label>
+              <input
+                type="url"
+                name="shopeeUrl"
+                value={formData.shopeeUrl}
+                onChange={handleChange}
+                placeholder="https://shopee.co.id/product/..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Tokopedia */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#03AC0E]"></span>
+                Link Produk di Tokopedia
+              </label>
+              <input
+                type="url"
+                name="tokopediaUrl"
+                value={formData.tokopediaUrl}
+                onChange={handleChange}
+                placeholder="https://tokopedia.com/tokoanda/..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* TikTok Shop */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-black dark:bg-slate-300"></span>
+                Link Produk di TikTok Shop
+              </label>
+              <input
+                type="url"
+                name="tiktokShopUrl"
+                value={formData.tiktokShopUrl}
+                onChange={handleChange}
+                placeholder="https://shop.tiktok.com/view/product/..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Blibli */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#0095DA]"></span>
+                Link Produk di Blibli
+              </label>
+              <input
+                type="url"
+                name="blibliUrl"
+                value={formData.blibliUrl}
+                onChange={handleChange}
+                placeholder="https://www.blibli.com/p/..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Custom Marketplace Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                Nama Marketplace Kustom
+              </label>
+              <input
+                type="text"
+                name="customMarketplaceName"
+                value={formData.customMarketplaceName}
+                onChange={handleChange}
+                placeholder="Contoh: Lazada, Bukalapak, Zalora, WhatsApp"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* Custom Marketplace URL */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-1">
+                Link Marketplace Kustom
+              </label>
+              <input
+                type="url"
+                name="customMarketplaceUrl"
+                value={formData.customMarketplaceUrl}
+                onChange={handleChange}
+                placeholder="https://www.lazada.co.id/products/..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Publish Settings */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Pengaturan Publikasi</h2>
@@ -603,6 +1447,26 @@ export default function EditProduct() {
               />
               <span className="text-gray-700">Tandai sebagai produk unggulan</span>
             </label>
+            <div className="pt-2 border-t border-gray-100">
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="sandboxEnabled"
+                  checked={formData.sandboxEnabled}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-amber-600 rounded focus:ring-amber-500 mt-0.5"
+                />
+                <div>
+                  <span className="text-gray-900 font-medium flex items-center gap-1.5">
+                    <span className="px-1.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 rounded">🧪 Sandbox</span>
+                    Tandai sebagai produk pengujian sandbox
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Produk ini digunakan untuk simulasi transaksi payment gateway sandbox. Penjualan produk ini tidak mempengaruhi transaksi atau pendapatan riil.
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 

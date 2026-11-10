@@ -50,6 +50,17 @@ prisma/migrations/**/migration_lock.toml
 public/uploads/*
 !public/uploads/.gitkeep
 
+# Private Storage (tenant-isolated storage)
+storage/proofs/*
+!storage/proofs/.gitkeep
+
 # Logs
 logs
 *.log
+
+# Claude Code: local permission grants are per machine, plans are shared
+.claude/settings.local.json
+
+# Internal Documentation & Business Strategy
+docs/internal/
+

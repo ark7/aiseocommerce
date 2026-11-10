@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import DateRangeFilter from '@/components/common/DateRangeFilter';
+import Pagination from '@/components/common/Pagination';
 
 interface CustomerRow {
   id: string;
@@ -15,14 +17,12 @@ interface CustomerRow {
   createdAt: string;
 }
 
-interface Pagination {
+interface CustomerPagination {
   page: number;
   limit: number;
   total: number;
   totalPages: number;
 }
-
-const PAGE_SIZE = 20;
 
 function formatIDR(amount: number) {
   return new Intl.NumberFormat('id-ID', {
@@ -38,11 +38,33 @@ function formatDate(value: string | null) {
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
-  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [pagination, setPagination] = useState<CustomerPagination | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch('/api/admin/settings/general', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings?.defaultPageSize) {
+            setLimit(data.settings.defaultPageSize);
+          }
+        }
+      } catch {}
+    }
+    loadSettings();
+  }, []);
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -55,8 +77,10 @@ export default function AdminCustomersPage() {
         return;
       }
 
-      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (search.trim()) params.set('search', search.trim());
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
 
       const response = await fetch(`/api/admin/customers?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -74,7 +98,7 @@ export default function AdminCustomersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, limit, search, startDate, endDate]);
 
   useEffect(() => {
     fetchCustomers();
@@ -100,7 +124,7 @@ export default function AdminCustomersPage() {
       </div>
 
       <div className="bg-white rounded-lg shadow border overflow-hidden">
-        <div className="px-4 py-3 border-b">
+        <div className="px-4 py-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <input
             type="search"
             value={search}
@@ -111,6 +135,17 @@ export default function AdminCustomersPage() {
             placeholder="Cari nama, email, atau telepon"
             aria-label="Cari pelanggan"
             className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+          />
+
+          <DateRangeFilter
+            compact
+            startDate={startDate}
+            endDate={endDate}
+            onFilterChange={({ startDate: s, endDate: e }) => {
+              setStartDate(s);
+              setEndDate(e);
+              setPage(1);
+            }}
           />
         </div>
 
@@ -174,27 +209,19 @@ export default function AdminCustomersPage() {
           </div>
         )}
 
-        {pagination && pagination.totalPages > 1 && (
-          <div className="px-4 py-3 border-t flex items-center justify-between text-sm">
-            <span className="text-gray-500">
-              Halaman {pagination.page} dari {pagination.totalPages}
-            </span>
-            <div className="space-x-2">
-              <button
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={pagination.page <= 1}
-                className="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              >
-                Sebelumnya
-              </button>
-              <button
-                onClick={() => setPage((current) => current + 1)}
-                disabled={pagination.page >= pagination.totalPages}
-                className="px-3 py-1 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-              >
-                Berikutnya
-              </button>
-            </div>
+        {pagination && (
+          <div className="px-4 py-3 border-t">
+            <Pagination
+              page={page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              limit={limit}
+              onPageChange={(p) => setPage(p)}
+              onLimitChange={(l) => {
+                setLimit(l);
+                setPage(1);
+              }}
+            />
           </div>
         )}
       </div>

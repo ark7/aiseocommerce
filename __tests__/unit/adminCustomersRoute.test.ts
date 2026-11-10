@@ -99,7 +99,7 @@ describe('GET /api/admin/customers', () => {
         totalSpent: 1500000,
       })
     );
-    expect(body.pagination).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
+    expect(body.pagination).toEqual({ page: 1, limit: 10, total: 1, totalPages: 1 });
   });
 
   it('reports zero orders for a customer with no aggregate row', async () => {

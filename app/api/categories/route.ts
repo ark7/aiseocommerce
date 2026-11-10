@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getActiveStore } from '@/lib/store';
 import { verifyToken } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { z } from 'zod';
 import { revalidateCategory } from '@/lib/revalidate';
 import { getIPAddress } from '@/lib/ip';
@@ -37,23 +39,73 @@ export async function GET(request: Request) {
     const storeId = searchParams.get('storeId');
     const parentId = searchParams.get('parentId');
     const includeProducts = searchParams.get('includeProducts') === 'true';
+    const search = searchParams.get('search');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const hasPagination = searchParams.has('page') || searchParams.has('limit') || searchParams.get('paginate') === 'true';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
     
     const where: any = {};
-    if (storeId) where.storeId = storeId;
-    else if (user) where.storeId = user.storeId;
-    if (parentId) where.parentId = parentId;
-    else where.parentId = null; // Only top-level categories by default
+    let effectiveStoreId = storeId;
+    if (!effectiveStoreId && user) {
+      effectiveStoreId = user.storeId;
+    }
+    if (!effectiveStoreId) {
+      const activeStore = await getActiveStore();
+      if (activeStore) {
+        effectiveStoreId = activeStore.id;
+      }
+    }
+    if (effectiveStoreId) {
+      where.storeId = effectiveStoreId;
+    }
+    if (parentId !== undefined && parentId !== null && parentId !== 'all') {
+      where.parentId = parentId === '' ? null : parentId;
+    } else if (parentId === null && !hasPagination && !search) {
+      where.parentId = null; // Only top-level categories by default for dropdown
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
     
-    const categories = await prisma.category.findMany({
-      where,
-      orderBy: { name: 'asc' },
-      include: {
-        children: includeProducts ? { include: { products: true } } : true,
-        ...(includeProducts ? { products: true } : {}),
-      },
+    const [categories, total] = await Promise.all([
+      prisma.category.findMany({
+        where,
+        orderBy: { name: 'asc' },
+        ...(hasPagination ? { skip: (page - 1) * limit, take: limit } : {}),
+        include: {
+          children: includeProducts ? { include: { products: true } } : true,
+          ...(includeProducts ? { products: true } : {}),
+        },
+      }),
+      prisma.category.count({ where }),
+    ]);
+    
+    return NextResponse.json({
+      success: true,
+      categories,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
-    
-    return NextResponse.json({ success: true, categories });
   } catch (error) {
     return NextResponse.json({ error: 'Fetch failed' }, { status: 500 });
   }
@@ -68,6 +120,10 @@ export async function POST(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const body = await request.json();
     const validation = createCategorySchema.safeParse(body);
@@ -126,6 +182,10 @@ export async function PATCH(request: Request) {
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
+    
     const body = await request.json();
     const validation = updateCategorySchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: validation.error.format() }, { status: 400 });
@@ -181,6 +241,10 @@ export async function DELETE(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const body = await request.json();
     const { id } = body;

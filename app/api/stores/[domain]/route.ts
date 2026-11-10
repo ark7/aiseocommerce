@@ -11,29 +11,66 @@ export async function GET(
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
     
-    const store = await prisma.store.findUnique({
-      where: { domain },
-      include: {
-        settings: true,
-        products: {
-          where: { isPublished: true },
-          take: 8,
-          orderBy: { createdAt: 'desc' },
-          include: { images: { where: { isPrimary: true }, take: 1 } },
-        },
-        categories: { where: { parentId: null }, take: 10 },
-      },
-    });
-    
+    let store = (domain !== 'current' && domain !== 'default')
+      ? await prisma.store.findUnique({
+          where: { domain },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            categories: { where: { parentId: null }, take: 10 },
+          },
+        })
+      : null;
+
+    if (!store) {
+      const defaultDomain = process.env.DEFAULT_STORE_DOMAIN || process.env.LANDING_STORE_DOMAIN;
+      if (defaultDomain) {
+        store = await prisma.store.findFirst({
+          where: { domain: defaultDomain },
+          orderBy: { createdAt: 'asc' },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            categories: { where: { parentId: null }, take: 10 },
+          },
+        });
+      }
+      if (!store) {
+        store = await prisma.store.findFirst({
+          orderBy: { createdAt: 'asc' },
+          include: {
+            settings: true,
+            products: {
+              where: { isPublished: true, sandboxEnabled: false },
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              include: { images: { where: { isPrimary: true }, take: 1 } },
+            },
+            categories: { where: { parentId: null }, take: 10 },
+          },
+        });
+      }
+    }
+
     if (!store) return NextResponse.json({ error: 'Store not found' }, { status: 404 });
     
     const [featuredProducts, totalProducts, totalCategories] = await Promise.all([
       prisma.product.findMany({
-        where: { storeId: store.id, isPublished: true, isFeatured: true },
+        where: { storeId: store.id, isPublished: true, sandboxEnabled: false, isFeatured: true },
         take: 4,
         include: { images: { where: { isPrimary: true }, take: 1 } },
       }),
-      prisma.product.count({ where: { storeId: store.id, isPublished: true } }),
+      prisma.product.count({ where: { storeId: store.id, isPublished: true, sandboxEnabled: false } }),
       prisma.category.count({ where: { storeId: store.id } }),
     ]);
     
@@ -47,7 +84,15 @@ export async function GET(
         address: store.address,
         phone: store.phone,
         email: store.email,
-        settings: store.settings,
+        settings: store.settings ? {
+          midtransMerchantId: store.settings.midtransMerchantId,
+          defaultSeoTitle: store.settings.defaultSeoTitle,
+          defaultSeoDescription: store.settings.defaultSeoDescription,
+          googleTagId: store.settings.googleTagId,
+          businessName: store.settings.businessName,
+          businessAddress: store.settings.businessAddress,
+          businessPhone: store.settings.businessPhone,
+        } : null,
         statistics: { totalProducts, totalCategories },
       },
       featuredProducts,

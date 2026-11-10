@@ -18,16 +18,26 @@ model Store {
   address   String?
   phone     String?
   email     String?
+  isDemo    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  products    Product[]
-  orders      Order[]
-  ledgers     Ledger[]
-  settings    StoreSettings?
-  categories  Category[]
-  pettyCashes PettyCash[]
+  users            User[]
+  products         Product[]
+  orders           Order[]
+  ledgers          Ledger[]
+  settings         StoreSettings?
+  categories       Category[]
+  pettyCashes      PettyCash[]
+  productEvents    ProductEvent[]
+  ledgerCategories LedgerCategory[]
+  vouchers         Voucher[]
+  voucherClaims    VoucherClaim[]
+  articles         Article[]
+  landingPages     LandingPage[]
+  systemErrorLogs  SystemErrorLog[]
+  pageViewLogs     PageViewLog[]
+  dailyMetrics     DailyStoreMetric[]
 
   @@map("stores")
 }
@@ -40,6 +50,11 @@ model StoreSettings {
   midtransClientKey     String?
   midtransServerKey     String?
   flipApiKey            String?
+  sandboxPaymentEnabled Boolean  @default(false)
+  midtransSandboxMerchantId String?
+  midtransSandboxClientKey  String?
+  midtransSandboxServerKey  String?
+  flipSandboxApiKey         String?
   defaultSeoTitle       String?
   defaultSeoDescription String?
   googleTagId           String?
@@ -47,6 +62,75 @@ model StoreSettings {
   businessName          String?
   businessAddress       String?
   businessPhone         String?
+  turnstileSiteKey      String?
+  turnstileSecretKey    String?
+  turnstileEnabled      Boolean  @default(false)
+  tagline               String?
+  favicon               String?
+  heroBadge             String?
+  heroTitle             String?
+  heroSubtitle          String?
+  heroCtaText           String?
+  heroCtaLink           String?
+  heroCtaSecondaryText  String?
+  heroCtaSecondaryLink  String?
+  heroImageUrl          String?
+  primaryColor          String?  @default("#4F46E5")
+  fontFamily            String?  @default("inter")
+  defaultPageSize       Int      @default(10)
+  socialLinks           Json?
+  termsContent          String?  @db.Text
+  privacyContent        String?  @db.Text
+  cookieConsentEnabled  Boolean  @default(true)
+  cookieConsentTitle    String?  @default("Pemberitahuan & Izin Cookie")
+  cookieConsentText     String?  @db.Text
+  // === AI Assistant (BYOK) ===
+  aiProvider               String?   @default("GEMINI")
+  aiApiKey                 String?
+  aiModel                  String?   @default("gemini-1.5-flash")
+  aiCustomPrompt           String?   @db.Text
+  // === Notifikasi Pesanan (Telegram & WhatsApp) ===
+  notifyTelegramEnabled    Boolean   @default(false)
+  notifyTelegramBotToken   String?
+  notifyTelegramChatId     String?
+  notifyWhatsappEnabled    Boolean   @default(false)
+  notifyWhatsappProvider   String?   @default("FONNTE")
+  notifyWhatsappToken      String?
+  notifyWhatsappTargetPhone String?
+  notifyLowStockThreshold  Int       @default(3)
+  notifyOnNewOrder         Boolean   @default(true)
+  notifyOnPaymentProof     Boolean   @default(true)
+  notifyOnPaymentSuccess   Boolean   @default(true)
+  notifyOnLowStock         Boolean   @default(true)
+  // === Tarif Ongkos Kirim Manual (Flat Rate) ===
+  shippingOriginCity       String?
+  shippingFlatRateInner    Float?    @default(0)
+  shippingFlatRateOuter    Float?    @default(0)
+  shippingFreeThreshold    Float?
+  shippingCalculationType  String?   @default("FLAT_MANUAL")
+  // === Ekspedisi & Kurir Otomatis (Biteship API) ===
+  biteshipEnabled          Boolean   @default(false)
+  biteshipApiKey           String?
+  biteshipSandbox          Boolean   @default(true)
+  biteshipOriginAreaId     String?
+  biteshipOriginAddress    String?   @db.Text
+  biteshipOriginPostalCode String?
+  biteshipOriginContactName String?
+  biteshipOriginContactPhone String?
+  biteshipEnabledCouriers  String?   @default("jne,sicepat,jnt,anteraja,tiki,pos")
+  // === SMTP & Email Notifications ===
+  smtpEnabled              Boolean   @default(false)
+  smtpHost                 String?
+  smtpPort                 Int?      @default(587)
+  smtpSecure               Boolean   @default(false)
+  smtpUser                 String?
+  smtpPass                 String?
+  smtpFromName             String?
+  smtpFromEmail            String?
+  smtpReplyTo              String?
+  smtpVerified             Boolean   @default(false)
+  smtpVerifiedAt           DateTime?
+  smtpVerificationToken    String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -62,6 +146,8 @@ model User {
   firstName     String?
   lastName      String?
   phone         String?
+  title         String?
+  permissions   Json?     @default("[]")
   role          Role      @default(CUSTOMER)
   isActive      Boolean   @default(true)
   emailVerified Boolean   @default(false)
@@ -75,6 +161,7 @@ model User {
   stockLogs         StockLog[]
   approvedPettyCash PettyCash[]
   auditLogs         AuditLog[]
+  voucherClaims     VoucherClaim[]
 
   @@unique([storeId, email])
   @@map("users")
@@ -86,6 +173,12 @@ enum Role {
   STAFF
 }
 
+enum ProductType {
+  PHYSICAL
+  DIGITAL
+  EVENT
+}
+
 model Product {
   id               String         @id @default(cuid())
   storeId          String
@@ -95,27 +188,81 @@ model Product {
   slug             String
   description      String?        @db.Text
   shortDescription String?
+  productType      ProductType    @default(PHYSICAL)
+
+  // Field Khusus Produk Digital
+  digitalFileUrl        String?
+  digitalInstructions   String?        @db.Text
+
+  // Field Khusus Event & Seminar
+  eventStartDate        DateTime?
+  eventEndDate          DateTime?
+  eventLocationType     String?        @default("ONLINE")
+  eventVenueName        String?
+  eventLocationAddress  String?
+  eventSpeakers         Json?          @default("[]")
+  eventBenefits         Json?          @default("[]")
+  eventQuota            Int?
+
   basePrice        Float
   sellingPrice     Float
   discountPrice    Float?
+  saleStartsAt     DateTime?
+  saleEndsAt       DateTime?
+  saleQuota        Int?
+  saleSold         Int            @default(0)
   seoTitle         String?
   seoDescription   String?
   seoKeywords      String?
   stock            Int            @default(0)
   minStock         Int            @default(0)
+  isPreOrder       Boolean        @default(false)
+  preOrderDays     Int?
+  preOrderMessage  String?
   images           ProductImage[]
   categoryId       String?
   category         Category?      @relation(fields: [categoryId], references: [id])
   isPublished      Boolean        @default(true)
   isFeatured       Boolean        @default(false)
+  sandboxEnabled   Boolean        @default(false)
+
+  // Link Marketplace & Saluran Penjualan Eksternal
+  shopeeUrl             String?
+  tokopediaUrl          String?
+  tiktokShopUrl         String?
+  blibliUrl             String?
+  customMarketplaceName String?
+  customMarketplaceUrl  String?
+
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
 
-  stockLogs  StockLog[]
-  orderItems OrderItem[]
+  stockLogs     StockLog[]
+  orderItems    OrderItem[]
+  productEvents ProductEvent[]
+  articles      ArticleProduct[]
+  landingPages  LandingPage[]
+  variants      ProductVariant[]
 
   @@unique([storeId, slug])
   @@map("products")
+}
+
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String   @default("")
+  optionType  String   @default("CUSTOM")
+  optionValue String   @default("")
+  sku         String?
+  price       Float?
+  stock       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId])
+  @@map("product_variants")
 }
 
 model ProductImage {
@@ -189,20 +336,34 @@ model Order {
   subtotal        Float
   taxAmount       Float       @default(0)
   shippingCost    Float       @default(0)
+  shippingZone    String?
   discount        Float       @default(0)
   status          OrderStatus @default(PENDING)
   attribution     Json?
   notes           String?     @db.Text
   shippingAddress String?     @db.Text
+  // === Ekspedisi & Biteship Fulfillment ===
+  courierCode          String?
+  courierService       String?
+  courierServiceName   String?
+  courierEtd           String?
+  waybillNumber        String?
+  biteshipOrderId      String?
+  biteshipTrackingId   String?
+  biteshipStatus       String?
+  shippingTrackingHistory Json?
+  reservationExpiresAt DateTime?
   trackingUrl     String?
   shippedAt       DateTime?
   deliveredAt     DateTime?
   completedAt     DateTime?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  isSandbox       Boolean     @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  orderItems OrderItem[]
-  payments   Payment[]
+  orderItems   OrderItem[]
+  payments     Payment[]
+  voucherClaim VoucherClaim?
 
   @@map("orders")
 }
@@ -229,6 +390,8 @@ model OrderItem {
   unitPrice  Float
   totalPrice Float
   variation  String?
+  variantId  String?
+  saleQuotaUsed Boolean @default(false)
   createdAt  DateTime @default(now())
 
   @@map("order_items")
@@ -246,6 +409,7 @@ model Payment {
   transactionId   String?
   gatewayResponse String?       @db.Text
   status          PaymentStatus @default(PENDING)
+  isSandbox       Boolean       @default(false)
   verifiedById    String?
   verifiedBy      User?         @relation(fields: [verifiedById], references: [id])
   verifiedAt      DateTime?
@@ -281,6 +445,7 @@ model Ledger {
   referenceId   String?
   referenceType String?
   category      String?
+  isSandbox     Boolean    @default(false)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -294,6 +459,23 @@ enum LedgerType {
   CAPITAL
   LOAN
   REFUND
+}
+
+/// The allowed `Ledger.category` names per store and type. The ledger keeps the
+/// name as a plain string (see recordOrderIncome), so this table is a picklist
+/// and a rename cascade, not a foreign key.
+model LedgerCategory {
+  id        String     @id @default(cuid())
+  storeId   String
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  type      LedgerType
+  name      String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([storeId, type, name])
+  @@map("ledger_categories")
 }
 
 model PettyCash {
@@ -345,4 +527,192 @@ model LoginAttempt {
 
   @@index([ipAddress, createdAt])
   @@map("login_attempts")
+}
+
+/// The upper half of the product funnel. Orders record the conversion end and
+/// carry attribution; nothing recorded what happened before a purchase, so
+/// "this..." was previously unfalsifiable.
+enum ProductEventType {
+  VIEW
+  ADD_TO_CART
+  CHECKOUT_START
+}
+
+model ProductEvent {
+  id          String           @id @default(cuid())
+  storeId     String
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product          @relation(fields: [productId], references: [id])
+  type        ProductEventType
+  /// Anonymous, client-generated, stable per browser. Never a user id.
+  sessionId   String
+  /// Same shape as Order.attribution, so a funnel row and a sale join on campaign.
+  attribution Json?
+  createdAt   DateTime         @default(now())
+
+  @@index([storeId, productId, type, createdAt])
+  @@index([storeId, type, createdAt])
+  @@map("product_events")
+}
+
+model Voucher {
+  id          String      @id @default(cuid())
+  storeId     String
+  store       Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  code        String
+  name        String
+  description String?
+  type        VoucherType
+  value       Float
+  maxDiscount Float?
+  minPurchase Float?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  quota       Int?
+  claimed     Int         @default(0)
+  used        Int         @default(0)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  claims VoucherClaim[]
+
+  @@unique([storeId, code])
+  @@map("vouchers")
+}
+
+enum VoucherType {
+  FIXED
+  PERCENT
+}
+
+model VoucherClaim {
+  id        String    @id @default(cuid())
+  voucherId String
+  voucher   Voucher   @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claimedAt DateTime  @default(now())
+  usedAt    DateTime?
+  orderId   String?   @unique
+  order     Order?    @relation(fields: [orderId], references: [id])
+  Store     Store?    @relation(fields: [storeId], references: [id])
+  storeId   String?
+
+  /// Satu klaim per orang per voucher. Inilah yang membuat klaim ganda saat
+  /// tombol diklik dua kali berakhir sebagai baris yang sama, bukan dua baris.
+  @@unique([voucherId, userId])
+  @@map("voucher_claims")
+}
+
+// ---------- CMS ARTICLE MODELS ----------
+model Article {
+  id               String   @id @default(cuid())
+  storeId          String
+  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title            String
+  slug             String
+  content          String   @db.Text
+  seoTitle         String?
+  seoDescription   String?
+  imageUrl         String?
+  isFeatured       Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  products         ArticleProduct[]
+
+  @@unique([storeId, slug])
+  @@map("articles")
+}
+
+model ArticleProduct {
+  articleId String
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, productId])
+  @@map("article_products")
+}
+
+// ---------- CMS LANDING PAGE BUILDER ----------
+model LandingPage {
+  id             String    @id @default(cuid())
+  storeId        String
+  store          Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  title          String
+  slug           String
+  customPath     String?
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  ogImage        String?
+  isPublished    Boolean   @default(true)
+  productId      String?
+  product        Product?  @relation(fields: [productId], references: [id], onDelete: SetNull)
+  sections       Json      @default("[]")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([storeId, slug])
+  @@map("landing_pages")
+}
+
+// ---------- TELEMETRY & OBSERVABILITY MODELS ----------
+model SystemErrorLog {
+  id         String    @id @default(cuid())
+  storeId    String?
+  store      Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  severity   String    @default("ERROR")
+  source     String
+  message    String    @db.Text
+  stack      String?   @db.Text
+  path       String?
+  method     String?
+  statusCode Int?
+  ipAddress  String?
+  userAgent  String?
+  context    Json?
+  isResolved Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+
+  @@index([storeId, createdAt])
+  @@index([severity, createdAt])
+  @@map("system_error_logs")
+}
+
+model PageViewLog {
+  id         String   @id @default(cuid())
+  storeId    String
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  path       String
+  referrer   String?
+  deviceType String?
+  browser    String?
+  sessionId  String
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, createdAt])
+  @@map("page_view_logs")
+}
+
+model DailyStoreMetric {
+  id             String   @id @default(cuid())
+  storeId        String
+  store          Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  date           DateTime
+  totalViews     Int      @default(0)
+  uniqueVisitors Int      @default(0)
+  topPaths       Json     @default("[]")
+  referrers      Json     @default("[]")
+  devices        Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([storeId, date])
+  @@map("daily_store_metrics")
 }

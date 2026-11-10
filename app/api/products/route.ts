@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
@@ -13,24 +14,27 @@ import {
   auditProductUpdated,
   auditProductDeleted,
 } from '@/services/auditService';
+import {
+  optimizeAndSaveImage,
+  validateRawImage,
+  MAX_RAW_UPLOAD_SIZE,
+} from '@/lib/imageOptimizer';
+import { getActiveStore } from '@/lib/store';
 
 const UPLOAD_DIR = './public/uploads';
-const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
 async function ensureUploadDir() {
   await mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 }
 
-function generateFilename(originalName: string): string {
-  const ext = originalName.split('.').pop();
-  return `${randomUUID()}.${ext}`;
-}
-
-async function saveFile(file: File, filename: string): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const filePath = join(UPLOAD_DIR, filename);
-  await writeFile(filePath, buffer);
-  return `/uploads/${filename}`;
+async function saveFile(file: File, storeId?: string): Promise<string> {
+  const result = await optimizeAndSaveImage({
+    file,
+    type: 'product',
+    storeId,
+    originalFilename: file.name,
+  });
+  return result.url;
 }
 
 /**
@@ -69,23 +73,89 @@ const formBoolean = z
   .optional()
   .transform((value) => (value === undefined ? undefined : value === 'true'));
 
+/**
+ * Kuota harga coret: bilangan bulat, dan `''` berarti "tanpa kuota" (`null`),
+ * bukan nol. Nol akan mematikan harga coret sejak detik pertama dipasang.
+ */
+const nullableInt = z
+  .union([z.literal(''), z.coerce.number().int().min(0)])
+  .optional()
+  .transform((value) => (value === '' ? null : value));
+
+/**
+ * Tanggal datang sebagai string dari FormData. `''` mengosongkan jendela,
+ * absen membiarkannya apa adanya — sama seperti nullableNumber.
+ */
+const nullableDate = z
+  .union([z.literal(''), z.coerce.date()])
+  .optional()
+  .transform((value) => (value === '' ? null : value));
+
+const jsonArrayTransform = z
+  .union([z.literal(''), z.string(), z.array(z.any())])
+  .optional()
+  .transform((val) => {
+    if (!val || val === '') return [];
+    if (Array.isArray(val)) return val;
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+
+const productTypeEnum = z
+  .enum(['PHYSICAL', 'DIGITAL', 'EVENT'])
+  .optional()
+  .transform((val) => (val === undefined ? 'PHYSICAL' : val));
+
+const eventLocationTypeEnum = z
+  .enum(['ONLINE', 'OFFLINE'])
+  .optional()
+  .transform((val) => (val === undefined ? 'ONLINE' : val));
+
 const productFields = {
   name: z.string().min(1),
   slug: z.string().min(1),
   description: nullableText,
   shortDescription: nullableText,
+  productType: productTypeEnum,
+  digitalFileUrl: nullableText,
+  digitalInstructions: nullableText,
+  eventStartDate: nullableDate,
+  eventEndDate: nullableDate,
+  eventLocationType: eventLocationTypeEnum,
+  eventVenueName: nullableText,
+  eventLocationAddress: nullableText,
+  eventSpeakers: jsonArrayTransform,
+  eventBenefits: jsonArrayTransform,
+  eventQuota: nullableInt,
   basePrice: z.coerce.number().min(0),
   sellingPrice: z.coerce.number().min(0),
   discountPrice: nullableNumber,
+  saleStartsAt: nullableDate,
+  saleEndsAt: nullableDate,
+  saleQuota: nullableInt,
   sku: nullableText,
   categoryId: nullableText,
   stock: optionalNumber,
   minStock: optionalNumber,
   isPublished: formBoolean,
   isFeatured: formBoolean,
+  sandboxEnabled: formBoolean,
+  isPreOrder: formBoolean,
+  preOrderDays: nullableInt,
+  preOrderMessage: nullableText,
   seoTitle: nullableText,
   seoDescription: nullableText,
   seoKeywords: nullableText,
+  shopeeUrl: nullableText,
+  tokopediaUrl: nullableText,
+  tiktokShopUrl: nullableText,
+  blibliUrl: nullableText,
+  customMarketplaceName: nullableText,
+  customMarketplaceUrl: nullableText,
 };
 
 /** Prisma's code for "a unique constraint rejected this write". */
@@ -132,6 +202,7 @@ const createProductSchema = z.object({
   minStock: withDefault(productFields.minStock, 0),
   isPublished: withDefault(productFields.isPublished, true),
   isFeatured: withDefault(productFields.isFeatured, false),
+  sandboxEnabled: withDefault(productFields.sandboxEnabled, false),
 });
 
 /**
@@ -154,18 +225,49 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
     const isPublished = searchParams.get('isPublished');
     const isFeatured = searchParams.get('isFeatured');
+    const sandbox = searchParams.get('sandbox');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '12');
+    const limit = parseInt(searchParams.get('limit') || '10');
     const orderBy = searchParams.get('orderBy') || 'createdAt';
     const orderDirection = searchParams.get('orderDirection') || 'desc';
     
     const where: any = {};
-    if (storeId) where.storeId = storeId;
-    else if (user) where.storeId = user.storeId;
+    if (storeId) {
+      where.storeId = storeId;
+    } else if (user) {
+      where.storeId = user.storeId;
+    } else {
+      const activeStore = await getActiveStore();
+      if (activeStore) {
+        where.storeId = activeStore.id;
+      }
+    }
     if (categoryId) where.categoryId = categoryId;
     if (isPublished !== null) where.isPublished = isPublished === 'true';
     else if (!user) where.isPublished = true;
     if (isFeatured !== null) where.isFeatured = isFeatured === 'true';
+    // Sandbox products are test fixtures: only store staff may list them. The
+    // public, and signed-in customers, never see them (the `sandbox` filter is
+    // ignored for them rather than honoured).
+    const isStaff = !!user && ['ADMIN', 'STAFF'].includes(user.role);
+    if (!isStaff) where.sandboxEnabled = false;
+    else if (sandbox !== null) where.sandboxEnabled = sandbox === 'true';
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!isNaN(start.getTime())) where.createdAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          where.createdAt.lte = end;
+        }
+      }
+    }
     if (search) where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
@@ -181,6 +283,7 @@ export async function GET(request: Request) {
         include: {
           images: { orderBy: { order: 'asc' }, take: 1 },
           category: true,
+          variants: { orderBy: { createdAt: 'asc' } },
         },
       }),
       prisma.product.count({ where }),
@@ -206,6 +309,10 @@ export async function POST(request: Request) {
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
+    
     const formData = await request.formData();
     const productData: Record<string, any> = {};
     const images: File[] = [];
@@ -229,10 +336,29 @@ export async function POST(request: Request) {
     
     const imageUrls: string[] = [];
     for (const image of images) {
-      if (image.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Image too large' }, { status: 400 });
-      const filename = generateFilename(image.name);
-      const url = await saveFile(image, filename);
+      const val = validateRawImage(image.size, image.type);
+      if (!val.valid) return NextResponse.json({ error: val.error }, { status: 400 });
+      const url = await saveFile(image, user.storeId);
       imageUrls.push(url);
+    }
+
+    let variantsData: Array<{
+      name?: string;
+      optionType?: string;
+      optionValue?: string;
+      sku?: string;
+      price?: number;
+      stock?: number;
+    }> = [];
+
+    const rawVariants = formData.get('variants');
+    if (rawVariants && typeof rawVariants === 'string') {
+      try {
+        const parsed = JSON.parse(rawVariants);
+        if (Array.isArray(parsed)) variantsData = parsed;
+      } catch (err) {
+        console.warn('Failed to parse variants JSON in create product:', err);
+      }
     }
     
     const product = await prisma.product.create({
@@ -247,8 +373,18 @@ export async function POST(request: Request) {
             order: index,
           })),
         },
+        variants: variantsData.length > 0 ? {
+          create: variantsData.map((v) => ({
+            name: v.name || `${v.optionType || 'Opsi'}: ${v.optionValue || ''}`.trim(),
+            optionType: v.optionType || 'CUSTOM',
+            optionValue: v.optionValue || '',
+            sku: v.sku || null,
+            price: v.price ? Number(v.price) : null,
+            stock: Number(v.stock) || 0,
+          })),
+        } : undefined,
       },
-      include: { images: true, category: true },
+      include: { images: true, category: true, variants: true },
     });
 
     // A new listing must be crawlable before the ISR window expires.
@@ -294,6 +430,10 @@ export async function PATCH(request: Request) {
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
+    
     storeId = user.storeId;
 
     const formData = await request.formData();
@@ -336,10 +476,37 @@ export async function PATCH(request: Request) {
     
     const newImageUrls: string[] = [];
     for (const image of images) {
-      if (image.size > MAX_FILE_SIZE) return NextResponse.json({ error: 'Image too large' }, { status: 400 });
-      const filename = generateFilename(image.name);
-      const url = await saveFile(image, filename);
+      const val = validateRawImage(image.size, image.type);
+      if (!val.valid) return NextResponse.json({ error: val.error }, { status: 400 });
+      const url = await saveFile(image, user.storeId);
       newImageUrls.push(url);
+    }
+
+    const rawVariants = formData.get('variants');
+    if (rawVariants && typeof rawVariants === 'string') {
+      try {
+        const parsedVariants = JSON.parse(rawVariants);
+        if (Array.isArray(parsedVariants)) {
+          await prisma.productVariant.deleteMany({
+            where: { productId },
+          });
+          if (parsedVariants.length > 0) {
+            await prisma.productVariant.createMany({
+              data: parsedVariants.map((v: any) => ({
+                productId: productId as string,
+                name: v.name || `${v.optionType || 'Opsi'}: ${v.optionValue || ''}`.trim(),
+                optionType: v.optionType || 'CUSTOM',
+                optionValue: v.optionValue || '',
+                sku: v.sku || null,
+                price: v.price ? Number(v.price) : null,
+                stock: Number(v.stock) || 0,
+              })),
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to parse variants JSON in update product:', err);
+      }
     }
     
     const product = await prisma.product.update({
@@ -357,7 +524,7 @@ export async function PATCH(request: Request) {
           })),
         },
       },
-      include: { images: true, category: true },
+      include: { images: true, category: true, variants: { orderBy: { createdAt: 'asc' } } },
     });
 
     // Pass the old slug too: a rename has to purge the URL it used to live at,
@@ -405,6 +572,10 @@ export async function DELETE(request: Request) {
     
     const user = await verifyToken(token);
     if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    
+    if (await isDemoStore(user.storeId)) {
+      return createDemoReadOnlyResponse();
+    }
     
     const body = await request.json();
     const { id } = body;

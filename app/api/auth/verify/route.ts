@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyToken, getUserById } from '@/lib/auth';
+import { normalizePermissions } from '@/lib/rbac';
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     
+    const permissions = normalizePermissions((user as any).permissions);
+    const store = (user as any).store;
+    const isDemo = Boolean(
+      store?.isDemo ||
+      store?.domain === 'demo.larismanis.online' ||
+      store?.domain === 'demo-store.local' ||
+      user.storeId === 'demo-store-001' ||
+      user.email.endsWith('@demo-store.local')
+    );
+
     return NextResponse.json({
       success: true,
       user: {
@@ -29,6 +40,9 @@ export async function GET(request: Request) {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
+        title: (user as any).title ?? null,
+        permissions,
+        isDemo,
       },
     });
   } catch (error) {

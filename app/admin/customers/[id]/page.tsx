@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { STATUS_LABELS } from '@/lib/orderStatus';
-import type { OrderStatus } from '@prisma/client';
+import { STATUS_LABELS, type OrderStatus } from '@/lib/orderStatus';
 
 interface OrderHistoryRow {
   id: string;

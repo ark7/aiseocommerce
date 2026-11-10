@@ -1,5 +1,120 @@
 import { prisma } from '@/lib/prisma';
-import { LedgerType, StockType } from '@prisma/client';
+import { LedgerType, StockType, Prisma } from '@prisma/client';
+import { resolveUnitPrice } from '@/lib/pricing';
+import {
+  VOUCHER_REJECTION_LABELS,
+  checkVoucherUsable,
+  resolveVoucherDiscount,
+} from '@/lib/voucher';
+import type { VoucherRejection } from '@/lib/voucher';
+import {
+  validateCartSandboxSeparation,
+  validateOrderSandboxIntegrity,
+} from '@/lib/paymentGateway';
+import { dispatchLowStockWarningNotification } from '@/lib/orderNotificationService';
+import { calculateOrderShipping } from '@/lib/shipping';
+import type { ShippingZone } from '@/lib/shipping';
+
+type Db = typeof prisma | Prisma.TransactionClient;
+
+/**
+ * The cart's prices no longer match the shelf. Thrown before any money is
+ * recorded so the customer can look at the new total and confirm again —
+ * silently charging more than the page showed is the one thing checkout
+ * must never do.
+ */
+export class PriceChangedError extends Error {
+  constructor(
+    public readonly changes: { productId: string; name: string; shown: number; actual: number }[]
+  ) {
+    super('Harga produk berubah sejak terakhir dilihat');
+    this.name = 'PriceChangedError';
+  }
+}
+
+/** The voucher cannot be used on this order, with a reason the buyer may read. */
+export class VoucherError extends Error {
+  constructor(public readonly reason: VoucherRejection) {
+    super(VOUCHER_REJECTION_LABELS[reason]);
+    this.name = 'VoucherError';
+  }
+}
+
+export type ProductUnavailableReason = 'NOT_FOUND' | 'INSUFFICIENT_STOCK' | 'UNPUBLISHED' | 'STORE_MISMATCH';
+
+/**
+ * Thrown when an ordered product is missing, out of stock, unpublished, or belongs
+ * to another store, providing clear customer-facing product names and actionable recovery data.
+ */
+export class ProductUnavailableError extends Error {
+  constructor(
+    public readonly productId: string,
+    public readonly productName: string,
+    public readonly reason: ProductUnavailableReason,
+    public readonly availableStock?: number
+  ) {
+    let msg = `Produk "${productName}" tidak ditemukan di toko ini (Product ${productName} not found).`;
+    if (reason === 'INSUFFICIENT_STOCK') {
+      msg = `Stok tidak mencukupi untuk produk "${productName}" (Insufficient stock for product ${productName}${
+        availableStock !== undefined ? `, sisa ${availableStock}` : ''
+      }).`;
+    } else if (reason === 'STORE_MISMATCH') {
+      msg = `Produk "${productName}" berasal dari toko lain dan tidak dapat diproses di toko ini.`;
+    } else if (reason === 'UNPUBLISHED') {
+      msg = `Produk "${productName}" saat ini sedang tidak dipublikasikan.`;
+    }
+    super(msg);
+    this.name = 'ProductUnavailableError';
+  }
+}
+
+/**
+ * How long an unpaid order may hold the stock and sale quota it reserved.
+ *
+ * Long enough to finish a bank transfer, short enough that an abandoned
+ * checkout puts the discounted units back the same day. Only orders that are
+ * still PENDING are ever released, so a paid order is never affected.
+ */
+function reservationTtlMs(): number {
+  const minutes = Number(process.env.ORDER_RESERVATION_MINUTES);
+  return (Number.isFinite(minutes) && minutes > 0 ? minutes : 120) * 60_000;
+}
+
+/**
+ * Write the INCOME ledger row that puts a paid order's money into the books,
+ * once per order. Every path that marks an order paid (admin status change,
+ * manual payment approval, gateway webhook) funnels through here, so finance
+ * shows the sale and a retry or a second path cannot count it twice.
+ *
+ * ponytail: the existence check is not atomic — two callers racing on the same
+ * order can both miss it. Add a unique index on (referenceType, referenceId)
+ * when double-counted sales actually show up.
+ */
+export async function recordOrderIncome(
+  db: Db,
+  order: { id: string; storeId: string; orderNumber: string; totalAmount: number; isSandbox?: boolean }
+) {
+  const existing = await db.ledger.findFirst({
+    where: { referenceId: order.id, referenceType: 'ORDER', type: LedgerType.INCOME },
+    select: { id: true },
+  });
+  if (existing) return existing;
+
+  const isSandbox = Boolean(order.isSandbox);
+
+  return db.ledger.create({
+    data: {
+      storeId: order.storeId,
+      type: LedgerType.INCOME,
+      amount: order.totalAmount,
+      description: isSandbox ? `[SANDBOX] Order ${order.orderNumber}` : `Order ${order.orderNumber}`,
+      referenceId: order.id,
+      referenceType: 'ORDER',
+      category: isSandbox ? 'SANDBOX_SALES' : 'SALES',
+      isSandbox,
+    },
+  });
+}
 
 export interface ProcessOrderResult {
   success: boolean;
@@ -18,80 +133,208 @@ export interface FinanceSummary {
   totalLoans: number;
 }
 
+/**
+ * Price the lines, reserve stock and sale quota, apply the voucher, and write
+ * the totals — all in one transaction.
+ *
+ * `expectedUnitPrices` is what the cart showed the customer. When the result
+ * differs, the whole order is rolled back and `PriceChangedError` names every
+ * difference at once, so the buyer confirms the new total instead of finding
+ * it on the receipt.
+ */
 export async function createOrder(
   storeId: string,
-  items: { productId: string; quantity: number }[],
+  items: { productId: string; quantity: number; name?: string; variantId?: string; variation?: string }[],
   customerId?: string,
-  attribution?: Record<string, unknown>
+  attribution?: Record<string, unknown>,
+  voucherCode?: string,
+  expectedUnitPrices?: Record<string, number>,
+  shippingOptions?: {
+    shippingZone?: ShippingZone | string;
+    shippingAddress?: string | null;
+    courierCode?: string | null;
+    courierService?: string | null;
+    courierServiceName?: string | null;
+    courierEtd?: string | null;
+    shippingCost?: number | null;
+  }
 ) {
-  try {
-    return await prisma.$transaction(async (tx) => {
-      // 1. Create order record
-      // Generate a simple order number (you might want to improve this)
-      const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      const order = await tx.order.create({
-        data: {
-          storeId,
-          userId: customerId, // assuming customerId is the userId for now
-          orderNumber,
-          totalAmount: 0, // we'll calculate below
-          subtotal: 0,
-          taxAmount: 0,
-          shippingCost: 0,
-          discount: 0,
-          status: 'PENDING', // initial status before payment
-          // Campaign source for paid traffic; omitted when the order arrived
-          // with no attribution at all (direct or organic).
-          ...(attribution && Object.keys(attribution).length > 0
-            ? { attribution: attribution as object }
-            : {}),
+  const lowStockAlerts: Array<{ name: string; remaining: number; storeId: string }> = [];
+
+  const createdOrder = await prisma.$transaction(async (tx) => {
+    const now = new Date();
+
+    // Scoped by storeId: an id from another tenant must not be orderable, and
+    // the previous unscoped lookup let one store sell another store's catalogue.
+    const products = await tx.product.findMany({
+      where: { id: { in: items.map((item) => item.productId) }, storeId },
+      include: { variants: true },
+    });
+    const byId = new Map(products.map((product) => [product.id, product]));
+
+    // Query store settings for sandbox validation and shipping configuration
+    let storeSettings: any = null;
+    if (tx.storeSettings?.findUnique) {
+      storeSettings = await tx.storeSettings.findUnique({
+        where: { storeId },
+        select: {
+          sandboxPaymentEnabled: true,
+          shippingOriginCity: true,
+          shippingFlatRateInner: true,
+          shippingFlatRateOuter: true,
+          shippingFreeThreshold: true,
         },
       });
+    }
 
-      // 2. Create order items and calculate total
-      let totalAmount = 0;
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
-        // Ensure we have enough stock (should have been reserved, but double-check)
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`);
-        }
-        const itemTotal = product.sellingPrice * item.quantity;
-        totalAmount += itemTotal;
+    // Validate sandbox cart integrity: do not mix sandbox test products with regular products,
+    // and ensure sandbox mode is enabled if ordering a sandbox product.
+    const { isSandbox } = validateCartSandboxSeparation(products);
+    if (isSandbox) {
+      validateOrderSandboxIntegrity(true, storeSettings);
+    }
 
-        await tx.orderItem.create({
-          data: {
-            orderId: order.id,
-            productId: product.id,
-            quantity: item.quantity,
-            unitPrice: product.sellingPrice,
-            totalPrice: itemTotal,
-          },
+    const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const order = await tx.order.create({
+      data: {
+        storeId,
+        userId: customerId,
+        orderNumber,
+        totalAmount: 0, // filled in at the end, once every line is priced
+        subtotal: 0,
+        taxAmount: 0,
+        shippingCost: 0,
+        discount: 0,
+        status: 'PENDING', // initial status before payment
+        isSandbox,
+        // An unpaid order holds real stock and real sale quota. Without a
+        // deadline it holds them forever, and an abandoned cart can empty a
+        // promotion without anyone buying anything.
+        reservationExpiresAt: new Date(now.getTime() + reservationTtlMs()),
+        // Campaign source for paid traffic; omitted when the order arrived
+        // with no attribution at all (direct or organic).
+        ...(attribution && Object.keys(attribution).length > 0
+          ? { attribution: attribution as object }
+          : {}),
+      },
+    });
+
+    let subtotal = 0;
+    const priceChanges: { productId: string; name: string; shown: number; actual: number }[] = [];
+
+    for (const item of items) {
+      const product = byId.get(item.productId);
+      if (!product) {
+        // Find if this product belongs to another store or was deleted
+        const anyProduct = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { id: true, name: true, storeId: true, isPublished: true },
         });
+
+        const name = anyProduct?.name || item.name || item.productId;
+        const reason: ProductUnavailableReason = anyProduct
+          ? anyProduct.storeId !== storeId
+            ? 'STORE_MISMATCH'
+            : anyProduct.isPublished === false
+            ? 'UNPUBLISHED'
+            : 'NOT_FOUND'
+          : 'NOT_FOUND';
+
+        throw new ProductUnavailableError(item.productId, name, reason);
       }
 
-      // 3. Update order with calculated totals
-      await tx.order.update({
-        where: { id: order.id },
+      if (product.isPublished === false) {
+        throw new ProductUnavailableError(product.id, product.name, 'UNPUBLISHED');
+      }
+
+      let selectedVariant = null;
+      if (item.variantId) {
+        selectedVariant = product.variants?.find((v: any) => v.id === item.variantId) || null;
+        if (!selectedVariant) {
+          throw new ProductUnavailableError(
+            item.productId,
+            `${product.name} (Varian tidak ditemukan)`,
+            'NOT_FOUND'
+          );
+        }
+
+        if (!product.isPreOrder && selectedVariant.stock < item.quantity) {
+          throw new ProductUnavailableError(
+            product.id,
+            `${product.name} (${selectedVariant.name || selectedVariant.optionValue})`,
+            'INSUFFICIENT_STOCK',
+            selectedVariant.stock
+          );
+        }
+      } else if (!product.isPreOrder && product.stock < item.quantity) {
+        throw new ProductUnavailableError(
+          product.id,
+          product.name,
+          'INSUFFICIENT_STOCK',
+          product.stock
+        );
+      }
+
+      let unitPrice = resolveUnitPrice(product, now);
+      if (selectedVariant && selectedVariant.price != null && selectedVariant.price > 0) {
+        unitPrice = selectedVariant.price;
+      }
+      let saleQuotaUsed = false;
+
+      if (!selectedVariant && unitPrice < product.sellingPrice) {
+        // The quota check lives in the WHERE clause so it happens at write
+        // time: two buyers racing for the last discounted unit cannot both
+        // read "1 left" and both get it. Losing the race is not an error —
+        // it only means the discount is gone.
+        const reserved = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            storeId,
+            OR: [
+              { saleQuota: null },
+              { saleSold: { lte: (product.saleQuota ?? 0) - item.quantity } },
+            ],
+          },
+          data: { saleSold: { increment: item.quantity } },
+        });
+
+        if (reserved.count === 0) unitPrice = product.sellingPrice;
+        else saleQuotaUsed = true;
+      }
+
+      const shown = expectedUnitPrices?.[product.id];
+      if (shown !== undefined && shown !== unitPrice) {
+        priceChanges.push({ productId: product.id, name: product.name, shown, actual: unitPrice });
+      }
+
+      const itemTotal = unitPrice * item.quantity;
+      subtotal += itemTotal;
+
+      const variationSnapshot =
+        item.variation ||
+        (selectedVariant ? `${selectedVariant.optionType}: ${selectedVariant.optionValue}` : null);
+
+      await tx.orderItem.create({
         data: {
-          totalAmount,
-          subtotal: totalAmount, // assuming no tax/shipping/discount for now
+          orderId: order.id,
+          productId: product.id,
+          quantity: item.quantity,
+          unitPrice,
+          totalPrice: itemTotal,
+          variantId: selectedVariant?.id || item.variantId || null,
+          variation: variationSnapshot,
+          saleQuotaUsed,
         },
       });
 
-      // 4. Reserve stock inside this same transaction. Calling reserveStock()
-      //    here would open a nested transaction and commit the reservation
-      //    independently of the order.
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`)
-        }
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`)
+      // Reserved inside this same transaction: a nested $transaction would
+      // commit the reservation independently of the order.
+      if (!product.isPreOrder) {
+        if (selectedVariant) {
+          await tx.productVariant.update({
+            where: { id: selectedVariant.id },
+            data: { stock: { decrement: item.quantity } },
+          });
         }
         await tx.stockLog.create({
           data: {
@@ -104,64 +347,131 @@ export async function createOrder(
             referenceId: order.id,
             userId: customerId,
           },
-        })
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { decrement: item.quantity } },
-        })
-      }
+        });
 
-      return order;
+        // Conditional for the same reason as the quota above: the stock check at
+        // the top of the loop read a snapshot, and two orders for the last unit
+        // would both pass it and both decrement, leaving stock negative.
+        const stockTaken = await tx.product.updateMany({
+          where: { id: product.id, storeId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (stockTaken.count === 0) {
+          throw new ProductUnavailableError(
+            product.id,
+            product.name,
+            'INSUFFICIENT_STOCK',
+            0
+          );
+        }
+
+        const remaining = product.stock - item.quantity;
+        if (remaining <= 3) {
+          lowStockAlerts.push({ name: product.name, remaining, storeId });
+        }
+      }
+    }
+
+    // Checked after every line is priced, so the customer sees the whole
+    // difference at once rather than one product per round trip.
+    if (priceChanges.length > 0) throw new PriceChangedError(priceChanges);
+
+    let discount = 0;
+    if (voucherCode) {
+      // A voucher is a claimed right, and a claim belongs to a customer.
+      if (!customerId) throw new VoucherError('NOT_CLAIMED');
+
+      const voucher = await tx.voucher.findUnique({
+        where: { storeId_code: { storeId, code: voucherCode.trim().toUpperCase() } },
+      });
+      if (!voucher) throw new VoucherError('NOT_FOUND');
+
+      const claim = await tx.voucherClaim.findUnique({
+        where: { voucherId_userId: { voucherId: voucher.id, userId: customerId } },
+      });
+      if (!claim) throw new VoucherError('NOT_CLAIMED');
+
+      const eligibility = checkVoucherUsable(voucher, claim, subtotal, now);
+      if (!eligibility.ok) throw new VoucherError(eligibility.reason);
+
+      discount = resolveVoucherDiscount(voucher, subtotal);
+
+      // Spent in the same transaction as the order, and conditioned on the
+      // claim still being unused. `checkVoucherUsable` above only saw a
+      // snapshot: two checkouts of one claim both read `usedAt: null` and both
+      // pass it. The predicate is what actually decides who gets it.
+      const spent = await tx.voucherClaim.updateMany({
+        where: { id: claim.id, usedAt: null },
+        data: { usedAt: now, orderId: order.id },
+      });
+      if (spent.count === 0) throw new VoucherError('ALREADY_USED');
+
+      await tx.voucher.update({
+        where: { id: voucher.id },
+        data: { used: { increment: 1 } },
+      });
+    }
+
+    // Evaluate physical vs digital items and calculate server-side shipping cost
+    const hasPhysicalItems = products.some((p: any) => !p.productType || p.productType === 'PHYSICAL');
+
+    let effectiveShippingCost = 0;
+    let effectiveShippingZone: string = shippingOptions?.shippingZone || 'INNER';
+
+    if (!hasPhysicalItems) {
+      effectiveShippingCost = 0;
+      effectiveShippingZone = 'DIGITAL';
+    } else if (
+      typeof storeSettings?.shippingFreeThreshold === 'number' &&
+      storeSettings.shippingFreeThreshold > 0 &&
+      subtotal >= storeSettings.shippingFreeThreshold
+    ) {
+      effectiveShippingCost = 0;
+      effectiveShippingZone = 'FREE';
+    } else if (typeof shippingOptions?.shippingCost === 'number' && shippingOptions.shippingCost >= 0) {
+      // Biteship or client selected courier fee
+      effectiveShippingCost = shippingOptions.shippingCost;
+      effectiveShippingZone = shippingOptions.shippingZone || 'BITESHIP';
+    } else {
+      const shippingResult = calculateOrderShipping({
+        hasPhysicalItems,
+        subtotal,
+        selectedZone: shippingOptions?.shippingZone,
+        config: {
+          originCity: storeSettings?.shippingOriginCity ?? null,
+          flatRateInner: storeSettings?.shippingFlatRateInner ?? 0,
+          flatRateOuter: storeSettings?.shippingFlatRateOuter ?? 0,
+          freeThreshold: storeSettings?.shippingFreeThreshold ?? null,
+        },
+      });
+      effectiveShippingCost = shippingResult.cost;
+      effectiveShippingZone = shippingResult.zone;
+    }
+
+    const totalAmount = Math.max(0, subtotal - discount) + effectiveShippingCost;
+
+    return tx.order.update({
+      where: { id: order.id },
+      data: {
+        subtotal,
+        discount,
+        shippingCost: effectiveShippingCost,
+        shippingZone: effectiveShippingZone,
+        shippingAddress: shippingOptions?.shippingAddress ? shippingOptions.shippingAddress.trim() : null,
+        courierCode: shippingOptions?.courierCode || null,
+        courierService: shippingOptions?.courierService || null,
+        courierServiceName: shippingOptions?.courierServiceName || null,
+        courierEtd: shippingOptions?.courierEtd || null,
+        totalAmount,
+      },
     });
-  } catch (error) {
-    throw error;
-  }
-}
+  });
 
-/**
- * Reserve stock for items before order creation.
- * Returns true on success, throws on failure.
- */
-export async function reserveStock(
-  storeId: string,
-  items: { productId: string; quantity: number }[],
-  userId?: string
-): Promise<boolean> {
-  try {
-    await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: item.productId } })
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`)
-        }
-        if (product.stock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}`)
-        }
-        // create reservation log
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            type: 'RESERVATION' as any,
-            quantity: item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock - item.quantity,
-            reason: `Reservation for order creation`,
-            referenceId: null,
-            userId,
-          },
-        })
-        // decrement stock atomically
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { decrement: item.quantity } },
-        })
-      }
-    })
-    return true
-  } catch (e) {
-    // let caller handle
-    throw e
+  for (const alert of lowStockAlerts) {
+    dispatchLowStockWarningNotification(alert.name, alert.remaining, alert.storeId);
   }
+
+  return createdOrder;
 }
 
 export async function processOrderPayment(
@@ -183,17 +493,7 @@ export async function processOrderPayment(
       // Stock was already decremented and logged as a RESERVATION when the order
       // was created. Moving it again here deducted it twice, and the stock check
       // below would fail because the reserved units are already gone from stock.
-      const ledgerEntry = await tx.ledger.create({
-        data: {
-          storeId: order.storeId,
-          type: LedgerType.INCOME,
-          amount: order.totalAmount,
-          description: `Order ${order.orderNumber} - ${order.orderItems.length} items`,
-          referenceId: order.id,
-          referenceType: 'ORDER',
-          category: 'SALES',
-        },
-      });
+      const ledgerEntry = await recordOrderIncome(tx, order);
 
       await tx.order.update({
         where: { id: orderId },
@@ -210,8 +510,10 @@ export async function processOrderPayment(
 }
 
 /**
- * Return reserved stock for an order and mark it cancelled.
- * Used when a manual payment is rejected, so the units go back on sale.
+ * Return everything an order reserved — stock, sale quota, and the voucher —
+ * and mark it cancelled. Used when a manual payment is rejected, so a transfer
+ * that never arrived does not permanently consume the last discounted unit or
+ * burn a voucher the customer only gets to claim once.
  */
 export async function releaseStock(
   orderId: string,
@@ -220,7 +522,7 @@ export async function releaseStock(
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: { orderItems: true },
+      include: { orderItems: true, voucherClaim: true },
     });
     if (!order) return { success: false, error: 'Order not found' };
     if (order.status === 'CANCELLED') {
@@ -233,23 +535,47 @@ export async function releaseStock(
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product) continue;
 
-        await tx.stockLog.create({
-          data: {
-            productId: product.id,
-            type: StockType.RETURN,
-            quantity: item.quantity,
-            previousStock: product.stock,
-            newStock: product.stock + item.quantity,
-            reason: `Release for cancelled order ${order.orderNumber}`,
-            referenceId: order.id,
-            userId,
-          },
-        });
-        await tx.product.update({
-          where: { id: product.id },
-          data: { stock: { increment: item.quantity } },
-        });
+        if (!product.isPreOrder) {
+          await tx.stockLog.create({
+            data: {
+              productId: product.id,
+              type: StockType.RETURN,
+              quantity: item.quantity,
+              previousStock: product.stock,
+              newStock: product.stock + item.quantity,
+              reason: `Release for cancelled order ${order.orderNumber}`,
+              referenceId: order.id,
+              userId,
+            },
+          });
+          await tx.product.update({
+            where: { id: product.id },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+
+        // Only the lines that actually took quota give it back; decrementing
+        // every line would invent quota that was never spent.
+        if (item.saleQuotaUsed) {
+          await tx.product.updateMany({
+            where: { id: product.id, saleSold: { gte: item.quantity } },
+            data: { saleSold: { decrement: item.quantity } },
+          });
+        }
+
         released += item.quantity;
+      }
+
+      // An unpaid order should not leave the customer's one-shot voucher spent.
+      if (order.voucherClaim) {
+        await tx.voucherClaim.updateMany({
+          where: { id: order.voucherClaim.id, orderId: order.id },
+          data: { usedAt: null, orderId: null },
+        });
+        await tx.voucher.updateMany({
+          where: { id: order.voucherClaim.voucherId, used: { gt: 0 } },
+          data: { used: { decrement: 1 } },
+        });
       }
 
       await tx.order.update({
@@ -262,6 +588,46 @@ export async function releaseStock(
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+export interface ReleaseExpiredResult {
+  released: number;
+  failed: string[];
+}
+
+/**
+ * Cancel unpaid orders whose reservation has run out, giving back their stock,
+ * their sale quota and their voucher.
+ *
+ * Nothing is corrupted while this does not run — a stale reservation only
+ * shrinks what is available. But a promotion whose quota is held by abandoned
+ * checkouts is a promotion nobody can buy, so this wants running on a schedule
+ * (see `app/api/cron/release-expired`).
+ *
+ * Bounded by `limit` on purpose: each order is unwound in its own transaction,
+ * so a large backlog drains over several runs instead of holding one long one.
+ */
+export async function releaseExpiredReservations(
+  limit: number = 50,
+  now: Date = new Date()
+): Promise<ReleaseExpiredResult> {
+  const expired = await prisma.order.findMany({
+    where: { status: 'PENDING', reservationExpiresAt: { lte: now } },
+    orderBy: { reservationExpiresAt: 'asc' },
+    take: limit,
+    select: { id: true },
+  });
+
+  let released = 0;
+  const failed: string[] = [];
+
+  for (const { id } of expired) {
+    const result = await releaseStock(id);
+    if (result.success) released += 1;
+    else failed.push(id);
+  }
+
+  return { released, failed };
 }
 
 export async function addStock(
@@ -393,20 +759,25 @@ export async function recordPettyCash(
 export async function getFinanceSummary(
   storeId: string,
   startDate?: Date,
-  endDate?: Date
+  endDate?: Date,
+  options?: { includeSandbox?: boolean }
 ): Promise<FinanceSummary> {
   try {
     const now = new Date();
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const where = {
+    const where: Prisma.LedgerWhereInput = {
       storeId,
       createdAt: {
         gte: startDate || firstDayOfMonth,
         lte: endDate || lastDayOfMonth,
       },
     };
+
+    if (!options?.includeSandbox) {
+      where.isSandbox = false;
+    }
 
     const ledgers = await prisma.ledger.findMany({ where, orderBy: { createdAt: 'asc' } });
 
@@ -460,7 +831,7 @@ export async function getLowStockProducts(storeId: string, threshold: number = 5
   }
 }
 
-export default { createOrder, processOrderPayment, reserveStock, releaseStock,
+export default { createOrder, processOrderPayment, releaseStock, releaseExpiredReservations,
   addStock,
   adjustStock,
   recordExpense,

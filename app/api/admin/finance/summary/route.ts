@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getFinanceSummary } from '@/services/transactionService';
+import { isConfiguredCategory } from '@/lib/ledgerCategory';
 
 export async function GET(request: Request) {
   try {
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
+    const includeSandbox = searchParams.get('includeSandbox') === 'true';
     const now = new Date();
     let start: Date | undefined, end: Date | undefined;
     
@@ -40,11 +42,15 @@ export async function GET(request: Request) {
         break;
     }
     
-    const summary = await getFinanceSummary(user.storeId, start, end);
+    const summary = await getFinanceSummary(user.storeId, start, end, { includeSandbox });
     
     const [recentTransactions, lowStockProducts, pendingPayments, todaySales] = await Promise.all([
       prisma.ledger.findMany({
-        where: { storeId: user.storeId, createdAt: { gte: start, lte: end } },
+        where: {
+          storeId: user.storeId,
+          createdAt: { gte: start, lte: end },
+          ...(includeSandbox ? {} : { isSandbox: false }),
+        },
         orderBy: { createdAt: 'desc' },
         take: 10,
         select: { id: true, type: true, amount: true, description: true, category: true, createdAt: true },
@@ -52,7 +58,12 @@ export async function GET(request: Request) {
       prisma.product.count({ where: { storeId: user.storeId, stock: { lte: 5 }, isPublished: true } }),
       prisma.payment.count({ where: { order: { storeId: user.storeId }, method: 'MANUAL', status: 'PENDING' } }),
       prisma.order.aggregate({
-        where: { storeId: user.storeId, status: 'PAID', createdAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } },
+        where: {
+          storeId: user.storeId,
+          status: 'PAID',
+          ...(includeSandbox ? {} : { isSandbox: false }),
+          createdAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
+        },
         _sum: { totalAmount: true },
         _count: { _all: true },
       }),
@@ -88,7 +99,16 @@ export async function POST(request: Request) {
     
     const validTypes = ['INCOME', 'EXPENSE', 'PETTY_CASH', 'CAPITAL', 'LOAN', 'REFUND'];
     if (!validTypes.includes(type)) return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
-    
+
+    // Same rule as the ledger route: this is a second write path to the same
+    // column, so the invariant has to be enforced here too.
+    if (typeof category === 'string' && category.trim() !== '') {
+      const configured = await isConfiguredCategory(prisma, user.storeId, type, category);
+      if (!configured) {
+        return NextResponse.json({ error: 'Kategori tidak terdaftar' }, { status: 400 });
+      }
+    }
+
     const ledger = await prisma.ledger.create({
       data: {
         storeId: user.storeId,

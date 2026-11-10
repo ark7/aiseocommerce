@@ -31,12 +31,14 @@ function stub({
   orders = 0,
   customers = 0,
   pending = 0,
+  sandbox = 0,
   paid = [] as Array<{ totalAmount?: number | null }>,
 } = {}) {
   (prisma.product.count as jest.Mock).mockResolvedValue(products);
-  (prisma.order.count as jest.Mock).mockImplementation(({ where }) =>
-    Promise.resolve(where.status === 'PENDING' ? pending : orders)
-  );
+  (prisma.order.count as jest.Mock).mockImplementation(({ where }) => {
+    if (where.isSandbox === true) return Promise.resolve(sandbox);
+    return Promise.resolve(where.status === 'PENDING' ? pending : orders);
+  });
   (prisma.user.count as jest.Mock).mockResolvedValue(customers);
   (prisma.order.findMany as jest.Mock).mockResolvedValue(paid);
 }
@@ -77,20 +79,35 @@ describe('GET /api/admin/stats', () => {
   it('scopes every read to the store on the token', async () => {
     await stats();
 
-    expect(prisma.product.count).toHaveBeenCalledWith({ where: { storeId: 'store-1' } });
+    expect(prisma.product.count).toHaveBeenCalledWith({
+      where: { storeId: 'store-1', sandboxEnabled: false },
+    });
     expect(prisma.order.findMany).toHaveBeenCalledWith({
-      where: { storeId: 'store-1', status: 'PAID' },
+      where: { storeId: 'store-1', status: 'PAID', isSandbox: false },
     });
     expect(prisma.user.count).toHaveBeenCalledWith({
       where: { storeId: 'store-1', role: 'CUSTOMER' },
     });
     expect(prisma.order.count).toHaveBeenCalledWith({
-      where: { storeId: 'store-1', status: 'PENDING' },
+      where: { storeId: 'store-1', status: 'PENDING', isSandbox: false },
+    });
+  });
+
+  it('keeps sandbox orders out of the real counts and reports them apart', async () => {
+    await stats();
+
+    // Real counts are filtered at the query...
+    expect(prisma.order.count).toHaveBeenCalledWith({
+      where: { storeId: 'store-1', isSandbox: false },
+    });
+    // ...and test orders are only ever counted under their own name.
+    expect(prisma.order.count).toHaveBeenCalledWith({
+      where: { storeId: 'store-1', isSandbox: true },
     });
   });
 
   it('reports each count under the name the dashboard reads', async () => {
-    stub({ products: 12, orders: 34, customers: 5, pending: 2 });
+    stub({ products: 12, orders: 34, customers: 5, pending: 2, sandbox: 7 });
 
     await expect(stats()).resolves.toEqual({
       products: 12,
@@ -98,6 +115,7 @@ describe('GET /api/admin/stats', () => {
       customers: 5,
       pendingOrders: 2,
       revenue: 0,
+      sandboxOrders: 7,
     });
   });
 

@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   experimental: {
+    instrumentationHook: true,
     serverActions: {
       bodySizeLimit: '2mb',
     },
-    middlewareRuntime: 'nodejs', // Force Node.js runtime for all middleware
   },
   images: {
     remotePatterns: [

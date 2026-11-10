@@ -17,6 +17,7 @@ export interface StorefrontPaths {
   sitemap: string;
   product: (slug: string) => string;
   category: (slug: string) => string;
+  landingPage: (slug: string) => string;
 }
 
 /** Pure path builder — kept separate so it can be asserted without a database. */
@@ -27,6 +28,7 @@ export function storefrontPaths(domain: string): StorefrontPaths {
     sitemap: `/${domain}/sitemap.xml`,
     product: (slug: string) => `/${domain}/product/${slug}`,
     category: (slug: string) => `/${domain}/category/${slug}`,
+    landingPage: (slug: string) => `/${domain}/lp/${slug}`,
   };
 }
 
@@ -96,4 +98,32 @@ export async function revalidateCategory(
     paths.products,
     paths.sitemap,
   ]);
+}
+
+/**
+ * A commercial landing page was created, updated, or deleted.
+ * Purges the landing page URL and sitemap.xml immediately.
+ */
+export async function revalidateLandingPage(
+  storeId: string,
+  slug: string,
+  previousSlug?: string
+): Promise<void> {
+  await purge(storeId, (paths) => [
+    paths.landingPage(slug),
+    previousSlug && previousSlug !== slug ? paths.landingPage(previousSlug) : undefined,
+    paths.sitemap,
+  ]);
+
+  try {
+    revalidatePath(`/lp/${slug}`);
+    if (previousSlug && previousSlug !== slug) {
+      revalidatePath(`/lp/${previousSlug}`);
+    }
+    revalidatePath('/sitemap.xml');
+  } catch (error) {
+    logger.debug('Standalone revalidate path warning', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

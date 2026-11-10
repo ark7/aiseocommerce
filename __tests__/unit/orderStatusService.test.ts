@@ -33,8 +33,21 @@ function makeTx(overrides: Record<string, unknown> = {}) {
     },
     stockLog: { create: jest.fn().mockResolvedValue({}) },
     payment: { findFirst: jest.fn().mockResolvedValue({ id: 'pay-1' }) },
-    ledger: { create: jest.fn().mockResolvedValue({}) },
+    ledger: {
+      create: jest.fn().mockResolvedValue({}),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     ...overrides,
+  };
+}
+
+/** Ledger doubles for the cases that turn on what is already in the books. */
+function ledgerWith(existingIncome: unknown) {
+  return {
+    ledger: {
+      create: jest.fn().mockResolvedValue({}),
+      findFirst: jest.fn().mockResolvedValue(existingIncome),
+    },
   };
 }
 
@@ -108,8 +121,34 @@ describe('updateOrderStatus', () => {
     );
   });
 
-  it('returns stock and writes a reversing entry when a paid order is cancelled', async () => {
+  it('writes the sale into the ledger when the order menu marks it paid', async () => {
     const tx = makeTx();
+    const result = await run(tx, 'PAID', { ...ORDER, status: 'PENDING' });
+
+    expect(result).toEqual({ success: true, status: 'PAID' });
+    expect(tx.ledger.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: 'INCOME',
+          amount: 500000,
+          referenceId: ORDER.id,
+          referenceType: 'ORDER',
+          category: 'SALES',
+        }),
+      })
+    );
+  });
+
+  it('does not book the same sale twice when income already exists', async () => {
+    // A gateway webhook or an earlier approval already wrote the sale.
+    const tx = makeTx(ledgerWith({ id: 'ledger-1' }));
+    await run(tx, 'PAID', { ...ORDER, status: 'PENDING' });
+
+    expect(tx.ledger.create).not.toHaveBeenCalled();
+  });
+
+  it('returns stock and writes a reversing entry when a paid order is cancelled', async () => {
+    const tx = makeTx(ledgerWith({ id: 'ledger-1' }));
     const result = await run(tx, 'CANCELLED');
 
     expect(result.success).toBe(true);
@@ -128,8 +167,8 @@ describe('updateOrderStatus', () => {
     );
   });
 
-  it('writes no reversing entry when no payment was ever confirmed', async () => {
-    const tx = makeTx({ payment: { findFirst: jest.fn().mockResolvedValue(null) } });
+  it('writes no reversing entry when no sale ever reached the books', async () => {
+    const tx = makeTx(ledgerWith(null));
     await run(tx, 'CANCELLED');
 
     expect(tx.ledger.create).not.toHaveBeenCalled();

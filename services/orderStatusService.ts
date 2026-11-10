@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 import { OrderStatus, LedgerType, StockType } from '@prisma/client';
 import { auditOrderStatusChanged } from '@/services/auditService';
 import { canTransition } from '@/lib/orderStatus';
+import { recordOrderIncome } from '@/services/transactionService';
 
 /** Statuses that put the order's reserved stock back on the shelf. */
 const RESTOCKING_STATUSES: OrderStatus[] = ['CANCELLED', 'REFUNDED'];
@@ -39,7 +40,7 @@ export async function updateOrderStatus(
 
   const existing = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, storeId: true, status: true, totalAmount: true, orderNumber: true },
+    select: { id: true, storeId: true, status: true, totalAmount: true, orderNumber: true, isSandbox: true },
   });
 
   if (!existing || existing.storeId !== storeId) {
@@ -71,6 +72,18 @@ export async function updateOrderStatus(
 
       if (moved.count === 0) return false;
 
+      // Money in. The order menu writes it here so a sale shows up in finance
+      // without waiting on a gateway webhook.
+      if (newStatus === 'PAID') {
+        await recordOrderIncome(tx, {
+          id: orderId,
+          storeId,
+          orderNumber: existing.orderNumber,
+          totalAmount: existing.totalAmount,
+          isSandbox: existing.isSandbox,
+        });
+      }
+
       if (isRestocking) {
         const items = await tx.orderItem.findMany({
           where: { orderId },
@@ -80,9 +93,9 @@ export async function updateOrderStatus(
         for (const item of items) {
           const product = await tx.product.findUnique({
             where: { id: item.productId },
-            select: { id: true },
+            select: { id: true, isPreOrder: true },
           });
-          if (!product) continue;
+          if (!product || product.isPreOrder) continue;
 
           // `update` returns the post-increment row, so the log records the real
           // before/after even when another order moves the same product at once.
@@ -108,21 +121,27 @@ export async function updateOrderStatus(
       }
 
       if (isReversing) {
-        const paidPayment = await tx.payment.findFirst({
-          where: { orderId, status: 'PAID' },
+        // Reverse what actually reached the books, not what a payment row says:
+        // an order marked PAID straight from the order menu has income but no
+        // payment record, and its refund still has to come back out.
+        const income = await tx.ledger.findFirst({
+          where: { referenceId: orderId, referenceType: 'ORDER', type: LedgerType.INCOME },
           select: { id: true },
         });
 
-        if (paidPayment) {
+        if (income) {
           await tx.ledger.create({
             data: {
               storeId,
               type: LedgerType.REFUND,
               amount: existing.totalAmount,
-              description: `Order ${existing.orderNumber} ${newStatus}`,
+              description: existing.isSandbox
+                ? `[SANDBOX] Order ${existing.orderNumber} ${newStatus}`
+                : `Order ${existing.orderNumber} ${newStatus}`,
               referenceId: orderId,
               referenceType: 'ORDER',
-              category: 'REFUND',
+              category: existing.isSandbox ? 'SANDBOX_REFUND' : 'REFUND',
+              isSandbox: Boolean(existing.isSandbox),
             },
           });
         }
