@@ -7,6 +7,7 @@ import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import { Prisma } from '@prisma/client';
 import { getActiveStore } from '@/lib/store';
+import { getCatalogDisplayPricing } from '@/lib/pricing';
 
 // Revalidate immediately so changes made in Super-Admin or Preview Mode reflect instantly
 export const revalidate = 0;
@@ -15,7 +16,11 @@ type LandingStore = Prisma.StoreGetPayload<{
   include: {
     settings: true;
     products: {
-      include: { images: true };
+      include: {
+        images: true;
+        priceTiers: true;
+        variants: { include: { priceTiers: true } };
+      };
     };
     articles: true;
   };
@@ -35,7 +40,11 @@ export default async function LandingPage() {
               where: { isPublished: true, sandboxEnabled: false, isFeatured: true },
               take: 8,
               orderBy: { createdAt: 'desc' },
-              include: { images: { where: { isPrimary: true }, take: 1 } },
+              include: {
+                images: { where: { isPrimary: true }, take: 1 },
+                priceTiers: { where: { variantId: null }, orderBy: { minQty: 'asc' } },
+                variants: { include: { priceTiers: { orderBy: { minQty: 'asc' } } } },
+              },
             },
             articles: {
               where: { isFeatured: true },
@@ -222,7 +231,9 @@ export default async function LandingPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {store.products.map((product) => (
+              {store.products.map((product) => {
+                const displayPricing = getCatalogDisplayPricing(product);
+                return (
                 <GatedLink
                   key={product.id}
                   href={`/product/${product.slug}`}
@@ -242,7 +253,13 @@ export default async function LandingPage() {
                         No Image
                       </div>
                     )}
-                    {product.isPreOrder ? (
+                    {displayPricing.isBatch ? (
+                      <span
+                        className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow bg-indigo-600"
+                      >
+                        HARGA GROSIR
+                      </span>
+                    ) : product.isPreOrder ? (
                       <span
                         className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow bg-amber-500"
                       >
@@ -262,8 +279,15 @@ export default async function LandingPage() {
                       {product.name}
                     </h3>
                     <p style={{ color: primaryColor }} className="text-base font-bold">
-                      Rp {product.sellingPrice.toLocaleString('id-ID')}
+                      {displayPricing.isBatch
+                        ? `Mulai Rp ${displayPricing.effectivePrice.toLocaleString('id-ID')}`
+                        : `Rp ${displayPricing.effectivePrice.toLocaleString('id-ID')}`}
                     </p>
+                    {displayPricing.isBatch && (
+                      <p className="text-[11px] text-indigo-700 font-medium">
+                        📦 Harga bertingkat sesuai qty
+                      </p>
+                    )}
                     {product.isPreOrder && (
                       <p className="text-[11px] text-amber-700 font-medium">
                         ⏳ Pre-Order {product.preOrderDays ? `(${product.preOrderDays} hari)` : ''}
@@ -271,7 +295,8 @@ export default async function LandingPage() {
                     )}
                   </div>
                 </GatedLink>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
