@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
-import { isSaleActive, resolveUnitPrice } from '@/lib/pricing';
+import { getCatalogDisplayPricing } from '@/lib/pricing';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import Pagination from '@/components/common/Pagination';
@@ -87,10 +87,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         saleEndsAt: true,
         saleQuota: true,
         saleSold: true,
+        hasBatchPricing: true,
         stock: true,
         isPreOrder: true,
         preOrderDays: true,
         images: { orderBy: { order: 'asc' }, take: 1, select: { url: true, altText: true } },
+        priceTiers: { where: { variantId: null }, select: { minQty: true, maxQty: true, unitPrice: true } },
+        variants: { select: { priceTiers: { select: { minQty: true, maxQty: true, unitPrice: true } } } },
       },
     }),
     prisma.product.count({ where }),
@@ -248,8 +251,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {products.map((product) => {
-                const onSale = isSaleActive(product);
-                const price = resolveUnitPrice(product);
+                const pricing = getCatalogDisplayPricing(product);
                 const image = product.images[0];
 
                 return (
@@ -272,8 +274,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                           <span className="text-sm text-gray-400">Tanpa gambar</span>
                         </div>
                       )}
+                      {pricing.isBatch && (
+                        <span className="absolute top-2 left-2 z-10 bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
+                          HARGA GROSIR
+                        </span>
+                      )}
                       {product.isPreOrder && (
-                        <span className="absolute top-2 left-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow">
+                        <span
+                          className={`absolute ${pricing.isBatch ? 'top-9' : 'top-2'} left-2 z-10 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded shadow`}
+                        >
                           PRE-ORDER
                         </span>
                       )}
@@ -281,8 +290,15 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
                     <div className="p-4">
                       <h3 className="font-medium text-gray-900 mb-1">{product.name}</h3>
-                      <p className="font-semibold text-gray-900">{formatIDR(price)}</p>
-                      {onSale && (
+                      <p className="font-semibold text-gray-900">
+                        {pricing.isBatch ? `Mulai ${formatIDR(pricing.effectivePrice)}` : formatIDR(pricing.effectivePrice)}
+                      </p>
+                      {pricing.isBatch && (
+                        <p className="text-xs text-indigo-700 font-medium mt-0.5">
+                          Harga bertingkat sesuai qty
+                        </p>
+                      )}
+                      {pricing.onSale && (
                         <p className="text-sm text-gray-400 line-through">
                           {formatIDR(product.sellingPrice)}
                         </p>

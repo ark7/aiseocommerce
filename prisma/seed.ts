@@ -15,6 +15,7 @@
  */
 
 import { PrismaClient, Role, OrderStatus, PaymentStatus, PaymentMethod, StockType, LedgerType } from '@prisma/client';
+import { upsertIdCardShowcaseProduct } from './batchShowcaseData';
 
 const prisma = new PrismaClient();
 
@@ -485,6 +486,8 @@ async function main() {
     await prisma.orderItem.deleteMany({ where: { product: { storeId: demoStore.id } } });
     await prisma.payment.deleteMany({ where: { order: { storeId: demoStore.id } } });
     await prisma.order.deleteMany({ where: { storeId: demoStore.id } });
+    await prisma.productPriceTier.deleteMany({ where: { product: { storeId: demoStore.id } } });
+    await prisma.productVariant.deleteMany({ where: { product: { storeId: demoStore.id } } });
     await prisma.productImage.deleteMany({ where: { product: { storeId: demoStore.id } } });
     await prisma.stockLog.deleteMany({ where: { product: { storeId: demoStore.id } } });
     await prisma.product.deleteMany({ where: { storeId: demoStore.id } });
@@ -637,6 +640,9 @@ async function main() {
     createdProducts.push(product);
     console.log(`  ✓ [${product.category?.name}] ${product.name} - Rp ${product.sellingPrice.toLocaleString('id-ID')}`);
   }
+  const idCardShowcase = await upsertIdCardShowcaseProduct(prisma, store.id);
+  createdProducts.push(idCardShowcase);
+  console.log(`  ✓ [Percetakan & Merchandise] ${idCardShowcase.name} - Mulai Rp ${idCardShowcase.sellingPrice.toLocaleString('id-ID')} (Batch Matrix)`);
   console.log(`✅ ${createdProducts.length} produk katalog berhasil dibuat.\n`);
 
   // 6. Create Users (Admin, Staff, Customers)

@@ -8,7 +8,8 @@ import StoreFooter from '@/components/StoreFooter'
 import { readStoredAttribution } from '@/lib/attribution'
 import { trackFunnelEvent } from '@/lib/funnelEvents'
 import { z } from 'zod'
-import { updateCartQuantity, removeFromCart, clearCart, dispatchCartUpdated } from '@/lib/cart'
+import { updateCartQuantity, removeFromCart, clearCart, dispatchCartUpdated, type CartItemPriceTier } from '@/lib/cart'
+import { formatTierRangeLabel, resolveBatchUnitPrice } from '@/lib/pricing'
 import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector'
 
 interface CartItem {
@@ -21,28 +22,42 @@ interface CartItem {
   productType?: 'PHYSICAL' | 'DIGITAL' | 'EVENT'
   variantId?: string
   variation?: string
+  hasBatchPricing?: boolean
+  minOrderQty?: number
+  baseUnitPrice?: number
+  priceTiers?: CartItemPriceTier[]
 }
 
 interface ProblematicProduct {
   productId: string
   productName: string
-  reason: 'NOT_FOUND' | 'INSUFFICIENT_STOCK' | 'UNPUBLISHED' | 'STORE_MISMATCH'
+  reason: 'NOT_FOUND' | 'INSUFFICIENT_STOCK' | 'UNPUBLISHED' | 'STORE_MISMATCH' | 'MIN_ORDER_QTY'
   availableStock?: number
 }
 
 // Prisma ids are cuids, and seeded rows use plain strings like demo-prod-001.
 // Validating as uuid rejected every real cart item.
+const CartItemPriceTierSchema = z.object({
+  minQty: z.number().int().min(1),
+  maxQty: z.number().int().min(1).nullable(),
+  unitPrice: z.number().nonnegative(),
+})
+
 const CartItemSchema = z.object({
   productId: z.string().min(1),
   name: z.string(),
   price: z.number().positive(),
   quantity: z.number().int().positive(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().min(1).optional(),
   isPreOrder: z.boolean().optional(),
   productType: z.enum(['PHYSICAL', 'DIGITAL', 'EVENT']).optional(),
   storeDomain: z.string().optional(),
   variantId: z.string().optional(),
   variation: z.string().optional(),
+  hasBatchPricing: z.boolean().optional(),
+  minOrderQty: z.number().int().min(1).optional(),
+  baseUnitPrice: z.number().nonnegative().optional(),
+  priceTiers: z.array(CartItemPriceTierSchema).optional(),
 })
 
 interface ShippingConfigProps {
@@ -276,6 +291,28 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
       return
     }
 
+    for (const item of cartItems) {
+      if (item.hasBatchPricing || (item.minOrderQty && item.minOrderQty > 1)) {
+        const res = resolveBatchUnitPrice(
+          item.baseUnitPrice ?? item.price,
+          item.priceTiers,
+          item.quantity,
+          item.minOrderQty
+        )
+        if (res.isBelowMinimum) {
+          setProblematicProduct({
+            productId: item.productId,
+            productName: item.variation ? `${item.name} (${item.variation})` : item.name,
+            reason: 'MIN_ORDER_QTY',
+          })
+          setError(
+            `Minimal pemesanan untuk "${item.name}${item.variation ? ` (${item.variation})` : ''}" adalah ${res.effectiveMinOrderQty} pcs.`
+          )
+          return
+        }
+      }
+    }
+
     // Every line gets its own row, so a product that is carried to checkout and
     // then abandoned is distinguishable from one that never got that far. An
     // order that follows also counts here; the report subtracts nothing.
@@ -309,7 +346,10 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
           // they no longer match the shelf, instead of charging the difference
           // without telling anyone.
           expectedUnitPrices: Object.fromEntries(
-            cartItems.map(item => [item.productId, item.price])
+            cartItems.map(item => [
+              item.variantId ? `${item.productId}::${item.variantId}` : item.productId,
+              item.price,
+            ])
           ),
           shippingZone: hasPhysicalItems ? (selectedCourier ? 'INNER' : shippingZone) : undefined,
           shippingAddress: hasPhysicalItems
@@ -363,6 +403,15 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
         if (data.code === 'VOUCHER_REJECTED') {
           setAppliedVoucher(null)
           throw new Error(data.error || 'Voucher tidak bisa dipakai')
+        }
+
+        if (data.code === 'MIN_ORDER_QTY') {
+          setProblematicProduct({
+            productId: data.productId,
+            productName: data.productName,
+            reason: 'MIN_ORDER_QTY',
+          })
+          throw new Error(data.error || 'Jumlah pesanan di bawah minimal order')
         }
 
         if (data.code === 'PRODUCT_UNAVAILABLE') {
@@ -488,10 +537,26 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
 
             {cartItems.map(item => {
               const isProblematic = problematicProduct?.productId === item.productId
+              const batchInfo = item.hasBatchPricing
+                ? resolveBatchUnitPrice(
+                    item.baseUnitPrice ?? item.price,
+                    item.priceTiers,
+                    item.quantity,
+                    item.minOrderQty
+                  )
+                : null
+              const effectiveItemMin = batchInfo
+                ? batchInfo.effectiveMinOrderQty
+                : Math.max(1, item.minOrderQty ?? 1)
+              const activeTierLabel =
+                batchInfo?.matchedTier
+                  ? formatTierRangeLabel(batchInfo.matchedTier.minQty, batchInfo.matchedTier.maxQty)
+                  : null
+
               return (
                 <div
-                  key={item.productId}
-                  className={`bg-white dark:bg-slate-900 rounded-lg shadow border border-gray-200 dark:border-slate-800 p-4 flex items-center transition-colors ${
+                  key={`${item.productId}::${item.variantId || 'default'}`}
+                  className={`bg-white dark:bg-slate-900 rounded-lg shadow border border-gray-200 dark:border-slate-800 p-4 flex flex-wrap sm:flex-nowrap items-center gap-3 transition-colors ${
                     isProblematic ? 'border-red-400 bg-red-50/30 dark:bg-red-950/20 ring-2 ring-red-200' : ''
                   }`}
                 >
@@ -504,12 +569,17 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
                       className="w-20 h-20 object-cover rounded mr-4"
                     />
                   )}
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-[200px]">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-medium text-gray-900 dark:text-white">{item.name}</h3>
                       {item.variation && (
                         <span className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 text-[11px] font-semibold px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
                           🏷️ {item.variation}
+                        </span>
+                      )}
+                      {activeTierLabel && (
+                        <span className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                          Grosir: {activeTierLabel}
                         </span>
                       )}
                       {isProblematic && (
@@ -533,26 +603,63 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-600 dark:text-slate-300">Rp {item.price.toLocaleString()}</p>
+                    <p className="text-gray-600 dark:text-slate-300 text-sm mt-0.5">
+                      Rp {item.price.toLocaleString('id-ID')}
+                      {item.hasBatchPricing && (
+                        <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                          / pcs • Total: <strong className="text-slate-800 dark:text-slate-100">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</strong>
+                        </span>
+                      )}
+                    </p>
+                    {batchInfo?.isBelowMinimum && (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-300">
+                        <span>Minimal order: {effectiveItemMin} pcs</span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.productId, effectiveItemMin, item.variantId)}
+                          className="underline font-semibold hover:text-rose-900"
+                        >
+                          Sesuaikan ({effectiveItemMin} pcs)
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div 
                     data-quantity-stepper
                     className="flex items-center bg-white dark:bg-slate-800 rounded-lg border border-gray-300 dark:border-slate-700 overflow-hidden shadow-xs transition-colors"
                   >
                     <button
-                      onClick={() => updateQuantity(item.productId, item.quantity - 1, item.variantId)}
+                      onClick={() => updateQuantity(item.productId, Math.max(effectiveItemMin, item.quantity - 1), item.variantId)}
                       aria-label="Kurangi jumlah item"
                       className="px-2.5 py-1 text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-700 transition disabled:opacity-40"
-                      disabled={item.quantity <= 1}
+                      disabled={item.quantity <= effectiveItemMin}
                     >
                       -
                     </button>
-                    <span 
-                      data-quantity-counter
-                      className="px-3.5 py-1 border-l border-r border-gray-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold text-sm select-none"
-                    >
-                      {item.quantity}
-                    </span>
+                    {item.hasBatchPricing ? (
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        data-quantity-counter
+                        aria-label={`Jumlah ${item.name}${item.variation ? ` ${item.variation}` : ''}`}
+                        min={effectiveItemMin}
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 10)
+                          if (!Number.isNaN(parsed) && parsed >= 1) {
+                            updateQuantity(item.productId, parsed, item.variantId)
+                          }
+                        }}
+                        className="w-20 px-2 py-1 border-l border-r border-gray-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 font-semibold text-sm text-center focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                      />
+                    ) : (
+                      <span 
+                        data-quantity-counter
+                        className="px-3.5 py-1 border-l border-r border-gray-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 font-semibold text-sm select-none"
+                      >
+                        {item.quantity}
+                      </span>
+                    )}
                     <button
                       onClick={() => updateQuantity(item.productId, item.quantity + 1, item.variantId)}
                       aria-label="Tambah jumlah item"

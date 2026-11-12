@@ -212,6 +212,8 @@ model Product {
   saleEndsAt       DateTime?
   saleQuota        Int?
   saleSold         Int            @default(0)
+  hasBatchPricing  Boolean        @default(false)
+  minOrderQty      Int            @default(1)
   seoTitle         String?
   seoDescription   String?
   seoKeywords      String?
@@ -244,26 +246,46 @@ model Product {
   articles      ArticleProduct[]
   landingPages  LandingPage[]
   variants      ProductVariant[]
+  priceTiers    ProductPriceTier[]
 
   @@unique([storeId, slug])
   @@map("products")
 }
 
 model ProductVariant {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   productId   String
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name        String   @default("")
-  optionType  String   @default("CUSTOM")
-  optionValue String   @default("")
+  product     Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String             @default("")
+  optionType  String             @default("CUSTOM")
+  optionValue String             @default("")
   sku         String?
   price       Float?
-  stock       Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  stock       Int                @default(0)
+  minOrderQty Int                @default(1)
+  priceTiers  ProductPriceTier[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([productId])
   @@map("product_variants")
+}
+
+model ProductPriceTier {
+  id        String          @id @default(cuid())
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  minQty    Int             @default(1)
+  maxQty    Int?
+  unitPrice Float           @default(0)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@index([productId])
+  @@index([variantId])
+  @@map("product_price_tiers")
 }
 
 model ProductImage {

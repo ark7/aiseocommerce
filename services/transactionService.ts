@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { LedgerType, StockType, Prisma } from '@prisma/client';
-import { resolveUnitPrice } from '@/lib/pricing';
+import { resolveUnitPrice, resolveBatchUnitPrice } from '@/lib/pricing';
 import {
   VOUCHER_REJECTION_LABELS,
   checkVoucherUsable,
@@ -65,6 +65,25 @@ export class ProductUnavailableError extends Error {
     }
     super(msg);
     this.name = 'ProductUnavailableError';
+  }
+}
+
+/**
+ * Thrown when an ordered item's quantity is below the configured minimum order
+ * quantity (MOQ) of a product, variant, or its lowest pricing tier.
+ */
+export class MinOrderQuantityError extends Error {
+  constructor(
+    public readonly productId: string,
+    public readonly productName: string,
+    public readonly minQty: number,
+    public readonly actualQty: number,
+    public readonly variantId?: string | null
+  ) {
+    super(
+      `Minimal pemesanan untuk "${productName}" adalah ${minQty} pcs (Anda memesan ${actualQty} pcs).`
+    );
+    this.name = 'MinOrderQuantityError';
   }
 }
 
@@ -168,7 +187,18 @@ export async function createOrder(
     // the previous unscoped lookup let one store sell another store's catalogue.
     const products = await tx.product.findMany({
       where: { id: { in: items.map((item) => item.productId) }, storeId },
-      include: { variants: true },
+      include: {
+        priceTiers: {
+          where: { variantId: null },
+          orderBy: { minQty: 'asc' },
+        },
+        variants: {
+          include: {
+            priceTiers: { orderBy: { minQty: 'asc' } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     const byId = new Map(products.map((product) => [product.id, product]));
 
@@ -275,36 +305,97 @@ export async function createOrder(
         );
       }
 
+      const explicitMinQty = selectedVariant
+        ? Math.max((selectedVariant as any).minOrderQty ?? 1, (product as any).minOrderQty ?? 1)
+        : ((product as any).minOrderQty ?? 1);
+      const fallbackBasePrice =
+        selectedVariant && selectedVariant.price != null && selectedVariant.price > 0
+          ? selectedVariant.price
+          : product.sellingPrice;
+
       let unitPrice = resolveUnitPrice(product, now);
-      if (selectedVariant && selectedVariant.price != null && selectedVariant.price > 0) {
-        unitPrice = selectedVariant.price;
-      }
       let saleQuotaUsed = false;
 
-      if (!selectedVariant && unitPrice < product.sellingPrice) {
-        // The quota check lives in the WHERE clause so it happens at write
-        // time: two buyers racing for the last discounted unit cannot both
-        // read "1 left" and both get it. Losing the race is not an error —
-        // it only means the discount is gone.
-        const reserved = await tx.product.updateMany({
-          where: {
-            id: product.id,
-            storeId,
-            OR: [
-              { saleQuota: null },
-              { saleSold: { lte: (product.saleQuota ?? 0) - item.quantity } },
-            ],
-          },
-          data: { saleSold: { increment: item.quantity } },
-        });
+      if ((product as any).hasBatchPricing) {
+        const variantTiers = Array.isArray((selectedVariant as any)?.priceTiers)
+          ? (selectedVariant as any).priceTiers
+          : [];
+        const productTiers = Array.isArray((product as any).priceTiers)
+          ? (product as any).priceTiers
+          : [];
+        const activeTiers =
+          selectedVariant && variantTiers.length > 0 ? variantTiers : productTiers;
 
-        if (reserved.count === 0) unitPrice = product.sellingPrice;
-        else saleQuotaUsed = true;
+        const batchResolution = resolveBatchUnitPrice(
+          fallbackBasePrice,
+          activeTiers,
+          item.quantity,
+          explicitMinQty
+        );
+
+        if (batchResolution.isBelowMinimum) {
+          const itemDisplayName = selectedVariant
+            ? `${product.name} (${selectedVariant.optionValue})`
+            : product.name;
+          throw new MinOrderQuantityError(
+            product.id,
+            itemDisplayName,
+            batchResolution.effectiveMinOrderQty,
+            item.quantity,
+            selectedVariant?.id ?? null
+          );
+        }
+
+        unitPrice = batchResolution.unitPrice;
+      } else {
+        if (explicitMinQty > 1 && item.quantity < explicitMinQty) {
+          const itemDisplayName = selectedVariant
+            ? `${product.name} (${selectedVariant.optionValue})`
+            : product.name;
+          throw new MinOrderQuantityError(
+            product.id,
+            itemDisplayName,
+            explicitMinQty,
+            item.quantity,
+            selectedVariant?.id ?? null
+          );
+        }
+
+        if (selectedVariant && selectedVariant.price != null && selectedVariant.price > 0) {
+          unitPrice = selectedVariant.price;
+        }
+
+        if (!selectedVariant && unitPrice < product.sellingPrice) {
+          // The quota check lives in the WHERE clause so it happens at write
+          // time: two buyers racing for the last discounted unit cannot both
+          // read "1 left" and both get it. Losing the race is not an error —
+          // it only means the discount is gone.
+          const reserved = await tx.product.updateMany({
+            where: {
+              id: product.id,
+              storeId,
+              OR: [
+                { saleQuota: null },
+                { saleSold: { lte: (product.saleQuota ?? 0) - item.quantity } },
+              ],
+            },
+            data: { saleSold: { increment: item.quantity } },
+          });
+
+          if (reserved.count === 0) unitPrice = product.sellingPrice;
+          else saleQuotaUsed = true;
+        }
       }
 
-      const shown = expectedUnitPrices?.[product.id];
+      const variantPriceKey = selectedVariant ? `${product.id}::${selectedVariant.id}` : product.id;
+      const shown = expectedUnitPrices?.[variantPriceKey] ?? expectedUnitPrices?.[product.id];
       if (shown !== undefined && shown !== unitPrice) {
-        priceChanges.push({ productId: product.id, name: product.name, shown, actual: unitPrice });
+        priceChanges.push({
+          productId: product.id,
+          name: selectedVariant ? `${product.name} (${selectedVariant.optionValue})` : product.name,
+          shown,
+          actual: unitPrice,
+        });
       }
 
       const itemTotal = unitPrice * item.quantity;

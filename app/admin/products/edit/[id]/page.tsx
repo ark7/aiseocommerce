@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import BatchPricingMatrixEditor, {
+  BatchVariantInput,
+  MatrixBand,
+  ProductTierRow,
+  PRINTING_9_TIER_BANDS,
+  buildMatrixFromApiProduct,
+  serializeProductTiers,
+  serializeVariantTiers,
+} from '@/components/admin/BatchPricingMatrixEditor';
 
 interface ProductImage {
   id: string;
@@ -16,15 +25,7 @@ interface Category {
   name: string;
 }
 
-interface FormVariant {
-  id: string;
-  optionType: 'SIZE' | 'COLOR' | 'CUSTOM';
-  optionValue: string;
-  name: string;
-  sku: string;
-  price: string;
-  stock: string;
-}
+type FormVariant = BatchVariantInput;
 
 const EMPTY_FORM = {
   name: '',
@@ -43,6 +44,7 @@ const EMPTY_FORM = {
   eventBenefits: '',
   basePrice: '',
   sellingPrice: '',
+  minOrderQty: '1',
   discountPrice: '',
   saleStartsAt: '',
   saleEndsAt: '',
@@ -108,6 +110,15 @@ export default function EditProduct() {
 
   const [hasVariants, setHasVariants] = useState(false);
   const [variants, setVariants] = useState<FormVariant[]>([]);
+  const [hasBatchPricing, setHasBatchPricing] = useState(false);
+  const [matrixBands, setMatrixBands] = useState<MatrixBand[]>(() =>
+    PRINTING_9_TIER_BANDS.slice(0, 3).map((b, i) => ({
+      id: `band_init_${i}`,
+      minQty: b.minQty,
+      maxQty: b.maxQty,
+    }))
+  );
+  const [productTiers, setProductTiers] = useState<ProductTierRow[]>([]);
 
   const addVariant = (type: 'SIZE' | 'COLOR' | 'CUSTOM' = 'CUSTOM') => {
     setVariants((prev) => [
@@ -120,9 +131,59 @@ export default function EditProduct() {
         sku: '',
         price: formData.sellingPrice || '',
         stock: '10',
+        minOrderQty: '1',
+        tierPrices: {},
       },
     ]);
     setHasVariants(true);
+  };
+
+  const applyIdCardMatrixSample = () => {
+    const newBands: MatrixBand[] = PRINTING_9_TIER_BANDS.map((b, i) => ({
+      id: `band_idcard_${i}`,
+      minQty: b.minQty,
+      maxQty: b.maxQty,
+    }));
+    const ekonomisPrices = ['5250', '4750', '4250', '3750', '3250', '2750', '2250', '2000', '1800'];
+    const premiumPrices = ['', '6000', '5000', '4500', '4000', '3500', '3000', '2750', '2550'];
+
+    const ecoMap: Record<string, string> = {};
+    const premMap: Record<string, string> = {};
+    newBands.forEach((b, idx) => {
+      if (ekonomisPrices[idx]) ecoMap[b.id] = ekonomisPrices[idx];
+      if (premiumPrices[idx]) premMap[b.id] = premiumPrices[idx];
+    });
+
+    setMatrixBands(newBands);
+    setHasVariants(true);
+    setHasBatchPricing(true);
+    setVariants([
+      {
+        id: 'var_eco_' + Date.now(),
+        optionType: 'CUSTOM',
+        optionValue: 'Ekonomis (Pigmen)',
+        name: 'Tipe Cetak: Ekonomis (Pigmen)',
+        sku: 'ID-ECO',
+        price: '5250',
+        stock: '5000',
+        minOrderQty: '1',
+        tierPrices: ecoMap,
+      },
+      {
+        id: 'var_prem_' + Date.now(),
+        optionType: 'CUSTOM',
+        optionValue: 'Premium (Laser)',
+        name: 'Tipe Cetak: Premium (Laser)',
+        sku: 'ID-PREM',
+        price: '6000',
+        stock: '5000',
+        minOrderQty: '11',
+        tierPrices: premMap,
+      },
+    ]);
+    if (!formData.basePrice) {
+      setFormData((prev) => ({ ...prev, basePrice: '1500', sellingPrice: '1800' }));
+    }
   };
 
   const addPresetSizes = () => {
@@ -135,6 +196,8 @@ export default function EditProduct() {
       sku: formData.sku ? `${formData.sku}-${s}` : '',
       price: formData.sellingPrice || '',
       stock: '10',
+      minOrderQty: '1',
+      tierPrices: {},
     }));
     setVariants((prev) => [...prev, ...newVars]);
     setHasVariants(true);
@@ -150,12 +213,18 @@ export default function EditProduct() {
       sku: formData.sku ? `${formData.sku}-${c.toUpperCase().substring(0, 3)}` : '',
       price: formData.sellingPrice || '',
       stock: '10',
+      minOrderQty: '1',
+      tierPrices: {},
     }));
     setVariants((prev) => [...prev, ...newVars]);
     setHasVariants(true);
   };
 
-  const updateVariant = (index: number, field: keyof FormVariant, value: string) => {
+  const updateVariant = (
+    index: number,
+    field: Exclude<keyof FormVariant, 'tierPrices'>,
+    value: string
+  ) => {
     setVariants((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -213,6 +282,7 @@ export default function EditProduct() {
         eventBenefits: Array.isArray(product.eventBenefits) ? product.eventBenefits.join('\n') : asText(product.eventBenefits),
         basePrice: asText(product.basePrice),
         sellingPrice: asText(product.sellingPrice),
+        minOrderQty: asText(product.minOrderQty || '1'),
         discountPrice: asText(product.discountPrice),
         saleStartsAt: toDateTimeInput(product.saleStartsAt),
         saleEndsAt: toDateTimeInput(product.saleEndsAt),
@@ -239,6 +309,13 @@ export default function EditProduct() {
       });
       setExistingImages(product.images ?? []);
 
+      const matrix = buildMatrixFromApiProduct(product);
+      setHasBatchPricing(Boolean(product.hasBatchPricing));
+      if (matrix.bands.length > 0) {
+        setMatrixBands(matrix.bands);
+      }
+      setProductTiers(matrix.singleTiers);
+
       const fetchedVariants: FormVariant[] = Array.isArray(product.variants) && product.variants.length > 0
         ? product.variants.map((v: any) => ({
             id: v.id || ('var_' + Math.random().toString(36).substring(2, 6)),
@@ -248,6 +325,8 @@ export default function EditProduct() {
             sku: asText(v.sku),
             price: asText(v.price),
             stock: asText(v.stock),
+            minOrderQty: asText(v.minOrderQty || '1'),
+            tierPrices: matrix.variantTierPricesByVariantId[v.id] || {},
           }))
         : [];
 
@@ -326,30 +405,64 @@ export default function EditProduct() {
       // Blank fields are sent as '' on purpose: the API turns that into
       // undefined, which is how a description gets cleared.
       Object.entries(formData).forEach(([key, value]) => {
-        payload.append(key, String(value));
+        if (hasBatchPricing && ['discountPrice', 'saleStartsAt', 'saleEndsAt', 'saleQuota'].includes(key)) {
+          payload.append(key, '');
+        } else {
+          payload.append(key, String(value));
+        }
       });
+
+      payload.set('hasBatchPricing', String(hasBatchPricing));
+      payload.set('minOrderQty', String(Math.max(1, parseInt(formData.minOrderQty, 10) || 1)));
 
       deletedImageIds.forEach((imageId) => payload.append(`deleteImage_${imageId}`, imageId));
       images.forEach((image) => payload.append('images', image));
 
+      const serializedProductTiers =
+        hasBatchPricing && (!hasVariants || variants.length === 0)
+          ? serializeProductTiers(productTiers)
+          : [];
+      payload.append('priceTiers', JSON.stringify(serializedProductTiers));
+
+      let derivedMinBatchPrice: number | null = null;
       if (hasVariants && variants.length > 0) {
         const totalVariantStock = variants.reduce((sum, v) => sum + (parseInt(v.stock) || 0), 0);
         payload.set('stock', String(totalVariantStock));
-        payload.append(
-          'variants',
-          JSON.stringify(
-            variants.map((v) => ({
-              optionType: v.optionType,
-              optionValue: v.optionValue.trim(),
-              name: v.name.trim() || `${v.optionType === 'SIZE' ? 'Ukuran' : v.optionType === 'COLOR' ? 'Warna' : 'Varian'}: ${v.optionValue.trim()}`,
-              sku: v.sku.trim() || null,
-              price: v.price ? Number(v.price) : null,
-              stock: Math.max(0, parseInt(v.stock) || 0),
-            }))
-          )
-        );
+        const mappedVariants = variants.map((v) => {
+          const vTiers = hasBatchPricing ? serializeVariantTiers(v, matrixBands) : [];
+          const lowestTierMinQty = vTiers.length > 0 ? Math.min(...vTiers.map((t) => t.minQty)) : 1;
+          const variantMinQty = Math.max(parseInt(v.minOrderQty || '1', 10) || 1, lowestTierMinQty);
+          const fallbackVariantPrice = v.price
+            ? Number(v.price)
+            : vTiers.length > 0
+            ? Math.max(...vTiers.map((t) => t.unitPrice))
+            : null;
+          if (vTiers.length > 0) {
+            const minP = Math.min(...vTiers.map((t) => t.unitPrice));
+            derivedMinBatchPrice =
+              derivedMinBatchPrice === null ? minP : Math.min(derivedMinBatchPrice, minP);
+          }
+          return {
+            optionType: v.optionType,
+            optionValue: v.optionValue.trim(),
+            name: v.name.trim() || `${v.optionType === 'SIZE' ? 'Ukuran' : v.optionType === 'COLOR' ? 'Warna' : 'Varian'}: ${v.optionValue.trim()}`,
+            sku: v.sku.trim() || null,
+            price: fallbackVariantPrice,
+            stock: Math.max(0, parseInt(v.stock) || 0),
+            minOrderQty: variantMinQty,
+            priceTiers: vTiers,
+          };
+        });
+        payload.append('variants', JSON.stringify(mappedVariants));
       } else {
         payload.append('variants', JSON.stringify([]));
+        if (serializedProductTiers.length > 0) {
+          derivedMinBatchPrice = Math.min(...serializedProductTiers.map((t) => t.unitPrice));
+        }
+      }
+
+      if (hasBatchPricing && (!formData.sellingPrice || Number(formData.sellingPrice) <= 0)) {
+        payload.set('sellingPrice', String(derivedMinBatchPrice ?? 0));
       }
 
       const response = await fetch('/api/products', {
@@ -681,8 +794,62 @@ export default function EditProduct() {
 
         {/* Pricing */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Harga</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Mode Harga Produk</h2>
+            <span className="text-xs text-gray-500">Pilih satu metode penetapan harga</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+            <button
+              type="button"
+              onClick={() => setHasBatchPricing(false)}
+              className={`text-left p-3.5 rounded-xl border-2 transition-all ${
+                !hasBatchPricing
+                  ? 'border-indigo-600 bg-indigo-50/70 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Mode Default (Harga Tetap &amp; Diskon)</span>
+                <span
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    !hasBatchPricing ? 'border-indigo-600' : 'border-gray-300'
+                  }`}
+                >
+                  {!hasBatchPricing && <span className="w-2 h-2 rounded-full bg-indigo-600" />}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Harga jual satuan tetap dengan opsi harga diskon / flash sale berbatas waktu atau kuota.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHasBatchPricing(true)}
+              className={`text-left p-3.5 rounded-xl border-2 transition-all ${
+                hasBatchPricing
+                  ? 'border-indigo-600 bg-indigo-50/70 shadow-sm'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-900">Mode Batch Pricing (Grosir Bertingkat / Matrix)</span>
+                <span
+                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    hasBatchPricing ? 'border-indigo-600' : 'border-gray-300'
+                  }`}
+                >
+                  {hasBatchPricing && <span className="w-2 h-2 rounded-full bg-indigo-600" />}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Harga satuan menyesuaikan rentang jumlah order (tier qty) &amp; mendukung tabel per varian.
+              </p>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="basePrice">
                 Harga Modal (Base Price) *
@@ -699,89 +866,119 @@ export default function EditProduct() {
                 placeholder="0"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="sellingPrice">
-                Harga Jual (Selling Price) *
-              </label>
-              <input
-                id="sellingPrice"
-                type="number"
-                name="sellingPrice"
-                value={formData.sellingPrice}
-                onChange={handleChange}
-                required
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="discountPrice">
-                Harga Diskon (Optional)
-              </label>
-              <input
-                id="discountPrice"
-                type="number"
-                name="discountPrice"
-                value={formData.discountPrice}
-                onChange={handleChange}
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="0"
-              />
-            </div>
+
+            {!hasBatchPricing ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="sellingPrice">
+                    Harga Jual (Selling Price) *
+                  </label>
+                  <input
+                    id="sellingPrice"
+                    type="number"
+                    name="sellingPrice"
+                    value={formData.sellingPrice}
+                    onChange={handleChange}
+                    required
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="discountPrice">
+                    Harga Diskon (Optional)
+                  </label>
+                  <input
+                    id="discountPrice"
+                    type="number"
+                    name="discountPrice"
+                    value={formData.discountPrice}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="0"
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="md:col-span-2 flex items-end">
+                <div className="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-900">
+                  <strong>Harga Display Katalog:</strong> Diambil otomatis dari tier grosir termurah (&ldquo;Mulai Rp ...&rdquo;). Promo harga coret dinonaktifkan saat Mode Batch aktif.
+                </div>
+              </div>
+            )}
           </div>
 
-          <p className="mt-4 text-xs text-gray-500">
-            Harga diskon tanpa jadwal dan tanpa kuota akan tayang terus. Isi salah satu di bawah
-            untuk menjadikannya penawaran berbatas waktu.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleStartsAt">
-                Mulai Berlaku
-              </label>
-              <input
-                type="datetime-local"
-                id="saleStartsAt"
-                name="saleStartsAt"
-                value={formData.saleStartsAt}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleEndsAt">
-                Berakhir Pada
-              </label>
-              <input
-                type="datetime-local"
-                id="saleEndsAt"
-                name="saleEndsAt"
-                value={formData.saleEndsAt}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleQuota">
-                Kuota Harga Diskon
-              </label>
-              <input
-                type="number"
-                id="saleQuota"
-                name="saleQuota"
-                value={formData.saleQuota}
-                onChange={handleChange}
-                min="1"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Tanpa batas"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Kosongkan untuk tanpa batas kuota.
+          {!hasBatchPricing ? (
+            <>
+              <p className="mt-2 text-xs text-gray-500">
+                Harga diskon tanpa jadwal dan tanpa kuota akan tayang terus. Isi salah satu di bawah
+                untuk menjadikannya penawaran berbatas waktu.
               </p>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleStartsAt">
+                    Mulai Berlaku
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="saleStartsAt"
+                    name="saleStartsAt"
+                    value={formData.saleStartsAt}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleEndsAt">
+                    Berakhir Pada
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="saleEndsAt"
+                    name="saleEndsAt"
+                    value={formData.saleEndsAt}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="saleQuota">
+                    Kuota Harga Diskon
+                  </label>
+                  <input
+                    type="number"
+                    id="saleQuota"
+                    name="saleQuota"
+                    value={formData.saleQuota}
+                    onChange={handleChange}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Tanpa batas"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Kosongkan untuk tanpa batas kuota.
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <BatchPricingMatrixEditor
+              hasVariants={hasVariants}
+              variants={variants}
+              matrixBands={matrixBands}
+              setMatrixBands={setMatrixBands}
+              productTiers={productTiers}
+              setProductTiers={setProductTiers}
+              minOrderQty={formData.minOrderQty}
+              onMinOrderQtyChange={(val) => setFormData((prev) => ({ ...prev, minOrderQty: val }))}
+              onUpdateVariant={(vIdx, updater) =>
+                setVariants((prev) => prev.map((v, i) => (i === vIdx ? updater(v) : v)))
+              }
+              onApplyVariantPreset={applyIdCardMatrixSample}
+            />
+          )}
         </div>
 
         {/* Inventory & Availability */}

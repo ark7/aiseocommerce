@@ -20,7 +20,16 @@ export async function GET(request: Request, { params }: RouteContext) {
       include: {
         images: { orderBy: { order: 'asc' } },
         category: true,
-        variants: { orderBy: { createdAt: 'asc' } },
+        priceTiers: {
+          where: { variantId: null },
+          orderBy: { minQty: 'asc' },
+        },
+        variants: {
+          include: {
+            priceTiers: { orderBy: { minQty: 'asc' } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
 
