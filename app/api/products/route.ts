@@ -83,6 +83,106 @@ const nullableInt = z
   .transform((value) => (value === '' ? null : value));
 
 /**
+ * Minimum order quantity is non-null (`@default(1)`), so blank means unchanged.
+ */
+const optionalMinOrderQty = z
+  .union([z.literal(''), z.coerce.number().int().min(1)])
+  .optional()
+  .transform((value) => (value === '' ? undefined : value));
+
+interface RawPriceTierInput {
+  minQty: number;
+  maxQty: number | null;
+  unitPrice: number;
+}
+
+function normalizePriceTiers(raw: unknown): RawPriceTierInput[] {
+  if (!Array.isArray(raw)) return [];
+  const valid: RawPriceTierInput[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const minQty = Math.floor(Number((entry as any).minQty));
+    const rawMax = (entry as any).maxQty;
+    const maxQty =
+      rawMax === null || rawMax === undefined || rawMax === ''
+        ? null
+        : Math.floor(Number(rawMax));
+    const unitPrice = Number((entry as any).unitPrice);
+    if (!Number.isFinite(minQty) || minQty < 1) continue;
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) continue;
+    if (maxQty !== null && (!Number.isFinite(maxQty) || maxQty < minQty)) continue;
+    valid.push({ minQty, maxQty, unitPrice });
+  }
+  return valid.sort((a, b) => a.minQty - b.minQty);
+}
+
+async function syncProductPriceTiers(params: {
+  productId: string;
+  variants: Array<{ id: string; optionType?: string; optionValue?: string }>;
+  variantsData: Array<{ optionType?: string; optionValue?: string; priceTiers?: unknown }>;
+  productTiersData: RawPriceTierInput[];
+  hasBatchPricing?: boolean;
+  clearExisting: boolean;
+}): Promise<void> {
+  const tierClient = (prisma as any).productPriceTier;
+  if (!tierClient) return;
+
+  if (params.clearExisting) {
+    await tierClient.deleteMany?.({ where: { productId: params.productId } });
+  }
+
+  if (params.hasBatchPricing === false) {
+    return;
+  }
+
+  const rows: Array<{
+    productId: string;
+    variantId: string | null;
+    minQty: number;
+    maxQty: number | null;
+    unitPrice: number;
+  }> = [];
+
+  if (params.variants.length > 0 && params.variantsData.length > 0) {
+    params.variantsData.forEach((v, idx) => {
+      const tiers = normalizePriceTiers(v.priceTiers);
+      if (tiers.length === 0) return;
+      const matched =
+        params.variants.find(
+          (cv) =>
+            cv.optionType === (v.optionType || 'CUSTOM') &&
+            cv.optionValue === (v.optionValue || '')
+        ) || params.variants[idx];
+      if (!matched?.id) return;
+      for (const tier of tiers) {
+        rows.push({
+          productId: params.productId,
+          variantId: matched.id,
+          minQty: tier.minQty,
+          maxQty: tier.maxQty,
+          unitPrice: tier.unitPrice,
+        });
+      }
+    });
+  }
+
+  for (const tier of params.productTiersData) {
+    rows.push({
+      productId: params.productId,
+      variantId: null,
+      minQty: tier.minQty,
+      maxQty: tier.maxQty,
+      unitPrice: tier.unitPrice,
+    });
+  }
+
+  if (rows.length > 0) {
+    await tierClient.createMany?.({ data: rows });
+  }
+}
+
+/**
+ * Resolves a human-readable message for valid dates sent as string via FormData.
  * Tanggal datang sebagai string dari FormData. `''` mengosongkan jendela,
  * absen membiarkannya apa adanya — sama seperti nullableNumber.
  */
@@ -133,6 +233,8 @@ const productFields = {
   eventQuota: nullableInt,
   basePrice: z.coerce.number().min(0),
   sellingPrice: z.coerce.number().min(0),
+  hasBatchPricing: formBoolean,
+  minOrderQty: optionalMinOrderQty,
   discountPrice: nullableNumber,
   saleStartsAt: nullableDate,
   saleEndsAt: nullableDate,
@@ -200,6 +302,8 @@ const createProductSchema = z.object({
   ...productFields,
   stock: withDefault(productFields.stock, 0),
   minStock: withDefault(productFields.minStock, 0),
+  hasBatchPricing: withDefault(productFields.hasBatchPricing, false),
+  minOrderQty: withDefault(productFields.minOrderQty, 1),
   isPublished: withDefault(productFields.isPublished, true),
   isFeatured: withDefault(productFields.isFeatured, false),
   sandboxEnabled: withDefault(productFields.sandboxEnabled, false),
@@ -283,7 +387,14 @@ export async function GET(request: Request) {
         include: {
           images: { orderBy: { order: 'asc' }, take: 1 },
           category: true,
-          variants: { orderBy: { createdAt: 'asc' } },
+          priceTiers: {
+            where: { variantId: null },
+            orderBy: { minQty: 'asc' },
+          },
+          variants: {
+            include: { priceTiers: { orderBy: { minQty: 'asc' } } },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       }),
       prisma.product.count({ where }),
@@ -349,6 +460,8 @@ export async function POST(request: Request) {
       sku?: string;
       price?: number;
       stock?: number;
+      minOrderQty?: number;
+      priceTiers?: unknown;
     }> = [];
 
     const rawVariants = formData.get('variants');
@@ -360,11 +473,42 @@ export async function POST(request: Request) {
         console.warn('Failed to parse variants JSON in create product:', err);
       }
     }
-    
+
+    let productTiersData: RawPriceTierInput[] = [];
+    const rawPriceTiers = formData.get('priceTiers');
+    if (rawPriceTiers && typeof rawPriceTiers === 'string') {
+      try {
+        productTiersData = normalizePriceTiers(JSON.parse(rawPriceTiers));
+      } catch (err) {
+        console.warn('Failed to parse priceTiers JSON in create product:', err);
+      }
+    }
+
+    const createData: Record<string, any> = { ...validation.data };
+    if (createData.hasBatchPricing) {
+      createData.discountPrice = null;
+      createData.saleStartsAt = null;
+      createData.saleEndsAt = null;
+      createData.saleQuota = null;
+
+      const allTierPrices = [
+        ...productTiersData.map((t) => t.unitPrice),
+        ...variantsData.flatMap((v) => normalizePriceTiers(v.priceTiers).map((t) => t.unitPrice)),
+      ];
+      if (allTierPrices.length > 0) {
+        if (!createData.sellingPrice || createData.sellingPrice <= 0) {
+          createData.sellingPrice = Math.min(...allTierPrices);
+        }
+        if (!createData.basePrice || createData.basePrice <= 0) {
+          createData.basePrice = Math.max(...allTierPrices);
+        }
+      }
+    }
+
     const product = await prisma.product.create({
       data: {
         storeId: user.storeId,
-        ...validation.data,
+        ...(createData as any),
         images: {
           create: imageUrls.map((url, index) => ({
             url,
@@ -381,11 +525,36 @@ export async function POST(request: Request) {
             sku: v.sku || null,
             price: v.price ? Number(v.price) : null,
             stock: Number(v.stock) || 0,
+            minOrderQty: Math.max(1, Math.floor(Number(v.minOrderQty) || 1)),
           })),
         } : undefined,
       },
-      include: { images: true, category: true, variants: true },
+      include: {
+        images: true,
+        category: true,
+        priceTiers: { where: { variantId: null }, orderBy: { minQty: 'asc' } },
+        variants: {
+          include: { priceTiers: { orderBy: { minQty: 'asc' } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
+
+    const hasAnyTiersToCreate =
+      Boolean(createData.hasBatchPricing) &&
+      (productTiersData.length > 0 ||
+        variantsData.some((v) => normalizePriceTiers(v.priceTiers).length > 0));
+
+    if (hasAnyTiersToCreate) {
+      await syncProductPriceTiers({
+        productId: product.id,
+        variants: (product as any).variants || [],
+        variantsData,
+        productTiersData,
+        hasBatchPricing: true,
+        clearExisting: false,
+      });
+    }
 
     // A new listing must be crawlable before the ISR window expires.
     await revalidateProduct(user.storeId, product.slug);
@@ -444,7 +613,7 @@ export async function PATCH(request: Request) {
     
     const entries = Array.from(formData.entries());
     for (const [key, value] of entries) {
-      if (key === 'id') continue;
+      if (key === 'id' || key === 'variants' || key === 'priceTiers') continue;
       else if (key === 'images' && value instanceof File) images.push(value);
       else if (key.startsWith('deleteImage_')) deletedImageIds.push(value as string);
       else productData[key] = value;
@@ -482,11 +651,13 @@ export async function PATCH(request: Request) {
       newImageUrls.push(url);
     }
 
+    let parsedVariantsData: Array<any> = [];
     const rawVariants = formData.get('variants');
     if (rawVariants && typeof rawVariants === 'string') {
       try {
         const parsedVariants = JSON.parse(rawVariants);
         if (Array.isArray(parsedVariants)) {
+          parsedVariantsData = parsedVariants;
           await prisma.productVariant.deleteMany({
             where: { productId },
           });
@@ -500,6 +671,7 @@ export async function PATCH(request: Request) {
                 sku: v.sku || null,
                 price: v.price ? Number(v.price) : null,
                 stock: Number(v.stock) || 0,
+                minOrderQty: Math.max(1, Math.floor(Number(v.minOrderQty) || 1)),
               })),
             });
           }
@@ -508,13 +680,47 @@ export async function PATCH(request: Request) {
         console.warn('Failed to parse variants JSON in update product:', err);
       }
     }
-    
+
+    let parsedProductTiers: RawPriceTierInput[] | null = null;
+    const rawPriceTiers = formData.get('priceTiers');
+    if (rawPriceTiers && typeof rawPriceTiers === 'string') {
+      try {
+        parsedProductTiers = normalizePriceTiers(JSON.parse(rawPriceTiers));
+      } catch (err) {
+        console.warn('Failed to parse priceTiers JSON in update product:', err);
+      }
+    }
+
+    const updateData: Record<string, any> = { ...validation.data };
+    const effectiveBatchPricing =
+      updateData.hasBatchPricing ?? (existingProduct as any).hasBatchPricing ?? false;
+
+    if (updateData.hasBatchPricing === true) {
+      updateData.discountPrice = null;
+      updateData.saleStartsAt = null;
+      updateData.saleEndsAt = null;
+      updateData.saleQuota = null;
+
+      const allTierPrices = [
+        ...(parsedProductTiers ?? []).map((t) => t.unitPrice),
+        ...parsedVariantsData.flatMap((v) => normalizePriceTiers(v.priceTiers).map((t) => t.unitPrice)),
+      ];
+      if (allTierPrices.length > 0) {
+        if (updateData.sellingPrice !== undefined && updateData.sellingPrice <= 0) {
+          updateData.sellingPrice = Math.min(...allTierPrices);
+        }
+        if (updateData.basePrice !== undefined && updateData.basePrice <= 0) {
+          updateData.basePrice = Math.max(...allTierPrices);
+        }
+      }
+    }
+
     const product = await prisma.product.update({
       // storeId is repeated here on purpose: the ownership check above is the
       // explicit 403, this is the write itself refusing to cross tenants.
       where: { id: productId, storeId: user.storeId },
       data: {
-        ...validation.data,
+        ...(updateData as any),
         images: {
           create: newImageUrls.map((url, index) => ({
             url,
@@ -524,8 +730,40 @@ export async function PATCH(request: Request) {
           })),
         },
       },
-      include: { images: true, category: true, variants: { orderBy: { createdAt: 'asc' } } },
+      include: {
+        images: true,
+        category: true,
+        priceTiers: { where: { variantId: null }, orderBy: { minQty: 'asc' } },
+        variants: {
+          include: { priceTiers: { orderBy: { minQty: 'asc' } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
+
+    if (
+      validation.data.hasBatchPricing === false ||
+      rawPriceTiers !== null ||
+      rawVariants !== null
+    ) {
+      const clearAll =
+        validation.data.hasBatchPricing === false ||
+        (rawVariants !== null && rawPriceTiers !== null);
+
+      const tierClient = (prisma as any).productPriceTier;
+      if (tierClient && !clearAll && rawPriceTiers !== null) {
+        await tierClient.deleteMany?.({ where: { productId, variantId: null } });
+      }
+
+      await syncProductPriceTiers({
+        productId,
+        variants: (product as any).variants || [],
+        variantsData: parsedVariantsData,
+        productTiersData: parsedProductTiers ?? [],
+        hasBatchPricing: effectiveBatchPricing,
+        clearExisting: clearAll,
+      });
+    }
 
     // Pass the old slug too: a rename has to purge the URL it used to live at,
     // otherwise the stale page keeps being served from the cache.

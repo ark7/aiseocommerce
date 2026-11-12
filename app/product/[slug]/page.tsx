@@ -10,7 +10,7 @@ import AddToCartButton from '@/components/AddToCartButton';
 import ProductViewTracker from '@/components/ProductViewTracker';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
-import { isSaleActive, resolveUnitPrice, saleRemaining } from '@/lib/pricing';
+import { isSaleActive, resolveUnitPrice, saleRemaining, getBatchPriceRange } from '@/lib/pricing';
 import ProductImageGallery from './ProductImageGallery';
 import ProductMarketplaceLinks from '@/components/ProductMarketplaceLinks';
 
@@ -77,7 +77,16 @@ async function loadProductPage(slug: string) {
       images: { orderBy: { order: 'asc' } },
       category: true,
       store: true,
-      variants: { orderBy: { createdAt: 'asc' } },
+      priceTiers: {
+        where: { variantId: null },
+        orderBy: { minQty: 'asc' },
+      },
+      variants: {
+        include: {
+          priceTiers: { orderBy: { minQty: 'asc' } },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
   if (!product || !product.isPublished) return null;
@@ -99,9 +108,17 @@ async function loadProductPage(slug: string) {
   );
 
   const now = new Date();
-  const onSale = isSaleActive(product, now);
-  const unitPrice = resolveUnitPrice(product, now);
-  const saleLeft = saleRemaining(product);
+  const isBatch = Boolean((product as any).hasBatchPricing);
+  const allBatchTiers = isBatch
+    ? [
+        ...((product as any).priceTiers ?? []),
+        ...((product.variants ?? []).flatMap((v: any) => v.priceTiers ?? [])),
+      ]
+    : [];
+  const batchRange = isBatch ? getBatchPriceRange(allBatchTiers) : null;
+  const onSale = !isBatch && isSaleActive(product, now);
+  const unitPrice = isBatch ? batchRange?.minPrice ?? product.sellingPrice : resolveUnitPrice(product, now);
+  const saleLeft = isBatch ? null : saleRemaining(product);
 
   const formatIDR = (amount: number) =>
     new Intl.NumberFormat('id-ID', {
@@ -110,7 +127,11 @@ async function loadProductPage(slug: string) {
       minimumFractionDigits: 0,
     }).format(amount);
 
-  const formattedPrice = formatIDR(product.sellingPrice);
+  const formattedPrice = batchRange
+    ? batchRange.minPrice === batchRange.maxPrice
+      ? formatIDR(batchRange.minPrice)
+      : `${formatIDR(batchRange.minPrice)} – ${formatIDR(batchRange.maxPrice)}`
+    : formatIDR(product.sellingPrice);
   const formattedDiscountPrice = onSale ? formatIDR(unitPrice) : null;
 
   return {
@@ -187,12 +208,23 @@ export default async function ProductPage({ params }: ProductPageProps) {
           </div>
           
           <div className="mt-10 px-4 sm:px-0 sm:mt-16 lg:mt-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              {(product as any).hasBatchPricing && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  HARGA GROSIR BERTINGKAT
+                </span>
+              )}
+            </div>
             <h1 className="text-3xl font-bold tracking-tight text-gray-900">{product.name}</h1>
             <div className="mt-3">
               <p className="text-3xl text-gray-900">
                 {formattedDiscountPrice ? (
                   <><span className="line-through text-gray-500">{formattedPrice}</span><span className="ml-2 font-bold text-indigo-600">{formattedDiscountPrice}</span></>
-                ) : formattedPrice}
+                ) : (product as any).hasBatchPricing ? (
+                  <span className="font-bold text-indigo-700">{formattedPrice} <span className="text-sm font-medium text-gray-500">/ pcs</span></span>
+                ) : (
+                  formattedPrice
+                )}
               </p>
               {formattedDiscountPrice && saleLeft != null && (
                 <p className="mt-1 text-sm text-orange-600 font-medium">
@@ -240,9 +272,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 price={unitPrice} 
                 name={product.name} 
                 stock={product.stock} 
+                imageUrl={product.images?.[0]?.url}
                 isPreOrder={product.isPreOrder}
                 preOrderDays={product.preOrderDays}
                 productType={product.productType}
+                hasBatchPricing={Boolean((product as any).hasBatchPricing)}
+                minOrderQty={(product as any).minOrderQty ?? 1}
+                priceTiers={(product as any).priceTiers ?? []}
                 variants={product.variants}
               />
               <ProductMarketplaceLinks
