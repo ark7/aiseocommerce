@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
-import { PriceChangedError, VoucherError, ProductUnavailableError, createOrder } from '@/services/transactionService'
+import {
+  PriceChangedError,
+  VoucherError,
+  ProductUnavailableError,
+  MinOrderQuantityError,
+  createOrder,
+} from '@/services/transactionService'
 import { dispatchOrderCreatedNotification } from '@/lib/orderNotificationService'
 import { requireUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
@@ -201,6 +207,21 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: error.message, code: 'VOUCHER_REJECTED', reason: error.reason },
         { status: 409 }
+      )
+    }
+
+    if (error instanceof MinOrderQuantityError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: 'MIN_ORDER_QTY',
+          productId: error.productId,
+          productName: error.productName,
+          minQty: error.minQty,
+          actualQty: error.actualQty,
+          variantId: error.variantId ?? null,
+        },
+        { status: 400 }
       )
     }
 

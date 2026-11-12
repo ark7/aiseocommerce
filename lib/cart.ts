@@ -3,6 +3,9 @@
  * Ensures consistent storage keys, cart calculations, and cross-component
  * synchronization across AddToCartButton, StoreHeader, and CartPage.
  */
+import { resolveBatchUnitPrice, type PriceTierInput } from '@/lib/pricing';
+
+export type CartItemPriceTier = PriceTierInput;
 
 export interface CartItem {
   productId: string;
@@ -15,6 +18,25 @@ export interface CartItem {
   storeDomain?: string;
   variantId?: string;
   variation?: string;
+  hasBatchPricing?: boolean;
+  minOrderQty?: number;
+  baseUnitPrice?: number;
+  priceTiers?: CartItemPriceTier[];
+}
+
+function recalculateBatchItemPrice(item: CartItem): CartItem {
+  if (!item.hasBatchPricing) return item;
+  const fallbackPrice = item.baseUnitPrice && item.baseUnitPrice > 0 ? item.baseUnitPrice : item.price;
+  const resolution = resolveBatchUnitPrice(
+    fallbackPrice,
+    item.priceTiers,
+    item.quantity,
+    item.minOrderQty
+  );
+  return {
+    ...item,
+    price: resolution.unitPrice,
+  };
 }
 
 export const CART_UPDATED_EVENT = 'cart-updated';
@@ -111,8 +133,13 @@ export function addToCart(storeDomain: string, item: CartItem): { cart: CartItem
     if (item.name) cart[existingIndex].name = item.name;
     if (item.imageUrl) cart[existingIndex].imageUrl = item.imageUrl;
     if (item.variation) cart[existingIndex].variation = item.variation;
+    if (item.hasBatchPricing !== undefined) cart[existingIndex].hasBatchPricing = item.hasBatchPricing;
+    if (item.minOrderQty !== undefined) cart[existingIndex].minOrderQty = item.minOrderQty;
+    if (item.baseUnitPrice !== undefined) cart[existingIndex].baseUnitPrice = item.baseUnitPrice;
+    if (item.priceTiers !== undefined) cart[existingIndex].priceTiers = item.priceTiers;
+    cart[existingIndex] = recalculateBatchItemPrice(cart[existingIndex]);
   } else {
-    cart.push({ ...item, storeDomain });
+    cart.push(recalculateBatchItemPrice({ ...item, storeDomain }));
   }
 
   localStorage.setItem(key, JSON.stringify(cart));
@@ -145,7 +172,9 @@ export function updateCartQuantity(
   if (quantity <= 0) {
     cart = cart.filter((item) => !matches(item));
   } else {
-    cart = cart.map((item) => (matches(item) ? { ...item, quantity } : item));
+    cart = cart.map((item) =>
+      matches(item) ? recalculateBatchItemPrice({ ...item, quantity }) : item
+    );
   }
 
   localStorage.setItem(key, JSON.stringify(cart));
