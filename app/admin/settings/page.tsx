@@ -7,6 +7,7 @@ import Link from 'next/link';
 import ImageUploader from '@/components/ImageUploader';
 import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector';
 import { getDefaultTerms, getDefaultPrivacy, DEFAULT_COOKIE_TITLE, DEFAULT_COOKIE_TEXT } from '@/lib/legalDefaults';
+import { createEmptyHeroSlide, type HeroSlideItem } from '@/lib/heroSlides';
 
 interface SocialLinks {
   instagram?: string;
@@ -385,6 +386,8 @@ function AdminSettingsContent() {
   };
   const [storeForm, setStoreForm] = useState<StoreForm>(EMPTY_STORE_FORM);
   const [heroForm, setHeroForm] = useState<HeroForm>(EMPTY_HERO_FORM);
+  const [heroSlides, setHeroSlides] = useState<HeroSlideItem[]>([]);
+  const [activeHeroSlideIndex, setActiveHeroSlideIndex] = useState(0);
   const [themeForm, setThemeForm] = useState<ThemeForm>(EMPTY_THEME_FORM);
   const [analyticsForm, setAnalyticsForm] = useState<AnalyticsForm>(EMPTY_ANALYTICS);
   const [turnstileForm, setTurnstileForm] = useState<TurnstileForm>(EMPTY_TURNSTILE);
@@ -468,7 +471,7 @@ function AdminSettingsContent() {
           defaultSeoDescription: s.defaultSeoDescription || '',
         });
 
-        setHeroForm({
+        const initialHeroForm: HeroForm = {
           heroBadge: s.heroBadge || EMPTY_HERO_FORM.heroBadge,
           heroTitle: s.heroTitle || EMPTY_HERO_FORM.heroTitle,
           heroSubtitle: s.heroSubtitle || EMPTY_HERO_FORM.heroSubtitle,
@@ -477,7 +480,27 @@ function AdminSettingsContent() {
           heroCtaSecondaryText: s.heroCtaSecondaryText || EMPTY_HERO_FORM.heroCtaSecondaryText,
           heroCtaSecondaryLink: s.heroCtaSecondaryLink || EMPTY_HERO_FORM.heroCtaSecondaryLink,
           heroImageUrl: s.heroImageUrl || '',
-        });
+        };
+        setHeroForm(initialHeroForm);
+
+        const loadedSlides: HeroSlideItem[] =
+          Array.isArray(s.heroSlides) && s.heroSlides.length > 0
+            ? s.heroSlides
+            : [
+                {
+                  id: 'primary-slide-1',
+                  badge: initialHeroForm.heroBadge,
+                  title: initialHeroForm.heroTitle,
+                  subtitle: initialHeroForm.heroSubtitle,
+                  ctaText: initialHeroForm.heroCtaText,
+                  ctaLink: initialHeroForm.heroCtaLink,
+                  ctaSecondaryText: initialHeroForm.heroCtaSecondaryText,
+                  ctaSecondaryLink: initialHeroForm.heroCtaSecondaryLink,
+                  imageUrl: initialHeroForm.heroImageUrl,
+                },
+              ];
+        setHeroSlides(loadedSlides);
+        setActiveHeroSlideIndex(0);
 
         setThemeForm({
           primaryColor: s.primaryColor || '#4F46E5',
@@ -715,6 +738,86 @@ function AdminSettingsContent() {
     }
   };
 
+  const activeHeroSlide: HeroSlideItem = heroSlides[activeHeroSlideIndex] || {
+    id: 'primary-slide-1',
+    badge: heroForm.heroBadge,
+    title: heroForm.heroTitle,
+    subtitle: heroForm.heroSubtitle,
+    ctaText: heroForm.heroCtaText,
+    ctaLink: heroForm.heroCtaLink,
+    ctaSecondaryText: heroForm.heroCtaSecondaryText,
+    ctaSecondaryLink: heroForm.heroCtaSecondaryLink,
+    imageUrl: heroForm.heroImageUrl,
+  };
+
+  const updateActiveHeroSlide = (patch: Partial<HeroSlideItem>) => {
+    setHeroSlides((prev) => {
+      const baseList =
+        prev.length > 0
+          ? [...prev]
+          : [
+              {
+                id: 'primary-slide-1',
+                badge: heroForm.heroBadge,
+                title: heroForm.heroTitle,
+                subtitle: heroForm.heroSubtitle,
+                ctaText: heroForm.heroCtaText,
+                ctaLink: heroForm.heroCtaLink,
+                ctaSecondaryText: heroForm.heroCtaSecondaryText,
+                ctaSecondaryLink: heroForm.heroCtaSecondaryLink,
+                imageUrl: heroForm.heroImageUrl,
+              },
+            ];
+      const targetIdx = Math.min(activeHeroSlideIndex, baseList.length - 1);
+      baseList[targetIdx] = { ...baseList[targetIdx], ...patch };
+      if (targetIdx === 0) {
+        const first = baseList[0];
+        setHeroForm({
+          heroBadge: first.badge,
+          heroTitle: first.title,
+          heroSubtitle: first.subtitle,
+          heroCtaText: first.ctaText,
+          heroCtaLink: first.ctaLink,
+          heroCtaSecondaryText: first.ctaSecondaryText,
+          heroCtaSecondaryLink: first.ctaSecondaryLink,
+          heroImageUrl: first.imageUrl,
+        });
+      }
+      return baseList;
+    });
+  };
+
+  const handleAddHeroSlide = () => {
+    if (heroSlides.length >= 8) return;
+    const newSlide = createEmptyHeroSlide(heroSlides.length);
+    newSlide.title = `Promo & Koleksi Unggulan #${heroSlides.length + 1}`;
+    newSlide.subtitle = 'Jelajahi penawaran eksklusif dan produk pilihan terbaik kami.';
+    const nextSlides = [...heroSlides, newSlide];
+    setHeroSlides(nextSlides);
+    setActiveHeroSlideIndex(nextSlides.length - 1);
+  };
+
+  const handleRemoveHeroSlide = (idxToRemove: number) => {
+    if (heroSlides.length <= 1) return;
+    const nextSlides = heroSlides.filter((_, idx) => idx !== idxToRemove);
+    setHeroSlides(nextSlides);
+    const nextActiveIdx = Math.max(0, Math.min(activeHeroSlideIndex, nextSlides.length - 1));
+    setActiveHeroSlideIndex(nextActiveIdx);
+    const first = nextSlides[0];
+    if (first) {
+      setHeroForm({
+        heroBadge: first.badge,
+        heroTitle: first.title,
+        heroSubtitle: first.subtitle,
+        heroCtaText: first.ctaText,
+        heroCtaLink: first.ctaLink,
+        heroCtaSecondaryText: first.ctaSecondaryText,
+        heroCtaSecondaryLink: first.ctaSecondaryLink,
+        heroImageUrl: first.imageUrl,
+      });
+    }
+  };
+
   const saveHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -725,10 +828,28 @@ function AdminSettingsContent() {
       const headers = authHeaders();
       if (!headers) throw new Error('Anda harus login terlebih dahulu.');
 
+      const firstSlide = heroSlides[0];
+      const payload = {
+        ...heroForm,
+        ...(firstSlide
+          ? {
+              heroBadge: firstSlide.badge,
+              heroTitle: firstSlide.title,
+              heroSubtitle: firstSlide.subtitle,
+              heroCtaText: firstSlide.ctaText,
+              heroCtaLink: firstSlide.ctaLink,
+              heroCtaSecondaryText: firstSlide.ctaSecondaryText,
+              heroCtaSecondaryLink: firstSlide.ctaSecondaryLink,
+              heroImageUrl: firstSlide.imageUrl,
+            }
+          : {}),
+        heroSlides: heroSlides.filter((s) => s.title.trim().length > 0),
+      };
+
       const res = await fetch('/api/admin/settings/general', {
         method: 'PUT',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify(heroForm),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -736,7 +857,7 @@ function AdminSettingsContent() {
         throw new Error(data.error || 'Gagal menyimpan pengaturan Hero Section.');
       }
 
-      setNotice('Banner Hero Section berhasil diperbarui.');
+      setNotice('Banner Hero Slider berhasil diperbarui.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan.');
     } finally {
@@ -1678,11 +1799,89 @@ function AdminSettingsContent() {
       {activeTab === 'hero' && (
         <div className="space-y-8">
           <form onSubmit={saveHero} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
-            <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Hero Banner Beranda</h2>
-              <p className="text-sm text-gray-500">
-                Atur headline utama, promo badge, ajakan bertindak (CTA), dan gambar visual di bagian paling atas beranda toko.
-              </p>
+            <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Hero Banner Slider Beranda</h2>
+                <p className="text-sm text-gray-500">
+                  Atur beberapa card slider (headline, promo badge, CTA, dan gambar) di bagian paling atas beranda toko.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddHeroSlide}
+                disabled={heroSlides.length >= 8}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold border border-indigo-200 disabled:opacity-50"
+              >
+                <span>+ Tambah Card Slide</span>
+              </button>
+            </div>
+
+            {/* Multi-Card Slide Selector */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {heroSlides.map((slide, idx) => {
+                  const isSelected = idx === activeHeroSlideIndex;
+                  return (
+                    <button
+                      key={slide.id || idx}
+                      type="button"
+                      onClick={() => setActiveHeroSlideIndex(idx)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      Slide {idx + 1}{idx === 0 ? ' (Utama)' : ''}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {heroSlides.length > 1 && (
+                <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-200">
+                  <span>Mengedit Slide {activeHeroSlideIndex + 1} dari {heroSlides.length} card</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={activeHeroSlideIndex === 0}
+                      onClick={() => {
+                        if (activeHeroSlideIndex === 0) return;
+                        const next = [...heroSlides];
+                        const [moved] = next.splice(activeHeroSlideIndex, 1);
+                        next.splice(activeHeroSlideIndex - 1, 0, moved);
+                        setHeroSlides(next);
+                        setActiveHeroSlideIndex(activeHeroSlideIndex - 1);
+                      }}
+                      className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40"
+                    >
+                      &larr; Geser Kiri
+                    </button>
+                    <button
+                      type="button"
+                      disabled={activeHeroSlideIndex >= heroSlides.length - 1}
+                      onClick={() => {
+                        if (activeHeroSlideIndex >= heroSlides.length - 1) return;
+                        const next = [...heroSlides];
+                        const [moved] = next.splice(activeHeroSlideIndex, 1);
+                        next.splice(activeHeroSlideIndex + 1, 0, moved);
+                        setHeroSlides(next);
+                        setActiveHeroSlideIndex(activeHeroSlideIndex + 1);
+                      }}
+                      className="px-2 py-1 rounded border border-gray-200 bg-white hover:bg-gray-100 disabled:opacity-40"
+                    >
+                      Geser Kanan &rarr;
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHeroSlide(activeHeroSlideIndex)}
+                      className="px-2 py-1 rounded border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 font-medium"
+                    >
+                      Hapus Slide
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1690,20 +1889,20 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Promo Badge Text</label>
                 <input
                   type="text"
-                  value={heroForm.heroBadge}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroBadge: e.target.value })}
+                  value={activeHeroSlide.badge}
+                  onChange={(e) => updateActiveHeroSlide({ badge: e.target.value })}
                   placeholder="Contoh: Koleksi Terbaru 2026 atau Promo Terbatas"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700">Headline Utama (Hero Title) *</label>
+                <label className="block text-sm font-medium text-gray-700">Headline Slide (Hero Title) *</label>
                 <input
                   type="text"
                   required
-                  value={heroForm.heroTitle}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroTitle: e.target.value })}
+                  value={activeHeroSlide.title}
+                  onChange={(e) => updateActiveHeroSlide({ title: e.target.value })}
                   placeholder="Contoh: Tampil Percaya Diri dengan Gaya Terbaik"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1713,8 +1912,8 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Deskripsi Pendukung (Subtitle)</label>
                 <textarea
                   rows={2}
-                  value={heroForm.heroSubtitle}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroSubtitle: e.target.value })}
+                  value={activeHeroSlide.subtitle}
+                  onChange={(e) => updateActiveHeroSlide({ subtitle: e.target.value })}
                   placeholder="Jelaskan nilai lebih produk atau penawaran toko Anda dalam 1-2 kalimat menarik."
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1724,8 +1923,8 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Teks Tombol CTA Utama</label>
                 <input
                   type="text"
-                  value={heroForm.heroCtaText}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroCtaText: e.target.value })}
+                  value={activeHeroSlide.ctaText}
+                  onChange={(e) => updateActiveHeroSlide({ ctaText: e.target.value })}
                   placeholder="Belanja Sekarang"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1735,8 +1934,8 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Link Tujuan CTA Utama</label>
                 <input
                   type="text"
-                  value={heroForm.heroCtaLink}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroCtaLink: e.target.value })}
+                  value={activeHeroSlide.ctaLink}
+                  onChange={(e) => updateActiveHeroSlide({ ctaLink: e.target.value })}
                   placeholder="/products"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1746,8 +1945,8 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Teks Tombol CTA Sekunder (Opsional)</label>
                 <input
                   type="text"
-                  value={heroForm.heroCtaSecondaryText}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroCtaSecondaryText: e.target.value })}
+                  value={activeHeroSlide.ctaSecondaryText}
+                  onChange={(e) => updateActiveHeroSlide({ ctaSecondaryText: e.target.value })}
                   placeholder="Baca Artikel & Panduan"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1757,8 +1956,8 @@ function AdminSettingsContent() {
                 <label className="block text-sm font-medium text-gray-700">Link Tujuan CTA Sekunder</label>
                 <input
                   type="text"
-                  value={heroForm.heroCtaSecondaryLink}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroCtaSecondaryLink: e.target.value })}
+                  value={activeHeroSlide.ctaSecondaryLink}
+                  onChange={(e) => updateActiveHeroSlide({ ctaSecondaryLink: e.target.value })}
                   placeholder="/articles"
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -1767,10 +1966,10 @@ function AdminSettingsContent() {
               <div className="md:col-span-2">
                 <ImageUploader
                   label="Gambar Banner Hero / Ilustrasi"
-                  description="Foto atau ilustrasi banner utama (maksimal 1920x1080px, otomatis dikompres ke WebP)."
+                  description="Foto atau ilustrasi banner slide (maksimal 1920x1080px, otomatis dikompres ke WebP)."
                   type="banner"
-                  value={heroForm.heroImageUrl}
-                  onChange={(url) => setHeroForm({ ...heroForm, heroImageUrl: url })}
+                  value={activeHeroSlide.imageUrl}
+                  onChange={(url) => updateActiveHeroSlide({ imageUrl: url })}
                   placeholderUrl="https://images.unsplash.com/photo-..."
                 />
               </div>
@@ -1782,7 +1981,7 @@ function AdminSettingsContent() {
                 disabled={saving}
                 className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
               >
-                {saving ? 'Menyimpan...' : 'Simpan Hero Section'}
+                {saving ? 'Menyimpan...' : 'Simpan Semua Slide Hero'}
               </button>
             </div>
           </form>
@@ -1790,7 +1989,9 @@ function AdminSettingsContent() {
           {/* Live Interactive Preview Box */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="font-semibold text-gray-900">Live Preview: Tampilan Hero di Beranda</h3>
+              <h3 className="font-semibold text-gray-900">
+                Live Preview: Slide {activeHeroSlideIndex + 1} dari {heroSlides.length || 1} di Beranda
+              </h3>
               <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium">
                 Pratinjau Otomatis
               </span>
@@ -1799,20 +2000,20 @@ function AdminSettingsContent() {
             <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6 md:p-12 overflow-hidden relative">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                 <div className="space-y-4">
-                  {heroForm.heroBadge && (
+                  {activeHeroSlide.badge && (
                     <span
                       style={{ backgroundColor: `${themeForm.primaryColor}15`, color: themeForm.primaryColor }}
                       className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                     >
                       <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: themeForm.primaryColor }} />
-                      {heroForm.heroBadge}
+                      {activeHeroSlide.badge}
                     </span>
                   )}
                   <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight">
-                    {heroForm.heroTitle || 'Judul Utama Toko'}
+                    {activeHeroSlide.title || 'Judul Utama Toko'}
                   </h1>
                   <p className="text-sm md:text-base text-gray-600 leading-relaxed">
-                    {heroForm.heroSubtitle || 'Deskripsi singkat mengenai toko dan produk unggulan yang ditawarkan.'}
+                    {activeHeroSlide.subtitle || 'Deskripsi singkat mengenai toko dan produk unggulan yang ditawarkan.'}
                   </p>
                   <div className="flex flex-wrap gap-3 pt-2">
                     <button
@@ -1820,23 +2021,23 @@ function AdminSettingsContent() {
                       style={{ backgroundColor: themeForm.primaryColor }}
                       className="text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm pointer-events-none"
                     >
-                      {heroForm.heroCtaText || 'Belanja Sekarang'} &rarr;
+                      {activeHeroSlide.ctaText || 'Belanja Sekarang'} &rarr;
                     </button>
-                    {heroForm.heroCtaSecondaryText && (
+                    {activeHeroSlide.ctaSecondaryText && (
                       <button
                         type="button"
                         className="bg-white border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium pointer-events-none"
                       >
-                        {heroForm.heroCtaSecondaryText}
+                        {activeHeroSlide.ctaSecondaryText}
                       </button>
                     )}
                   </div>
                 </div>
 
                 <div className="relative h-64 md:h-72 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center border shadow-inner">
-                  {heroForm.heroImageUrl ? (
+                  {activeHeroSlide.imageUrl ? (
                     <Image
-                      src={heroForm.heroImageUrl}
+                      src={activeHeroSlide.imageUrl}
                       alt="Banner Hero Preview"
                       fill
                       className="object-cover"

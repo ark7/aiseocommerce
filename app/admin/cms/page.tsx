@@ -7,6 +7,7 @@ import LandingPageBuilder from '@/components/LandingPageBuilder';
 import { LandingPageData } from '@/lib/landingPageTypes';
 import DateRangeFilter from '@/components/common/DateRangeFilter';
 import Pagination from '@/components/common/Pagination';
+import { createEmptyHeroSlide, type HeroSlideItem } from '@/lib/heroSlides';
 
 type CmsTab = 'landing-pages' | 'hero' | 'terms' | 'privacy' | 'cookie' | 'about' | 'articles';
 
@@ -77,6 +78,8 @@ export default function AdminCmsPage() {
     heroCtaSecondaryLink: '/articles',
     heroImageUrl: '',
   });
+  const [heroSlides, setHeroSlides] = useState<HeroSlideItem[]>([]);
+  const [activeSlideIdx, setActiveSlideIdx] = useState(0);
 
   const [legalForm, setLegalForm] = useState<LegalData>({
     termsContent: '',
@@ -113,7 +116,7 @@ export default function AdminCmsPage() {
         const s = data.settings || {};
         const st = data.store || {};
 
-        setHeroForm({
+        const initialHeroData: HeroData = {
           heroBadge: s.heroBadge || 'Koleksi Terbaru 2026',
           heroTitle: s.heroTitle || 'Tampil Percaya Diri dengan Produk Terbaik',
           heroSubtitle: s.heroSubtitle || 'Temukan pilihan produk berkualitas tinggi dengan penawaran eksklusif.',
@@ -122,7 +125,27 @@ export default function AdminCmsPage() {
           heroCtaSecondaryText: s.heroCtaSecondaryText || 'Artikel & Panduan',
           heroCtaSecondaryLink: s.heroCtaSecondaryLink || '/articles',
           heroImageUrl: s.heroImageUrl || '',
-        });
+        };
+        setHeroForm(initialHeroData);
+
+        const loadedSlides: HeroSlideItem[] =
+          Array.isArray(s.heroSlides) && s.heroSlides.length > 0
+            ? s.heroSlides
+            : [
+                {
+                  id: 'primary-slide-1',
+                  badge: initialHeroData.heroBadge,
+                  title: initialHeroData.heroTitle,
+                  subtitle: initialHeroData.heroSubtitle,
+                  ctaText: initialHeroData.heroCtaText,
+                  ctaLink: initialHeroData.heroCtaLink,
+                  ctaSecondaryText: initialHeroData.heroCtaSecondaryText,
+                  ctaSecondaryLink: initialHeroData.heroCtaSecondaryLink,
+                  imageUrl: initialHeroData.heroImageUrl,
+                },
+              ];
+        setHeroSlides(loadedSlides);
+        setActiveSlideIdx(0);
 
         setAboutForm({
           name: st.name || '',
@@ -183,19 +206,85 @@ export default function AdminCmsPage() {
     loadAllCmsData();
   }, [loadAllCmsData]);
 
+  const activeHeroSlide: HeroSlideItem = heroSlides[activeSlideIdx] || {
+    id: 'primary-slide-1',
+    badge: heroForm.heroBadge,
+    title: heroForm.heroTitle,
+    subtitle: heroForm.heroSubtitle,
+    ctaText: heroForm.heroCtaText,
+    ctaLink: heroForm.heroCtaLink,
+    ctaSecondaryText: heroForm.heroCtaSecondaryText,
+    ctaSecondaryLink: heroForm.heroCtaSecondaryLink,
+    imageUrl: heroForm.heroImageUrl,
+  };
+
+  const updateActiveSlide = (patch: Partial<HeroSlideItem>) => {
+    setHeroSlides((prev) => {
+      const base =
+        prev.length > 0
+          ? [...prev]
+          : [
+              {
+                id: 'primary-slide-1',
+                badge: heroForm.heroBadge,
+                title: heroForm.heroTitle,
+                subtitle: heroForm.heroSubtitle,
+                ctaText: heroForm.heroCtaText,
+                ctaLink: heroForm.heroCtaLink,
+                ctaSecondaryText: heroForm.heroCtaSecondaryText,
+                ctaSecondaryLink: heroForm.heroCtaSecondaryLink,
+                imageUrl: heroForm.heroImageUrl,
+              },
+            ];
+      const idx = Math.min(activeSlideIdx, base.length - 1);
+      base[idx] = { ...base[idx], ...patch };
+      if (idx === 0) {
+        const first = base[0];
+        setHeroForm({
+          heroBadge: first.badge,
+          heroTitle: first.title,
+          heroSubtitle: first.subtitle,
+          heroCtaText: first.ctaText,
+          heroCtaLink: first.ctaLink,
+          heroCtaSecondaryText: first.ctaSecondaryText,
+          heroCtaSecondaryLink: first.ctaSecondaryLink,
+          heroImageUrl: first.imageUrl,
+        });
+      }
+      return base;
+    });
+  };
+
   const saveHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
+      const firstSlide = heroSlides[0];
+      const payload = {
+        ...heroForm,
+        ...(firstSlide
+          ? {
+              heroBadge: firstSlide.badge,
+              heroTitle: firstSlide.title,
+              heroSubtitle: firstSlide.subtitle,
+              heroCtaText: firstSlide.ctaText,
+              heroCtaLink: firstSlide.ctaLink,
+              heroCtaSecondaryText: firstSlide.ctaSecondaryText,
+              heroCtaSecondaryLink: firstSlide.ctaSecondaryLink,
+              heroImageUrl: firstSlide.imageUrl,
+            }
+          : {}),
+        heroSlides: heroSlides.filter((s) => s.title.trim().length > 0),
+      };
       const res = await fetch('/api/admin/settings/general', {
         method: 'PUT',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify(heroForm),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error('Gagal menyimpan Hero Banner');
-      setNotice('Banner Beranda & Hero Section berhasil disimpan!');
+      setNotice('Banner Beranda & Hero Slider berhasil disimpan!');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -688,20 +777,71 @@ export default function AdminCmsPage() {
       {activeTab === 'hero' && (
         <form onSubmit={saveHero} className="space-y-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
-            <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-bold text-gray-900">Hero Section Beranda</h2>
-              <p className="text-xs text-gray-500 mt-1">
-                Teks promosi, tombol aksi (Call to Action), dan visual utama yang pertama kali dilihat pembeli saat membuka website Anda.
-              </p>
+            <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Hero Section Slider Beranda</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  Teks promosi, tombol aksi (Call to Action), dan visual multi-card slider yang pertama kali dilihat pembeli.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={heroSlides.length >= 8}
+                onClick={() => {
+                  const newSlide = createEmptyHeroSlide(heroSlides.length);
+                  newSlide.title = `Promo Spesial #${heroSlides.length + 1}`;
+                  newSlide.subtitle = 'Penawaran pilihan dan produk unggulan toko Anda.';
+                  const next = [...heroSlides, newSlide];
+                  setHeroSlides(next);
+                  setActiveSlideIdx(next.length - 1);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold border border-indigo-200 disabled:opacity-50"
+              >
+                + Tambah Card Slide
+              </button>
             </div>
+
+            {heroSlides.length > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+                <div className="flex flex-wrap gap-1.5">
+                  {heroSlides.map((slide, idx) => (
+                    <button
+                      key={slide.id || idx}
+                      type="button"
+                      onClick={() => setActiveSlideIdx(idx)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+                        idx === activeSlideIdx
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300'
+                      }`}
+                    >
+                      Slide {idx + 1}{idx === 0 ? ' (Utama)' : ''}
+                    </button>
+                  ))}
+                </div>
+                {heroSlides.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = heroSlides.filter((_, i) => i !== activeSlideIdx);
+                      setHeroSlides(next);
+                      setActiveSlideIdx(Math.max(0, Math.min(activeSlideIdx, next.length - 1)));
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                  >
+                    Hapus Slide
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Badge Header</label>
                 <input
                   type="text"
-                  value={heroForm.heroBadge}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroBadge: e.target.value })}
+                  value={activeHeroSlide.badge}
+                  onChange={(e) => updateActiveSlide({ badge: e.target.value })}
                   placeholder="Misal: Promo Ramadhan 2026 atau Koleksi Terbaru"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -711,8 +851,8 @@ export default function AdminCmsPage() {
                 <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">URL Gambar Banner (Hero Image)</label>
                 <input
                   type="text"
-                  value={heroForm.heroImageUrl}
-                  onChange={(e) => setHeroForm({ ...heroForm, heroImageUrl: e.target.value })}
+                  value={activeHeroSlide.imageUrl}
+                  onChange={(e) => updateActiveSlide({ imageUrl: e.target.value })}
                   placeholder="https://images.unsplash.com/..."
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
@@ -723,8 +863,8 @@ export default function AdminCmsPage() {
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Judul Utama (Hero Headline)</label>
               <input
                 type="text"
-                value={heroForm.heroTitle}
-                onChange={(e) => setHeroForm({ ...heroForm, heroTitle: e.target.value })}
+                value={activeHeroSlide.title}
+                onChange={(e) => updateActiveSlide({ title: e.target.value })}
                 placeholder="Tampil Percaya Diri dengan Produk Terbaik"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium focus:border-indigo-500 focus:ring-indigo-500"
               />
@@ -734,8 +874,8 @@ export default function AdminCmsPage() {
               <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider">Sub-judul / Penjelasan Promo</label>
               <textarea
                 rows={3}
-                value={heroForm.heroSubtitle}
-                onChange={(e) => setHeroForm({ ...heroForm, heroSubtitle: e.target.value })}
+                value={activeHeroSlide.subtitle}
+                onChange={(e) => updateActiveSlide({ subtitle: e.target.value })}
                 placeholder="Deskripsi singkat yang meyakinkan pembeli..."
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
               />
@@ -748,8 +888,8 @@ export default function AdminCmsPage() {
                   <label className="text-xs text-gray-500 block mb-1">Teks Tombol</label>
                   <input
                     type="text"
-                    value={heroForm.heroCtaText}
-                    onChange={(e) => setHeroForm({ ...heroForm, heroCtaText: e.target.value })}
+                    value={activeHeroSlide.ctaText}
+                    onChange={(e) => updateActiveSlide({ ctaText: e.target.value })}
                     placeholder="Mulai Belanja"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
@@ -758,8 +898,8 @@ export default function AdminCmsPage() {
                   <label className="text-xs text-gray-500 block mb-1">Tujuan Link (URL)</label>
                   <input
                     type="text"
-                    value={heroForm.heroCtaLink}
-                    onChange={(e) => setHeroForm({ ...heroForm, heroCtaLink: e.target.value })}
+                    value={activeHeroSlide.ctaLink}
+                    onChange={(e) => updateActiveSlide({ ctaLink: e.target.value })}
                     placeholder="/products"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
@@ -772,8 +912,8 @@ export default function AdminCmsPage() {
                   <label className="text-xs text-gray-500 block mb-1">Teks Tombol</label>
                   <input
                     type="text"
-                    value={heroForm.heroCtaSecondaryText}
-                    onChange={(e) => setHeroForm({ ...heroForm, heroCtaSecondaryText: e.target.value })}
+                    value={activeHeroSlide.ctaSecondaryText}
+                    onChange={(e) => updateActiveSlide({ ctaSecondaryText: e.target.value })}
                     placeholder="Artikel & Rekomendasi"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
@@ -782,8 +922,8 @@ export default function AdminCmsPage() {
                   <label className="text-xs text-gray-500 block mb-1">Tujuan Link (URL)</label>
                   <input
                     type="text"
-                    value={heroForm.heroCtaSecondaryLink}
-                    onChange={(e) => setHeroForm({ ...heroForm, heroCtaSecondaryLink: e.target.value })}
+                    value={activeHeroSlide.ctaSecondaryLink}
+                    onChange={(e) => updateActiveSlide({ ctaSecondaryLink: e.target.value })}
                     placeholder="/articles"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   />
@@ -794,28 +934,28 @@ export default function AdminCmsPage() {
             {/* Live Hero Preview */}
             <div className="pt-4 border-t border-gray-100">
               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-3">
-                Pratinjau Visual Hero Section:
+                Pratinjau Visual Slide {activeSlideIdx + 1}:
               </span>
               <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 rounded-2xl p-6 md:p-8 text-white shadow-md relative overflow-hidden">
                 <div className="max-w-xl space-y-3 relative z-10">
-                  {heroForm.heroBadge && (
+                  {activeHeroSlide.badge && (
                     <span className="inline-block bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-semibold text-indigo-100">
-                      {heroForm.heroBadge}
+                      {activeHeroSlide.badge}
                     </span>
                   )}
                   <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-                    {heroForm.heroTitle || 'Judul Banner Toko'}
+                    {activeHeroSlide.title || 'Judul Banner Toko'}
                   </h3>
                   <p className="text-xs md:text-sm text-indigo-100 leading-relaxed line-clamp-3">
-                    {heroForm.heroSubtitle || 'Deskripsi banner hero...'}
+                    {activeHeroSlide.subtitle || 'Deskripsi banner hero...'}
                   </p>
                   <div className="flex flex-wrap gap-2 pt-2">
                     <span className="px-4 py-2 bg-white text-indigo-900 rounded-lg text-xs font-bold shadow">
-                      {heroForm.heroCtaText || 'Mulai Belanja'} &rarr;
+                      {activeHeroSlide.ctaText || 'Mulai Belanja'} &rarr;
                     </span>
-                    {heroForm.heroCtaSecondaryText && (
+                    {activeHeroSlide.ctaSecondaryText && (
                       <span className="px-4 py-2 bg-indigo-700/60 border border-white/20 text-white rounded-lg text-xs font-semibold">
-                        {heroForm.heroCtaSecondaryText}
+                        {activeHeroSlide.ctaSecondaryText}
                       </span>
                     )}
                   </div>
@@ -830,7 +970,7 @@ export default function AdminCmsPage() {
               disabled={saving}
               className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition shadow-sm"
             >
-              {saving ? 'Menyimpan...' : 'Simpan Hero Section'}
+              {saving ? 'Menyimpan...' : 'Simpan Semua Slide Hero'}
             </button>
           </div>
         </form>

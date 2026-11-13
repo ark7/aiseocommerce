@@ -4,6 +4,11 @@ import { requireUser } from '@/lib/auth';
 import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import {
+  extractPublicSocialLinks,
+  mergeHeroSlidesIntoSocialLinks,
+  resolveStoreHeroSlides,
+} from '@/lib/heroSlides';
 
 const SocialLinksSchema = z.object({
   instagram: z.string().optional().nullable(),
@@ -12,6 +17,18 @@ const SocialLinksSchema = z.object({
   youtube: z.string().optional().nullable(),
   whatsapp: z.string().optional().nullable(),
 }).optional().nullable();
+
+const HeroSlideSchema = z.object({
+  id: z.string().optional().nullable(),
+  badge: z.string().optional().nullable(),
+  title: z.string().min(1, 'Judul slide hero tidak boleh kosong'),
+  subtitle: z.string().optional().nullable(),
+  ctaText: z.string().optional().nullable(),
+  ctaLink: z.string().optional().nullable(),
+  ctaSecondaryText: z.string().optional().nullable(),
+  ctaSecondaryLink: z.string().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
+});
 
 const GeneralSettingsUpdateSchema = z.object({
   // Store profile
@@ -35,6 +52,7 @@ const GeneralSettingsUpdateSchema = z.object({
   heroCtaSecondaryText: z.string().optional().nullable(),
   heroCtaSecondaryLink: z.string().optional().nullable(),
   heroImageUrl: z.string().optional().nullable(),
+  heroSlides: z.array(HeroSlideSchema).max(10).optional().nullable(),
 
   // Appearance
   primaryColor: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Format hex warna tidak valid').optional().nullable(),
@@ -153,10 +171,15 @@ export async function GET(request: Request) {
         heroCtaSecondaryText: s?.heroCtaSecondaryText ?? null,
         heroCtaSecondaryLink: s?.heroCtaSecondaryLink ?? null,
         heroImageUrl: s?.heroImageUrl ?? null,
+        heroSlides: resolveStoreHeroSlides({
+          storeName: store.name,
+          tagline: s?.tagline,
+          settings: s,
+        }),
         primaryColor: s?.primaryColor ?? '#4F46E5',
         fontFamily: s?.fontFamily ?? 'inter',
         defaultPageSize: s?.defaultPageSize ?? 10,
-        socialLinks: (s?.socialLinks as Record<string, string>) ?? {},
+        socialLinks: extractPublicSocialLinks(s?.socialLinks),
         defaultSeoTitle: s?.defaultSeoTitle ?? null,
         defaultSeoDescription: s?.defaultSeoDescription ?? null,
         sandboxPaymentEnabled: s?.sandboxPaymentEnabled ?? false,
@@ -278,10 +301,54 @@ export async function PUT(request: Request) {
     if (data.heroCtaSecondaryText !== undefined) settingsUpdateData.heroCtaSecondaryText = data.heroCtaSecondaryText ? data.heroCtaSecondaryText.trim() : null;
     if (data.heroCtaSecondaryLink !== undefined) settingsUpdateData.heroCtaSecondaryLink = data.heroCtaSecondaryLink ? data.heroCtaSecondaryLink.trim() : null;
     if (data.heroImageUrl !== undefined) settingsUpdateData.heroImageUrl = data.heroImageUrl ? data.heroImageUrl.trim() : null;
+    if (Array.isArray(data.heroSlides) && data.heroSlides.length > 0) {
+      const firstSlide = data.heroSlides[0];
+      if (data.heroBadge === undefined) settingsUpdateData.heroBadge = firstSlide.badge ? firstSlide.badge.trim() : null;
+      if (data.heroTitle === undefined) settingsUpdateData.heroTitle = firstSlide.title.trim();
+      if (data.heroSubtitle === undefined) settingsUpdateData.heroSubtitle = firstSlide.subtitle ? firstSlide.subtitle.trim() : null;
+      if (data.heroCtaText === undefined) settingsUpdateData.heroCtaText = firstSlide.ctaText ? firstSlide.ctaText.trim() : null;
+      if (data.heroCtaLink === undefined) settingsUpdateData.heroCtaLink = firstSlide.ctaLink ? firstSlide.ctaLink.trim() : null;
+      if (data.heroCtaSecondaryText === undefined) settingsUpdateData.heroCtaSecondaryText = firstSlide.ctaSecondaryText ? firstSlide.ctaSecondaryText.trim() : null;
+      if (data.heroCtaSecondaryLink === undefined) settingsUpdateData.heroCtaSecondaryLink = firstSlide.ctaSecondaryLink ? firstSlide.ctaSecondaryLink.trim() : null;
+      if (data.heroImageUrl === undefined) settingsUpdateData.heroImageUrl = firstSlide.imageUrl ? firstSlide.imageUrl.trim() : null;
+    }
     if (data.primaryColor !== undefined) settingsUpdateData.primaryColor = data.primaryColor ? data.primaryColor.trim() : '#4F46E5';
     if (data.fontFamily !== undefined) settingsUpdateData.fontFamily = data.fontFamily || 'inter';
     if (data.defaultPageSize !== undefined) settingsUpdateData.defaultPageSize = data.defaultPageSize;
-    if (data.socialLinks !== undefined) settingsUpdateData.socialLinks = data.socialLinks || {};
+    if (data.socialLinks !== undefined || data.heroSlides !== undefined) {
+      let existingSocialLinks: unknown = null;
+      try {
+        const existingStore = await prisma.store.findUnique({
+          where: { id: user.storeId },
+          include: { settings: true },
+        });
+        existingSocialLinks = existingStore?.settings?.socialLinks ?? null;
+      } catch {
+        existingSocialLinks = null;
+      }
+
+      if (data.heroSlides !== undefined) {
+        const normalizedSlides = (data.heroSlides || []).map((slide, idx) => ({
+          id: slide.id?.trim() || `slide-${idx + 1}`,
+          badge: slide.badge?.trim() || '',
+          title: slide.title.trim(),
+          subtitle: slide.subtitle?.trim() || '',
+          ctaText: slide.ctaText?.trim() || 'Mulai Belanja',
+          ctaLink: slide.ctaLink?.trim() || '/products',
+          ctaSecondaryText: slide.ctaSecondaryText?.trim() || '',
+          ctaSecondaryLink: slide.ctaSecondaryLink?.trim() || '/articles',
+          imageUrl: slide.imageUrl?.trim() || '',
+        }));
+        settingsUpdateData.socialLinks = mergeHeroSlidesIntoSocialLinks(
+          existingSocialLinks,
+          data.socialLinks,
+          normalizedSlides
+        );
+      } else {
+        const merged = mergeHeroSlidesIntoSocialLinks(existingSocialLinks, data.socialLinks, undefined);
+        settingsUpdateData.socialLinks = Object.keys(merged).length > 0 ? merged : (data.socialLinks || {});
+      }
+    }
     if (data.defaultSeoTitle !== undefined) settingsUpdateData.defaultSeoTitle = data.defaultSeoTitle ? data.defaultSeoTitle.trim() : null;
     if (data.defaultSeoDescription !== undefined) settingsUpdateData.defaultSeoDescription = data.defaultSeoDescription ? data.defaultSeoDescription.trim() : null;
     if (data.sandboxPaymentEnabled !== undefined) settingsUpdateData.sandboxPaymentEnabled = data.sandboxPaymentEnabled;

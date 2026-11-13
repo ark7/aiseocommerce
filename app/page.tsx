@@ -5,9 +5,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
+import HeroSlider from '@/components/HeroSlider';
+import ProductPreviewThumb from '@/components/ProductPreviewThumb';
 import { Prisma } from '@prisma/client';
 import { getActiveStore } from '@/lib/store';
 import { getCatalogDisplayPricing } from '@/lib/pricing';
+import { extractPublicSocialLinks, resolveStoreHeroSlides } from '@/lib/heroSlides';
 
 // Revalidate immediately so changes made in Super-Admin or Preview Mode reflect instantly
 export const revalidate = 0;
@@ -18,6 +21,7 @@ type LandingStore = Prisma.StoreGetPayload<{
     products: {
       include: {
         images: true;
+        category: { select: { name: true; slug: true } };
         priceTiers: true;
         variants: { include: { priceTiers: true } };
       };
@@ -41,7 +45,8 @@ export default async function LandingPage() {
               take: 8,
               orderBy: { createdAt: 'desc' },
               include: {
-                images: { where: { isPrimary: true }, take: 1 },
+                images: { orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }], take: 1 },
+                category: { select: { name: true, slug: true } },
                 priceTiers: { where: { variantId: null }, orderBy: { minQty: 'asc' } },
                 variants: { include: { priceTiers: { orderBy: { minQty: 'asc' } } } },
               },
@@ -84,15 +89,13 @@ export default async function LandingPage() {
 
   const s = store.settings;
   const primaryColor = s?.primaryColor || '#4F46E5';
-
-  const heroBadge = s?.heroBadge || 'Koleksi Terbaru 2026';
-  const heroTitle = s?.heroTitle || `Selamat Datang di ${store.name}`;
-  const heroSubtitle = s?.heroSubtitle || s?.tagline || 'Temukan berbagai produk berkualitas tinggi dengan penawaran terbaik dan garansi kepuasan pelanggan.';
-  const heroCtaText = s?.heroCtaText || 'Mulai Belanja';
-  const heroCtaLink = s?.heroCtaLink || '/products';
-  const heroCtaSecondaryText = s?.heroCtaSecondaryText || 'Baca Artikel Rekomendasi';
-  const heroCtaSecondaryLink = s?.heroCtaSecondaryLink || '/articles';
-  const heroImageUrl = s?.heroImageUrl;
+  const heroSlides = resolveStoreHeroSlides({
+    storeName: store.name,
+    tagline: s?.tagline,
+    settings: s,
+    fallbackProductImage: store.products[0]?.images[0]?.url || null,
+  });
+  const publicSocialLinks = extractPublicSocialLinks(s?.socialLinks);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -104,104 +107,13 @@ export default async function LandingPage() {
       />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 py-8 md:py-12 flex flex-col gap-16 w-full">
-        {/* HERO SECTION BUILDER */}
-        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-gray-50 to-indigo-50/20 border border-gray-200/80 shadow-sm p-6 sm:p-10 md:p-14">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Sisi Kiri: Teks & Call-to-Action */}
-            <div className="lg:col-span-7 space-y-6 text-left">
-              {heroBadge && (
-                <div
-                  style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
-                  className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide"
-                >
-                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }} />
-                  {heroBadge}
-                </div>
-              )}
-
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.15]">
-                {heroTitle}
-              </h1>
-
-              <p className="text-base sm:text-lg text-gray-600 max-w-xl leading-relaxed">
-                {heroSubtitle}
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Link
-                  href={heroCtaLink}
-                  style={{ backgroundColor: primaryColor }}
-                  className="text-white px-6 py-3.5 rounded-xl font-semibold text-sm sm:text-base shadow-sm hover:opacity-95 transition-all flex items-center gap-2 group"
-                >
-                  <span>{heroCtaText}</span>
-                  <span className="group-hover:translate-x-1 transition-transform">&rarr;</span>
-                </Link>
-
-                {heroCtaSecondaryText && (
-                  <Link
-                    href={heroCtaSecondaryLink}
-                    className="bg-white border border-gray-300 text-gray-700 px-6 py-3.5 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-50 hover:border-gray-400 transition-colors"
-                  >
-                    {heroCtaSecondaryText}
-                  </Link>
-                )}
-              </div>
-
-              {/* USP / Feature Badges */}
-              <div className="pt-4 border-t border-gray-200/60 grid grid-cols-3 gap-3 text-xs text-gray-500">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Produk Original</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Pengiriman Aman</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-600 font-bold">✓</span>
-                  <span>Layanan Responsif</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sisi Kanan: Visual Banner Image / Showcase Card */}
-            <div className="lg:col-span-5 relative">
-              <div className="relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-square w-full rounded-2xl overflow-hidden bg-gradient-to-tr from-gray-100 to-gray-200 border border-gray-200 shadow-md">
-                {heroImageUrl ? (
-                  <Image
-                    src={heroImageUrl}
-                    alt={heroTitle}
-                    fill
-                    className="object-cover"
-                    priority
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-3 bg-gradient-to-br from-indigo-50/40 via-white to-gray-50">
-                    <div
-                      style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}
-                      className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-inner"
-                    >
-                      🛍️
-                    </div>
-                    <div>
-                      <p className="font-bold text-gray-900 text-base">{store.name}</p>
-                      <p className="text-xs text-gray-500 max-w-xs mt-1">
-                        {s?.tagline || 'Pusat belanja online terpercaya dengan katalog kurasi terbaik.'}
-                      </p>
-                    </div>
-                    <span
-                      style={{ borderColor: primaryColor, color: primaryColor }}
-                      className="inline-block border text-[11px] font-semibold px-3 py-1 rounded-full bg-white shadow-xs"
-                    >
-                      Katalog Resmi Toko
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* HERO SECTION MULTI-CARD SLIDER */}
+        <HeroSlider
+          slides={heroSlides}
+          primaryColor={primaryColor}
+          storeName={store.name}
+          tagline={s?.tagline}
+        />
 
         {/* Featured Products (Pilihan Editor) */}
         <section className="space-y-6">
@@ -241,18 +153,12 @@ export default async function LandingPage() {
                   className="group relative overflow-hidden rounded-2xl border border-gray-200 p-3.5 transition-all hover:shadow-lg hover:border-gray-300 bg-white block"
                 >
                   <div className="aspect-square relative overflow-hidden rounded-xl bg-gray-100">
-                    {product.images[0] ? (
-                      <Image
-                        src={product.images[0].url}
-                        alt={product.name}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-gray-400 text-xs">
-                        No Image
-                      </div>
-                    )}
+                    <ProductPreviewThumb
+                      imageUrl={product.images[0]?.url}
+                      alt={product.images[0]?.altText || product.name}
+                      categoryName={product.category?.name}
+                      primaryColor={primaryColor}
+                    />
                     {displayPricing.isBatch ? (
                       <span
                         className="absolute top-2 left-2 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow bg-indigo-600"
@@ -342,11 +248,19 @@ export default async function LandingPage() {
                         src={article.imageUrl}
                         alt={article.title}
                         fill
+                        unoptimized
+                        sizes="(max-width: 768px) 100vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                        No Thumbnail
+                      <div
+                        style={{
+                          background: `linear-gradient(135deg, ${primaryColor}14 0%, #f8fafc 60%, ${primaryColor}20 100%)`,
+                        }}
+                        className="w-full h-full flex flex-col items-center justify-center text-gray-500 text-xs gap-1.5 p-4 text-center"
+                      >
+                        <span className="text-2xl" aria-hidden="true">📰</span>
+                        <span className="font-medium line-clamp-1">{article.title}</span>
                       </div>
                     )}
                     <span className="absolute top-2 left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">
@@ -384,7 +298,7 @@ export default async function LandingPage() {
         address={store.address}
         phone={store.phone}
         email={store.email}
-        socialLinks={s?.socialLinks as Record<string, string>}
+        socialLinks={publicSocialLinks}
       />
     </div>
   );
