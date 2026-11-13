@@ -5,8 +5,10 @@ import { useEffect, useRef, useState } from 'react';
 export interface TurnstileStorefrontShieldProps {
   siteKey?: string | null;
   initiallyVerified?: boolean;
-  storeDomain?: string;
-  context?: 'listing' | 'product-detail';
+  storeDomain?: string | null;
+  context?: 'listing' | 'product-detail' | 'public-global' | 'auth';
+  contextLabel?: string;
+  compact?: boolean;
   onVerifiedChange?: (verified: boolean) => void;
 }
 
@@ -44,6 +46,8 @@ export default function TurnstileStorefrontShield({
   initiallyVerified = false,
   storeDomain,
   context = 'listing',
+  contextLabel,
+  compact = false,
   onVerifiedChange,
 }: TurnstileStorefrontShieldProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -197,15 +201,19 @@ export default function TurnstileStorefrontShield({
   return (
     <div
       data-testid={`turnstile-shield-${context}`}
-      className="rounded-xl border border-slate-200 bg-white/95 p-3 shadow-xs space-y-2"
+      className={`rounded-xl border border-slate-200 bg-white/95 shadow-xs space-y-2 ${
+        compact ? 'p-2.5' : 'p-3'
+      }`}
     >
       <div className="flex items-center justify-between gap-2 text-xs text-slate-600">
         <span className="font-medium flex items-center gap-1.5">
           <span aria-hidden="true">🛡️</span>
           <span>
-            {context === 'product-detail'
-              ? 'Verifikasi cepat anti-bot sebelum menambah ke keranjang'
-              : 'Verifikasi cepat anti-bot Cloudflare Turnstile'}
+            {contextLabel
+              ? `Verifikasi cepat anti-bot untuk ${contextLabel}`
+              : context === 'product-detail'
+                ? 'Verifikasi cepat anti-bot sebelum menambah ke keranjang'
+                : 'Verifikasi cepat anti-bot Cloudflare Turnstile'}
           </span>
         </span>
         {verifying && (

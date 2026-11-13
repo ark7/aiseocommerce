@@ -4,12 +4,16 @@ import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { getBiteshipRates } from '@/lib/biteship';
 import { calculateOrderShipping } from '@/lib/shipping';
+import { allow } from '@/lib/rateLimit';
+import { getIPAddress } from '@/lib/ip';
+import { verifyRequestTurnstileOrPass } from '@/lib/turnstile';
 
 const ShippingRatesSchema = z.object({
   storeId: z.string().optional(),
   destinationPostalCode: z.union([z.string(), z.number()]).optional().nullable(),
   destinationAreaId: z.string().optional().nullable(),
   destinationAddress: z.string().optional().nullable(),
+  turnstileToken: z.string().optional(),
   items: z.array(
     z.object({
       productId: z.string().optional(),
@@ -24,6 +28,14 @@ const ShippingRatesSchema = z.object({
 
 export async function POST(request: Request) {
   try {
+    const ip = getIPAddress(request);
+    if (!allow(`shipping_rates:${ip}`, 20)) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan cek ongkir. Silakan coba lagi sebentar.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const data = ShippingRatesSchema.parse(body);
 
@@ -36,6 +48,19 @@ export async function POST(request: Request) {
 
     if (!store) {
       return NextResponse.json({ error: 'Store not found' }, { status: 404 });
+    }
+
+    const turnstileCheck = await verifyRequestTurnstileOrPass(
+      request,
+      store.settings as {
+        turnstileEnabled?: boolean | null;
+        turnstileSiteKey?: string | null;
+        turnstileSecretKey?: string | null;
+      } | null,
+      data.turnstileToken
+    );
+    if (!turnstileCheck.allowed) {
+      return NextResponse.json({ error: turnstileCheck.error }, { status: turnstileCheck.status });
     }
 
     const settings = store.settings;

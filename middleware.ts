@@ -57,7 +57,7 @@ const GENERAL_RATE_LIMIT = 100;
 const MALICIOUS_SCANNER_UA_REGEX =
   /(sqlmap|nikto|masscan|nmap|zgrab|nuclei|dirbuster|gobuster|acunetix|nessus|openvas|havij)/i;
 const SENSITIVE_PROBE_PATH_REGEX =
-  /^\/(\.env|\.git|wp-config\.php|phpmyadmin|pma|vendor\/phpunit|cgi-bin)/i;
+  /^\/(\.env|\.git|\.aws|\.ssh|wp-admin|wp-login\.php|wp-content|wp-includes|wp-config\.php|xmlrpc\.php|phpmyadmin|pma|adminer|cgi-bin|vendor\/phpunit|actuator|server-status|config\.json)/i;
 
 const rateLimitMemory = new Map<string, { count: number; resetTime: number }>();
 
@@ -76,9 +76,9 @@ export function isMaliciousScannerRequest(path: string, userAgent: string): bool
 }
 
 /**
- * Adaptive 1-minute burst limiter for catalog browsing and product searches.
- * Shoppers with a valid Cloudflare Turnstile session cookie receive generous limits,
- * while unverified IPs are capped tightly to block ILIKE query flooding and scrapers.
+ * Adaptive 1-minute burst limiter across ALL publicly exposed storefront paths & public APIs.
+ * Shoppers with a valid Cloudflare Turnstile session cookie (`cf_turnstile_pass`) receive generous limits,
+ * while unverified IPs are capped tightly to block ILIKE query flooding, scrapers, and DDoS bursts.
  */
 export function checkCatalogAndSearchRateLimit(
   ip: string,
@@ -87,24 +87,55 @@ export function checkCatalogAndSearchRateLimit(
   hasTurnstilePass: boolean,
   now: number = Date.now()
 ): { allowed: boolean; retryAfterSec: number } {
-  const isSearch = path === '/products' && searchQuery.trim().length > 0;
-  const isCatalog =
-    path === '/products' ||
-    path.startsWith('/product/') ||
-    path.startsWith('/category/');
+  const trimmedQuery = searchQuery.trim();
+  const isSearch =
+    (path === '/products' && trimmedQuery.length > 0) ||
+    path === '/api/shipping/areas' ||
+    (path.startsWith('/api/') && trimmedQuery.length > 0);
 
-  if (!isSearch && !isCatalog) {
+  const isPublicApi =
+    !isSearch &&
+    (path.startsWith('/api/products') ||
+      path.startsWith('/api/categories') ||
+      path.startsWith('/api/articles') ||
+      path.startsWith('/api/stores') ||
+      path.startsWith('/api/vouchers') ||
+      path.startsWith('/api/shipping') ||
+      path.startsWith('/api/regions'));
+
+  const isPublicPage =
+    !isSearch &&
+    !isPublicApi &&
+    (path === '/' ||
+      path === '/products' ||
+      path.startsWith('/product/') ||
+      path === '/categories' ||
+      path.startsWith('/category/') ||
+      path === '/articles' ||
+      path.startsWith('/articles/') ||
+      path === '/penawaran' ||
+      path.startsWith('/lp/') ||
+      path === '/terms' ||
+      path === '/syarat-ketentuan' ||
+      path === '/privacy' ||
+      path === '/kebijakan-privasi' ||
+      path === '/forgot-password' ||
+      path === '/reset-password');
+
+  if (!isSearch && !isPublicApi && !isPublicPage) {
     return { allowed: true, retryAfterSec: 0 };
   }
 
-  const key = isSearch ? `search_burst:${ip}` : `catalog_burst:${ip}`;
-  const limit = isSearch
-    ? hasTurnstilePass
-      ? 60
-      : 15
-    : hasTurnstilePass
-      ? 180
-      : 45;
+  let key = `catalog_burst:${ip}`;
+  let limit = hasTurnstilePass ? 180 : 45;
+
+  if (isSearch) {
+    key = `search_burst:${ip}`;
+    limit = hasTurnstilePass ? 60 : 15;
+  } else if (isPublicApi) {
+    key = `public_api_burst:${ip}`;
+    limit = hasTurnstilePass ? 120 : 30;
+  }
 
   const existing = rateLimitMemory.get(key);
   if (!existing || now > existing.resetTime) {
@@ -235,7 +266,10 @@ export async function middleware(request: NextRequest) {
 
   const turnstilePassCookie = request.cookies?.get(TURNSTILE_PASS_COOKIE)?.value;
   const hasTurnstilePass = verifyTurnstilePassToken(turnstilePassCookie, ip);
-  const searchQuery = request.nextUrl.searchParams.get('search') || '';
+  const searchQuery =
+    request.nextUrl.searchParams.get('search') ||
+    request.nextUrl.searchParams.get('q') ||
+    '';
   const burstCheck = checkCatalogAndSearchRateLimit(ip, path, searchQuery, hasTurnstilePass);
   if (!burstCheck.allowed) {
     logger.warn('Catalog/search burst rate limit exceeded', {
@@ -295,7 +329,8 @@ export async function middleware(request: NextRequest) {
   const segments = path.split('/').filter(Boolean);
   const standaloneFirstSegments = [
     'products', 'product', 'categories', 'category', 'articles', 'penawaran', 'lp',
-    'cart', 'orders', 'admin', 'super-admin', 'login', 'register', 'terms', 'privacy',
+    'cart', 'orders', 'admin', 'super-admin', 'login', 'register',
+    'forgot-password', 'reset-password', 'terms', 'privacy',
     'syarat-ketentuan', 'kebijakan-privasi', 'unauthorized', 'api',
     '_next', 'static'
   ];

@@ -4,6 +4,9 @@ import {
   resolveTurnstileConfig,
   createTurnstilePassToken,
   verifyTurnstilePassToken,
+  extractCookieValue,
+  verifyRequestTurnstileOrPass,
+  TURNSTILE_PASS_COOKIE,
 } from '@/lib/turnstile';
 import {
   isMaliciousScannerRequest,
@@ -189,6 +192,103 @@ describe('Turnstile Verification & Requirement', () => {
         expect(checkCatalogAndSearchRateLimit('192.0.2.51', '/products', 'kartu', true, now).allowed).toBe(true);
       }
       expect(checkCatalogAndSearchRateLimit('192.0.2.51', '/products', 'kartu', true, now).allowed).toBe(false);
+    });
+
+    it('blocks newly added probe paths (/wp-login.php, /xmlrpc.php, /actuator, /config.json)', () => {
+      expect(isMaliciousScannerRequest('/wp-login.php', 'Mozilla/5.0')).toBe(true);
+      expect(isMaliciousScannerRequest('/xmlrpc.php', 'Mozilla/5.0')).toBe(true);
+      expect(isMaliciousScannerRequest('/actuator', 'Mozilla/5.0')).toBe(true);
+      expect(isMaliciousScannerRequest('/config.json', 'Mozilla/5.0')).toBe(true);
+    });
+
+    it('protects all public pages and public APIs with adaptive rate limits', () => {
+      const now = 1_700_000_000_000;
+      for (let i = 0; i < 30; i++) {
+        expect(checkCatalogAndSearchRateLimit('192.0.2.70', '/api/products', '', false, now).allowed).toBe(true);
+      }
+      expect(checkCatalogAndSearchRateLimit('192.0.2.70', '/api/products', '', false, now).allowed).toBe(false);
+
+      for (let i = 0; i < 45; i++) {
+        expect(checkCatalogAndSearchRateLimit('192.0.2.71', '/articles/panduan', '', false, now).allowed).toBe(true);
+      }
+      expect(checkCatalogAndSearchRateLimit('192.0.2.71', '/articles/panduan', '', false, now).allowed).toBe(false);
+    });
+  });
+
+  describe('extractCookieValue & verifyRequestTurnstileOrPass', () => {
+    it('extracts cookie values from both Request Cookie header and NextRequest cookies map', () => {
+      const webReq = new Request('http://localhost:3000/api/shipping/rates', {
+        headers: {
+          cookie: `foo=bar; ${TURNSTILE_PASS_COOKIE}=abc.123.sig; theme=dark`,
+        },
+      });
+      expect(extractCookieValue(webReq, TURNSTILE_PASS_COOKIE)).toBe('abc.123.sig');
+      expect(extractCookieValue(webReq, 'missing')).toBeNull();
+
+      const nextLikeReq = {
+        cookies: {
+          get: (name: string) => (name === TURNSTILE_PASS_COOKIE ? { value: 'next-val' } : undefined),
+        },
+        headers: new Headers(),
+      } as unknown as Request;
+      expect(extractCookieValue(nextLikeReq, TURNSTILE_PASS_COOKIE)).toBe('next-val');
+    });
+
+    it('allows requests immediately when Turnstile is disabled', async () => {
+      const req = new Request('http://localhost:3000/api/auth/forgot-password', { method: 'POST' });
+      const res = await verifyRequestTurnstileOrPass(req, { turnstileEnabled: false });
+      expect(res).toEqual({ allowed: true, status: 200, error: null });
+    });
+
+    it('allows requests with valid cf_turnstile_pass cookie or valid body token when enabled', async () => {
+      const passToken = createTurnstilePassToken('203.0.113.88');
+      const cookieReq = new Request('http://localhost:3000/api/shipping/rates', {
+        method: 'POST',
+        headers: {
+          'x-forwarded-for': '203.0.113.88',
+          cookie: `${TURNSTILE_PASS_COOKIE}=${encodeURIComponent(passToken)}`,
+        },
+      });
+      const settings = {
+        turnstileEnabled: true,
+        turnstileSiteKey: '0xSITE',
+        turnstileSecretKey: '0xSECRET',
+      };
+
+      const cookieRes = await verifyRequestTurnstileOrPass(cookieReq, settings, undefined);
+      expect(cookieRes).toEqual({ allowed: true, status: 200, error: null });
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      } as any);
+      const tokenReq = new Request('http://localhost:3000/api/shipping/rates', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '203.0.113.88' },
+      });
+      const tokenRes = await verifyRequestTurnstileOrPass(tokenReq, settings, 'valid-turnstile-token');
+      expect(tokenRes).toEqual({ allowed: true, status: 200, error: null });
+    });
+
+    it('rejects requests lacking both valid pass cookie and valid token with status 400', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: false }),
+      } as any);
+      const req = new Request('http://localhost:3000/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'x-forwarded-for': '203.0.113.99' },
+      });
+      const settings = {
+        turnstileEnabled: true,
+        turnstileSiteKey: '0xSITE',
+        turnstileSecretKey: '0xSECRET',
+      };
+
+      const res = await verifyRequestTurnstileOrPass(req, settings, 'invalid-token');
+      expect(res.allowed).toBe(false);
+      expect(res.status).toBe(400);
+      expect(res.error).toContain('Cloudflare Turnstile');
     });
   });
 });

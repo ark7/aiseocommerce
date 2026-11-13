@@ -7,6 +7,13 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { cookies, headers } from 'next/headers';
 import Link from 'next/link';
 import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
+import { getIPAddress } from '@/lib/ip';
+import {
+  resolveTurnstileConfig,
+  TURNSTILE_PASS_COOKIE,
+  verifyTurnstilePassToken,
+} from '@/lib/turnstile';
+import GlobalPublicTurnstileGuard from '@/components/security/GlobalPublicTurnstileGuard';
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getActiveStore();
@@ -77,6 +84,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
 
+  const turnstileConfig = resolveTurnstileConfig(store?.settings);
+  let isTurnstileVerified = false;
+  if (turnstileConfig.enabled && turnstileConfig.siteKey) {
+    try {
+      const passCookie = cookies().get(TURNSTILE_PASS_COOKIE)?.value;
+      const clientIp = getIPAddress({ headers: headers() } as unknown as Request);
+      isTurnstileVerified = verifyTurnstilePassToken(passCookie, clientIp);
+    } catch {
+      // ignore outside request context
+    }
+  }
+
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
@@ -131,6 +150,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           )}
           {children}
           <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
+          <GlobalPublicTurnstileGuard
+            siteKey={turnstileConfig.siteKey}
+            initiallyVerified={isTurnstileVerified}
+            storeDomain={store?.domain}
+          />
           <CookieConsentBanner
             enabled={store?.settings?.cookieConsentEnabled ?? true}
             title={store?.settings?.cookieConsentTitle}

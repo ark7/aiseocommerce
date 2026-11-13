@@ -2,19 +2,30 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import TurnstileStorefrontShield from '@/components/security/TurnstileStorefrontShield';
 
 interface ForgotPasswordFormProps {
   storeDomain?: string;
   storeName?: string;
+  turnstileSiteKey?: string | null;
+  initiallyVerified?: boolean;
 }
 
-export function ForgotPasswordForm({ storeDomain, storeName }: ForgotPasswordFormProps) {
+export function ForgotPasswordForm({
+  storeDomain,
+  storeName,
+  turnstileSiteKey,
+  initiallyVerified = false,
+}: ForgotPasswordFormProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isDemoAccount, setIsDemoAccount] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [isTurnstileVerified, setIsTurnstileVerified] = useState<boolean>(
+    !turnstileSiteKey || Boolean(initiallyVerified)
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,9 +117,21 @@ export function ForgotPasswordForm({ storeDomain, storeName }: ForgotPasswordFor
             </p>
           </div>
 
+          {turnstileSiteKey && (
+            <TurnstileStorefrontShield
+              siteKey={turnstileSiteKey}
+              initiallyVerified={initiallyVerified}
+              storeDomain={storeDomain}
+              context="auth"
+              contextLabel="pemulihan password"
+              compact
+              onVerifiedChange={setIsTurnstileVerified}
+            />
+          )}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (Boolean(turnstileSiteKey) && !isTurnstileVerified)}
             className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-lg text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {loading ? (
