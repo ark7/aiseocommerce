@@ -1,8 +1,12 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ThemeToggle from './ThemeToggle';
 
 interface StoreFooterProps {
+  storeDomain?: string;
   storeName?: string | null;
   storeLogo?: string | null;
   tagline?: string | null;
@@ -13,6 +17,7 @@ interface StoreFooterProps {
 }
 
 export default function StoreFooter({
+  storeDomain,
   storeName,
   storeLogo,
   tagline,
@@ -21,11 +26,65 @@ export default function StoreFooter({
   email,
   socialLinks = {},
 }: StoreFooterProps) {
-  const name = storeName || 'Toko Online';
+  const [resolvedName, setResolvedName] = useState<string | null>(storeName ?? null);
+  const [resolvedLogo, setResolvedLogo] = useState<string | null>(storeLogo ?? null);
+  const [resolvedTagline, setResolvedTagline] = useState<string | null>(tagline ?? null);
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(address ?? null);
+  const [resolvedPhone, setResolvedPhone] = useState<string | null>(phone ?? null);
+  const [resolvedEmail, setResolvedEmail] = useState<string | null>(email ?? null);
+  const [resolvedSocialLinks, setResolvedSocialLinks] = useState<Record<string, string> | null>(
+    socialLinks ?? {}
+  );
+
+  useEffect(() => {
+    if (storeName !== undefined) setResolvedName(storeName ?? null);
+    if (storeLogo !== undefined) setResolvedLogo(storeLogo ?? null);
+    if (tagline !== undefined) setResolvedTagline(tagline ?? null);
+    if (address !== undefined) setResolvedAddress(address ?? null);
+    if (phone !== undefined) setResolvedPhone(phone ?? null);
+    if (email !== undefined) setResolvedEmail(email ?? null);
+    if (socialLinks !== undefined) setResolvedSocialLinks(socialLinks ?? {});
+  }, [storeName, storeLogo, tagline, address, phone, email, socialLinks]);
+
+  useEffect(() => {
+    if (storeName !== undefined && address !== undefined) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`/api/stores/${storeDomain || 'current'}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (cancelled || !data?.store) return;
+
+        setResolvedName((prev) => prev ?? data.store.name ?? null);
+        setResolvedLogo((prev) => prev ?? data.store.logo ?? null);
+        setResolvedAddress((prev) => prev ?? data.store.address ?? null);
+        setResolvedPhone((prev) => prev ?? data.store.phone ?? null);
+        setResolvedEmail((prev) => prev ?? data.store.email ?? null);
+        if (data.store.settings?.tagline) {
+          setResolvedTagline((prev) => prev ?? data.store.settings.tagline);
+        }
+        if (data.store.settings?.socialLinks) {
+          setResolvedSocialLinks((prev) =>
+            prev && Object.values(prev).some(Boolean) ? prev : data.store.settings.socialLinks
+          );
+        }
+      } catch {
+        // Footer still renders cleanly if fallback store fetch is unavailable.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storeDomain, storeName, address]);
+
+  const name = resolvedName || 'Toko Online';
   const currentYear = new Date().getFullYear();
 
   // Clean WhatsApp number
-  const waNumber = phone ? phone.replace(/[^0-9]/g, '') : '';
+  const waNumber = resolvedPhone ? resolvedPhone.replace(/[^0-9]/g, '') : '';
   const waFormatted = waNumber.startsWith('0') ? `62${waNumber.slice(1)}` : waNumber;
 
   return (
@@ -35,9 +94,9 @@ export default function StoreFooter({
           {/* Kolom 1: Profil Brand */}
           <div className="space-y-4 md:col-span-1">
             <Link href="/" className="flex items-center space-x-2">
-              {storeLogo ? (
+              {resolvedLogo ? (
                 <Image
-                  src={storeLogo}
+                  src={resolvedLogo}
                   alt={name}
                   width={40}
                   height={40}
@@ -52,8 +111,8 @@ export default function StoreFooter({
               <span className="text-xl font-bold text-white tracking-tight">{name}</span>
             </Link>
 
-            {tagline ? (
-              <p className="text-sm text-gray-400 leading-relaxed">{tagline}</p>
+            {resolvedTagline ? (
+              <p className="text-sm text-gray-400 leading-relaxed">{resolvedTagline}</p>
             ) : (
               <p className="text-sm text-gray-400 leading-relaxed">
                 Pusat belanja online terpercaya dengan pilihan produk berkualitas tinggi dan jaminan pelayanan terbaik.
@@ -61,13 +120,13 @@ export default function StoreFooter({
             )}
 
             {/* Media Sosial */}
-            {socialLinks && Object.values(socialLinks).some(Boolean) && (
+            {resolvedSocialLinks && Object.values(resolvedSocialLinks).some(Boolean) && (
               <div className="pt-2">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Ikuti Kami</p>
                 <div className="flex items-center space-x-3">
-                  {socialLinks.instagram && (
+                  {resolvedSocialLinks.instagram && (
                     <a
-                      href={socialLinks.instagram.startsWith('http') ? socialLinks.instagram : `https://instagram.com/${socialLinks.instagram.replace('@', '')}`}
+                      href={resolvedSocialLinks.instagram.startsWith('http') ? resolvedSocialLinks.instagram : `https://instagram.com/${resolvedSocialLinks.instagram.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-8 h-8 rounded-full bg-gray-800 hover:bg-indigo-600 flex items-center justify-center text-gray-300 hover:text-white transition-colors"
@@ -78,9 +137,9 @@ export default function StoreFooter({
                       </svg>
                     </a>
                   )}
-                  {socialLinks.tiktok && (
+                  {resolvedSocialLinks.tiktok && (
                     <a
-                      href={socialLinks.tiktok.startsWith('http') ? socialLinks.tiktok : `https://tiktok.com/@${socialLinks.tiktok.replace('@', '')}`}
+                      href={resolvedSocialLinks.tiktok.startsWith('http') ? resolvedSocialLinks.tiktok : `https://tiktok.com/@${resolvedSocialLinks.tiktok.replace('@', '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-8 h-8 rounded-full bg-gray-800 hover:bg-black flex items-center justify-center text-gray-300 hover:text-white transition-colors"
@@ -89,9 +148,9 @@ export default function StoreFooter({
                       <span className="font-bold text-xs">TT</span>
                     </a>
                   )}
-                  {socialLinks.facebook && (
+                  {resolvedSocialLinks.facebook && (
                     <a
-                      href={socialLinks.facebook.startsWith('http') ? socialLinks.facebook : `https://facebook.com/${socialLinks.facebook}`}
+                      href={resolvedSocialLinks.facebook.startsWith('http') ? resolvedSocialLinks.facebook : `https://facebook.com/${resolvedSocialLinks.facebook}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-8 h-8 rounded-full bg-gray-800 hover:bg-blue-600 flex items-center justify-center text-gray-300 hover:text-white transition-colors"
@@ -121,7 +180,7 @@ export default function StoreFooter({
                 <Link href="/categories" className="hover:text-white transition-colors">Kategori Produk</Link>
               </li>
               <li>
-                <Link href="/articles" className="hover:text-white transition-colors">Artikel & Rekomendasi</Link>
+                <Link href="/articles" className="hover:text-white transition-colors">Artikel &amp; Rekomendasi</Link>
               </li>
               <li>
                 <Link href="/penawaran" className="text-orange-400 hover:text-orange-300 font-medium transition-colors">
@@ -136,13 +195,13 @@ export default function StoreFooter({
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Layanan Pelanggan</h3>
             <ul className="space-y-2.5 text-sm">
               <li>
-                <Link href="/orders" className="hover:text-white transition-colors">Status & Lacak Pesanan</Link>
+                <Link href="/orders" className="hover:text-white transition-colors">Status &amp; Lacak Pesanan</Link>
               </li>
               <li>
                 <Link href="/cart" className="hover:text-white transition-colors">Keranjang Belanja</Link>
               </li>
               <li>
-                <Link href="/terms" className="hover:text-white transition-colors">Syarat & Ketentuan</Link>
+                <Link href="/terms" className="hover:text-white transition-colors">Syarat &amp; Ketentuan</Link>
               </li>
               <li>
                 <Link href="/privacy" className="hover:text-white transition-colors">Kebijakan Privasi</Link>
@@ -165,22 +224,22 @@ export default function StoreFooter({
           {/* Kolom 4: Kontak & Alamat */}
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Kontak Kami</h3>
-            {address && (
+            {resolvedAddress && (
               <p className="text-sm text-gray-400 leading-relaxed">
                 <span className="font-semibold text-gray-300 block">Alamat:</span>
-                {address}
+                {resolvedAddress}
               </p>
             )}
-            {phone && (
+            {resolvedPhone && (
               <p className="text-sm text-gray-400">
                 <span className="font-semibold text-gray-300 block">Telepon / WhatsApp:</span>
-                {phone}
+                {resolvedPhone}
               </p>
             )}
-            {email && (
+            {resolvedEmail && (
               <p className="text-sm text-gray-400">
                 <span className="font-semibold text-gray-300 block">Email:</span>
-                <a href={`mailto:${email}`} className="hover:underline text-gray-300">{email}</a>
+                <a href={`mailto:${resolvedEmail}`} className="hover:underline text-gray-300">{resolvedEmail}</a>
               </p>
             )}
           </div>
@@ -191,7 +250,7 @@ export default function StoreFooter({
           <p>© {currentYear} {name}. Seluruh hak cipta dilindungi.</p>
           <div className="flex items-center space-x-6 text-xs text-gray-400">
             <Link href="/terms" className="hover:text-white transition-colors">
-              Syarat & Ketentuan
+              Syarat &amp; Ketentuan
             </Link>
             <span className="text-gray-700">•</span>
             <Link href="/privacy" className="hover:text-white transition-colors">
@@ -217,4 +276,3 @@ export default function StoreFooter({
     </footer>
   );
 }
-
