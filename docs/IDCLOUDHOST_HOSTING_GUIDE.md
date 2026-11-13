@@ -165,10 +165,11 @@ docker compose logs -f marketing-wp
 # Restart Seluruh Layanan
 docker compose restart
 
-# Update Kode Aplikasi Terbaru dari Git
-git pull origin main
-docker compose build --no-cache web
-docker compose up -d web
+# Update Kode Aplikasi Terbaru dari Git (via SSH Alias larismanis-prod)
+ssh larismanis-prod "cd ~/aiseocommerce && git pull origin main && nohup sudo docker compose up -d --build --force-recreate web > ~/deploy-web.log 2>&1 < /dev/null &"
+
+# Pantau Log Rebuild Container Next.js Tanpa Menyentuh WordPress
+ssh larismanis-prod "tail -f ~/deploy-web.log"
 ```
 
 ---

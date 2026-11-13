@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState } from 'react';
 import Link from 'next/link';
+import TurnstileStorefrontShield from '@/components/security/TurnstileStorefrontShield';
 import { buildAddToCartCalls, getTrackingConfig, sendTrackingCalls } from '@/lib/tracking';
 import { trackFunnelEvent } from '@/lib/funnelEvents';
 import { addToCart } from '@/lib/cart';
@@ -26,6 +27,8 @@ interface AddToCartButtonProps {
   minOrderQty?: number;
   priceTiers?: PriceTierInput[];
   variants?: ProductVariantItem[];
+  turnstileSiteKey?: string | null;
+  turnstileVerified?: boolean;
 }
 
 export interface ProductVariantItem {
@@ -75,6 +78,8 @@ export default function AddToCartButton({
   minOrderQty = 1,
   priceTiers = [],
   variants = [],
+  turnstileSiteKey = null,
+  turnstileVerified = false,
 }: AddToCartButtonProps) {
   const matrixCaptionId = useId();
   const qtyErrorId = useId();
@@ -97,6 +102,9 @@ export default function AddToCartButton({
   const [qtyInput, setQtyInput] = useState(String(initialMinQty));
   const [hasInteractedQty, setHasInteractedQty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isBotVerified, setIsBotVerified] = useState<boolean>(
+    () => !turnstileSiteKey || Boolean(turnstileVerified)
+  );
 
   const fallbackPrice =
     selectedVariant?.price != null && selectedVariant.price > 0 ? selectedVariant.price : price;
@@ -176,6 +184,12 @@ export default function AddToCartButton({
       setError('Maaf, stok yang tersedia tidak mencukupi');
       return;
     }
+
+    if (turnstileSiteKey && !isBotVerified) {
+      setError('Mohon selesaikan verifikasi keamanan Cloudflare Turnstile terlebih dahulu.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -648,6 +662,18 @@ export default function AddToCartButton({
           +
         </button>
       </div>
+
+      {turnstileSiteKey && (
+        <div className="mb-3">
+          <TurnstileStorefrontShield
+            siteKey={turnstileSiteKey}
+            initiallyVerified={isBotVerified}
+            storeDomain={storeDomain}
+            context="product-detail"
+            onVerifiedChange={setIsBotVerified}
+          />
+        </div>
+      )}
 
       <button
         type="button"

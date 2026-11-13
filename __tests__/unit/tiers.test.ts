@@ -30,22 +30,45 @@ describe('Tiers & GatedLink Auth System', () => {
   });
 
   describe('gateFor', () => {
-    it('does not gate public auth paths', () => {
+    it('allows GUEST to browse public storefront, catalog, product details, and auth paths comfortably', () => {
       expect(gateFor('GUEST', '/')).toEqual({ gated: false, redirectPath: null });
       expect(gateFor('GUEST', '/login')).toEqual({ gated: false, redirectPath: null });
       expect(gateFor('GUEST', '/register')).toEqual({ gated: false, redirectPath: null });
+      expect(gateFor('GUEST', '/products')).toEqual({ gated: false, redirectPath: null });
+      expect(gateFor('GUEST', '/demo-store/product/shoes')).toEqual({ gated: false, redirectPath: null });
+      expect(gateFor('GUEST', '/product/cetak-id-card-pvc-custom')).toEqual({ gated: false, redirectPath: null });
+      expect(gateFor('GUEST', '/category/cetak')).toEqual({ gated: false, redirectPath: null });
+      expect(gateFor('GUEST', '/articles/panduan')).toEqual({ gated: false, redirectPath: null });
     });
 
-    it('gates GUEST attempting to navigate to store products / categories', () => {
-      const result = gateFor('GUEST', '/demo-store/product/shoes');
-      expect(result.gated).toBe(true);
-      expect(result.redirectPath).toBe('/login?from=%2Fdemo-store%2Fproduct%2Fshoes');
+    it('gates GUEST when attempting to access cart, orders, or admin pages', () => {
+      expect(gateFor('GUEST', '/cart')).toEqual({
+        gated: true,
+        redirectPath: '/login?from=%2Fcart',
+      });
+      expect(gateFor('GUEST', '/demo-store/cart')).toEqual({
+        gated: true,
+        redirectPath: '/login?from=%2Fdemo-store%2Fcart',
+      });
+      expect(gateFor('GUEST', '/orders')).toEqual({
+        gated: true,
+        redirectPath: '/login?from=%2Forders',
+      });
+      expect(gateFor('GUEST', '/admin/settings')).toEqual({
+        gated: true,
+        redirectPath: '/login?from=%2Fadmin%2Fsettings',
+      });
     });
 
-    it('allows CUSTOMER to navigate to store products', () => {
-      const result = gateFor('CUSTOMER', '/demo-store/product/shoes');
-      expect(result.gated).toBe(false);
-      expect(result.redirectPath).toBe(null);
+    it('allows CUSTOMER to navigate to store products and cart', () => {
+      expect(gateFor('CUSTOMER', '/demo-store/product/shoes')).toEqual({
+        gated: false,
+        redirectPath: null,
+      });
+      expect(gateFor('CUSTOMER', '/cart')).toEqual({
+        gated: false,
+        redirectPath: null,
+      });
     });
 
     it('gates CUSTOMER attempting to navigate to admin', () => {

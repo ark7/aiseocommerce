@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
+import { resolveTurnstileConfig } from '@/lib/turnstile';
 import { RegisterForm } from '@/components/RegisterForm';
 import Link from 'next/link';
 
@@ -26,9 +27,8 @@ export default async function RegisterPage({
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };
 
-  const siteKey = effectiveStore.settings?.turnstileEnabled
-    ? (effectiveStore.settings?.turnstileSiteKey ?? undefined)
-    : undefined;
+  const turnstileConfig = resolveTurnstileConfig(effectiveStore.settings);
+  const siteKey = turnstileConfig.siteKey ?? undefined;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
