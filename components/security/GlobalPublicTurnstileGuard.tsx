@@ -17,11 +17,29 @@ const INLINE_SHIELD_PATHS = new Set([
   '/forgot-password',
 ]);
 
+const SEO_OR_PREVIEW_BOT_REGEX =
+  /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|applebot|twitterbot|facebookexternalhit|linkedinbot|whatsapp|telegrambot|discordbot|pinterest|lighthouse|chrome-lighthouse|pagespeed|gtmetrix|ptst/i;
+
+const DEFERRED_ACTIVATION_EVENTS = [
+  'scroll',
+  'pointerdown',
+  'mousemove',
+  'touchstart',
+  'keydown',
+] as const;
+
+export const TURNSTILE_DEFERRED_IDLE_MS = 3500;
+
+export function isSearchEngineOrPreviewBot(userAgent?: string): boolean {
+  if (!userAgent) return false;
+  return SEO_OR_PREVIEW_BOT_REGEX.test(userAgent);
+}
+
 /**
  * Global Cloudflare Turnstile protection for all publicly exposed pages.
- * Renders a lightweight non-blocking floating shield at bottom-left on public routes
- * that don't already render an inline shield, and auto-dismisses once verified
- * (persisting via the 2-hour HttpOnly `cf_turnstile_pass` cookie).
+ * Defers script/widget mounting until after first impression (first user interaction or idle timer)
+ * and skips rendering for SEO crawlers/link preview bots so Core Web Vitals (FCP/LCP/CLS) and
+ * search indexing on the homepage remain completely unblocked.
  */
 export default function GlobalPublicTurnstileGuard({
   siteKey,
@@ -31,6 +49,12 @@ export default function GlobalPublicTurnstileGuard({
   const pathname = usePathname() || '/';
   const [verified, setVerified] = useState<boolean>(Boolean(initiallyVerified));
   const [dismissed, setDismissed] = useState<boolean>(Boolean(initiallyVerified));
+  const [readyToMount, setReadyToMount] = useState<boolean>(false);
+
+  const isInternalAdminRoute =
+    pathname.startsWith('/admin') || pathname.startsWith('/super-admin');
+  const hasDedicatedInlineShield =
+    INLINE_SHIELD_PATHS.has(pathname) || pathname.startsWith('/product/');
 
   useEffect(() => {
     if (initiallyVerified) {
@@ -40,6 +64,39 @@ export default function GlobalPublicTurnstileGuard({
   }, [initiallyVerified]);
 
   useEffect(() => {
+    if (!siteKey || dismissed || isInternalAdminRoute || hasDedicatedInlineShield) {
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && isSearchEngineOrPreviewBot(navigator.userAgent)) {
+      return;
+    }
+
+    let cancelled = false;
+    let activated = false;
+
+    const activate = () => {
+      if (cancelled || activated) return;
+      activated = true;
+      setReadyToMount(true);
+    };
+
+    for (const eventName of DEFERRED_ACTIVATION_EVENTS) {
+      window.addEventListener(eventName, activate, { once: true, passive: true });
+    }
+
+    const idleTimer = setTimeout(activate, TURNSTILE_DEFERRED_IDLE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(idleTimer);
+      for (const eventName of DEFERRED_ACTIVATION_EVENTS) {
+        window.removeEventListener(eventName, activate);
+      }
+    };
+  }, [siteKey, dismissed, isInternalAdminRoute, hasDedicatedInlineShield]);
+
+  useEffect(() => {
     if (!verified || dismissed) return;
     const timer = setTimeout(() => {
       setDismissed(true);
@@ -47,14 +104,9 @@ export default function GlobalPublicTurnstileGuard({
     return () => clearTimeout(timer);
   }, [verified, dismissed]);
 
-  if (!siteKey || dismissed) {
+  if (!siteKey || dismissed || !readyToMount) {
     return null;
   }
-
-  const isInternalAdminRoute =
-    pathname.startsWith('/admin') || pathname.startsWith('/super-admin');
-  const hasDedicatedInlineShield =
-    INLINE_SHIELD_PATHS.has(pathname) || pathname.startsWith('/product/');
 
   if (isInternalAdminRoute || hasDedicatedInlineShield) {
     return null;
@@ -63,6 +115,8 @@ export default function GlobalPublicTurnstileGuard({
   return (
     <div
       data-testid="global-public-turnstile-guard"
+      role="complementary"
+      aria-live="off"
       className="fixed bottom-4 left-4 z-40 max-w-sm shadow-lg rounded-xl"
     >
       <TurnstileStorefrontShield

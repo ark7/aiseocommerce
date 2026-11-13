@@ -60,6 +60,15 @@ export default function TurnstileStorefrontShield({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (
+      typeof navigator !== 'undefined' &&
+      /googlebot|bingbot|duckduckbot|applebot|lighthouse|chrome-lighthouse|pagespeed/i.test(
+        navigator.userAgent
+      )
+    ) {
+      return;
+    }
+
     if (!siteKey) {
       setVerified(true);
       onVerifiedRef.current?.(true);
