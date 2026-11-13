@@ -509,8 +509,8 @@ export const ADMIN_GUIDE_CHAPTERS: GuideChapter[] = [
         desc: 'Atur rekening bank manual toko (BCA, Mandiri, BRI, BNI) dan unggah QRIS statis toko. Konfigurasikan kredensial Midtrans Snap jika menggunakan payment gateway.',
       },
       {
-        title: '5. Tab Integrasi Pixel & Keamanan',
-        desc: 'Pasang ID Meta Pixel, Google Analytics (GA4), TikTok Pixel, dan Cloudflare Turnstile Site Key untuk mencegah bot spam.',
+        title: '5. Tab Integrasi Pixel & Keamanan (Cloudflare Turnstile Global)',
+        desc: 'Pasang ID Meta Pixel, Google Analytics (GA4), TikTok Pixel, serta Cloudflare Turnstile (Widget Mode Managed dari dash.cloudflare.com) dengan memasukkan Site Key & Secret Key lalu mencentang aktivasi. Proteksi langsung aktif di seluruh halaman & API publik dengan cookie sesi 2 jam (cf_turnstile_pass) agar pembeli nyaman menjelajah tanpa CAPTCHA berulang.',
       },
       {
         title: '6. Tab Asisten AI (BYOK)',
@@ -529,6 +529,7 @@ export const ADMIN_GUIDE_CHAPTERS: GuideChapter[] = [
       'Gunakan fitur "Cek DNS Live" di tab Email untuk memastikan reputasi domain toko Anda aman dari indikasi spam saat mengirim nota ke pembeli.',
       'Di tab Tema, aktifkan Dark Mode untuk menguji kenyamanan tampilan toko di malam hari.',
       'Kunci API AI (Gemini/OpenAI) yang Anda simpan di Tab Asisten AI terenkripsi aman dan tidak pernah dikirimkan ke peramban pelanggan di storefront publik.',
+      'Saat membuat widget Cloudflare Turnstile di dash.cloudflare.com, pilih Widget Mode "Managed" agar pengunjung asli terverifikasi mulus di latar belakang.',
     ],
     warnings: [
       'Jangan membagikan API Key (Midtrans, Biteship, Gemini, SMTP) kepada pihak luar demi keamanan transaksi dan saldo toko Anda.',
@@ -538,6 +539,10 @@ export const ADMIN_GUIDE_CHAPTERS: GuideChapter[] = [
       {
         q: 'Apakah perubahan logo dan warna toko membutuhkan restart server?',
         a: 'Tidak. Seluruh perubahan tema, font, logo, dan pengaturan tersimpan di database dan langsung terupdate seketika di seluruh halaman toko.',
+      },
+      {
+        q: 'Bagaimana cara mengaktifkan Cloudflare Turnstile di semua halaman publik?',
+        a: 'Buka menu Pengaturan -> tab 🛡️ Pixel & Keamanan -> gulir ke panel Cloudflare Turnstile. Buat widget mode Managed di dash.cloudflare.com untuk domain toko Anda, salin Site Key & Secret Key ke formulir, centang kotak aktivasi, lalu klik Simpan Turnstile. Sistem otomatis melindungi seluruh halaman publik (Beranda, Katalog, Detail Produk, Kategori, Artikel, LP, Auth) & API publik dengan sesi 2 jam.',
       },
     ],
     docAnchor: 'bab-12-menu-pengaturan-toko-master-settings---9-kategori',

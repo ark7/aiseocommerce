@@ -277,7 +277,15 @@ Menu Pengaturan ([`/admin/settings`](file:///home/ngabsenid/aiseocommerce/aiseoc
 
 ### 5. Tab Pixel & Keamanan
 * Pasang kode pelacak iklan: **Meta / Facebook Pixel ID**, **Google Analytics 4 (GA4) Measurement ID**, dan **TikTok Pixel ID**.
-* Pasang **Cloudflare Turnstile Site Key** untuk melindungi keranjang belanja dari serangan bot spam.
+* **Panduan Konfigurasi Cloudflare Turnstile (Proteksi Anti-Bot & DDoS Seluruh Path Publik):**
+  1. Login ke [Cloudflare Dashboard](https://dash.cloudflare.com), pilih menu **Turnstile**, lalu klik **Add widget**.
+  2. Beri nama widget dan masukkan hostname domain toko Anda (contoh: `demo.larismanis.online` atau domain kustom Anda) di bagian **Add Hostnames**.
+  3. Pilih **Widget Mode: Managed (Recommended)** agar pembeli asli diverifikasi mulus di latar belakang, lalu klik **Create**.
+  4. Salin **Site Key** (`0x4...`) dan **Secret Key** (`0x4...`), masuk ke menu **Pengaturan -> 🛡️ Pixel & Keamanan** di Admin Panel, tempelkan kedua kunci di panel **Cloudflare Turnstile (Anti-Bot / CAPTCHA)**, centang kotak **Aktifkan proteksi bot Cloudflare Turnstile di seluruh path publik**, lalu klik **Simpan Turnstile**.
+  5. **Cakupan Proteksi Global & Kenyamanan Pembeli:**
+     * **Halaman Publik:** Beranda (`/`), Katalog (`/products`), Detail Produk (`/product/*`), Kategori (`/categories`, `/category/*`), Artikel (`/articles`, `/articles/*`), Penawaran (`/penawaran`), Landing Page (`/lp/*`), Login (`/login`), Registrasi (`/register`), Lupa Password (`/forgot-password`), Reset Password (`/reset-password`), Syarat & Privasi.
+     * **API Publik:** Verifikasi Turnstile (`/api/security/turnstile-verify`), Checkout (`/api/orders`), Cek Ongkir & Area Biteship (`/api/shipping/rates`, `/api/shipping/areas`), Pemulihan Password (`/api/auth/forgot-password`, `/api/auth/reset-password`), serta endpoint katalog/kategori/artikel/voucher.
+     * Pembeli cukup lolos 1x dan akan menerima cookie sesi `cf_turnstile_pass` (berlaku 2 jam) sehingga dapat menjelajahi produk dengan nyaman tanpa login terlebih dahulu, sementara bot/scraper otomatis terbatasi rate-limit ketat.
 
 ### 6. Tab Legalitas & Kebijakan
 * Menuliskan halaman Syarat & Ketentuan Layanan, Kebijakan Privasi, Kebijakan Pengembalian Barang (Retur), dan mengaktifkan banner persetujuan Cookie.
