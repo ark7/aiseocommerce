@@ -6,14 +6,26 @@ import { sendEmail } from '@/lib/emailService';
 import { randomBytes } from 'crypto';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { allow } from '@/lib/rateLimit';
+import { getIPAddress } from '@/lib/ip';
+import { verifyRequestTurnstileOrPass } from '@/lib/turnstile';
 
 const ForgotPasswordSchema = z.object({
   email: z.string().email('Format email tidak valid'),
   storeDomain: z.string().optional(),
+  turnstileToken: z.string().optional(),
 });
 
 export async function POST(request: Request) {
   try {
+    const ip = getIPAddress(request);
+    if (!allow(`forgot_pw:${ip}`, 5)) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan reset kata sandi. Silakan coba lagi dalam 1 menit.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const parsed = ForgotPasswordSchema.safeParse(body);
 
@@ -52,6 +64,15 @@ export async function POST(request: Request) {
       if (targetUser?.store) {
         store = targetUser.store;
       }
+    }
+
+    const turnstileCheck = await verifyRequestTurnstileOrPass(
+      request,
+      (store as { settings?: { turnstileEnabled?: boolean | null; turnstileSiteKey?: string | null; turnstileSecretKey?: string | null } | null } | null)?.settings,
+      parsed.data.turnstileToken
+    );
+    if (!turnstileCheck.allowed) {
+      return NextResponse.json({ error: turnstileCheck.error }, { status: turnstileCheck.status });
     }
 
     // 2. Jika user tidak ditemukan, kembalikan pesan aman (mencegah enumerasi akun)

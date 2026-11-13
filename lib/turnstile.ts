@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { logger } from '@/lib/logger';
+import { getIPAddress } from '@/lib/ip';
 
 export const TURNSTILE_PASS_COOKIE = 'cf_turnstile_pass';
 export const TURNSTILE_PASS_MAX_AGE = 60 * 60 * 2; // 2 hours (seconds)
@@ -165,4 +166,77 @@ export function isTurnstileRequired(enabled: boolean, secret: string | null | un
   }
 
   return { required: true, error: null };
+}
+
+/**
+ * Extracts a named cookie from either a NextRequest-like `.cookies` map
+ * or a standard Web `Request` Cookie header.
+ */
+export function extractCookieValue(request: Request, cookieName: string): string | null {
+  try {
+    const reqWithCookies = request as {
+      cookies?: { get?: (name: string) => { value?: string } | undefined };
+    };
+    const nextCookieVal = reqWithCookies?.cookies?.get?.(cookieName)?.value;
+    if (nextCookieVal) return nextCookieVal;
+
+    const rawHeader = request.headers?.get?.('cookie') || '';
+    if (!rawHeader) return null;
+
+    const prefix = `${cookieName}=`;
+    for (const part of rawHeader.split(';')) {
+      const trimmed = part.trim();
+      if (trimmed.startsWith(prefix)) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      }
+    }
+  } catch {
+    // ignore malformed cookie header
+  }
+  return null;
+}
+
+/**
+ * Enforces Cloudflare Turnstile verification for public API requests when enabled,
+ * accepting either a valid signed `cf_turnstile_pass` cookie or a one-time body token.
+ */
+export async function verifyRequestTurnstileOrPass(
+  request: Request,
+  settings?: {
+    turnstileEnabled?: boolean | null;
+    turnstileSiteKey?: string | null;
+    turnstileSecretKey?: string | null;
+  } | null,
+  bodyToken?: string | null
+): Promise<{ allowed: boolean; status: number; error: string | null }> {
+  const config = resolveTurnstileConfig(settings);
+  if (!config.enabled) {
+    return { allowed: true, status: 200, error: null };
+  }
+
+  const { error: configError } = isTurnstileRequired(config.enabled, config.secretKey);
+  if (configError) {
+    return { allowed: false, status: 500, error: configError };
+  }
+
+  const ip = getIPAddress(request);
+  const passCookie = extractCookieValue(request, TURNSTILE_PASS_COOKIE);
+  if (verifyTurnstilePassToken(passCookie, ip)) {
+    return { allowed: true, status: 200, error: null };
+  }
+
+  const cleanToken = typeof bodyToken === 'string' ? bodyToken.trim() : '';
+  if (cleanToken) {
+    const isValid = await verifyTurnstile(config.secretKey || '', cleanToken, ip);
+    if (isValid) {
+      return { allowed: true, status: 200, error: null };
+    }
+  }
+
+  return {
+    allowed: false,
+    status: 400,
+    error:
+      'Verifikasi keamanan Cloudflare Turnstile diperlukan. Silakan muat ulang halaman dan selesaikan verifikasi anti-bot.',
+  };
 }

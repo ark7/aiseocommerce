@@ -1,5 +1,11 @@
+import { cookies } from 'next/headers';
 import { getActiveStore } from '@/lib/store';
 import { ForgotPasswordForm } from '@/components/ForgotPasswordForm';
+import {
+  resolveTurnstileConfig,
+  TURNSTILE_PASS_COOKIE,
+  verifyTurnstilePassToken,
+} from '@/lib/turnstile';
 import Link from 'next/link';
 
 export default async function ForgotPasswordPage({
@@ -23,6 +29,17 @@ export default async function ForgotPasswordPage({
     domain: 'demo.larismanis.online',
   };
 
+  const turnstileConfig = resolveTurnstileConfig(store?.settings);
+  let isTurnstileVerified = false;
+  if (turnstileConfig.enabled && turnstileConfig.siteKey) {
+    try {
+      const passCookie = cookies().get(TURNSTILE_PASS_COOKIE)?.value;
+      isTurnstileVerified = verifyTurnstilePassToken(passCookie);
+    } catch {
+      // ignore outside request context
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -40,6 +57,8 @@ export default async function ForgotPasswordPage({
           <ForgotPasswordForm
             storeDomain={effectiveStore.domain}
             storeName={effectiveStore.name}
+            turnstileSiteKey={turnstileConfig.siteKey}
+            initiallyVerified={isTurnstileVerified}
           />
         </div>
 
