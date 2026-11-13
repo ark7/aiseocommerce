@@ -60,30 +60,11 @@ export function requiredTierFor(pathname: string): Tier {
 
 /**
  * Helper to decide if a link should be gated (redirect to login) based on current role.
+ * Storefront browsing (home, catalog, product details, categories, articles) is open
+ * to GUEST visitors so shoppers can browse comfortably; login is required at checkout
+ * (/cart, /orders) and staff/admin routes.
  */
 export function gateFor(role: Tier, targetPath: string): { gated: boolean; redirectPath: string | null } {
-  const isPublicAuthPath =
-    targetPath === '/' ||
-    targetPath.startsWith('/login') ||
-    targetPath.startsWith('/register') ||
-    targetPath.startsWith('/api/auth');
-
-  if (isPublicAuthPath) {
-    return { gated: false, redirectPath: null };
-  }
-
-  // GUEST cannot access internal store/product/category pages; must login/signup
-  if (role === 'GUEST') {
-    const sanitizedFrom = targetPath.startsWith('/') && !targetPath.startsWith('//')
-      ? targetPath
-      : '/';
-
-    return {
-      gated: true,
-      redirectPath: `/login?from=${encodeURIComponent(sanitizedFrom)}`
-    };
-  }
-
   const required = requiredTierFor(targetPath);
 
   if (meetsTier(role, required)) {
