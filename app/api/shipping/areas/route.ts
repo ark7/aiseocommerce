@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
 import { searchBiteshipAreas } from '@/lib/biteship';
 import { prisma } from '@/lib/prisma';
+import { allow } from '@/lib/rateLimit';
+import { getIPAddress } from '@/lib/ip';
 
 export async function GET(request: Request) {
   try {
+    const ip = getIPAddress(request);
+    if (!allow(`shipping_areas:${ip}`, 30)) {
+      return NextResponse.json(
+        { error: 'Terlalu banyak permintaan pencarian wilayah. Silakan coba lagi sebentar.' },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || searchParams.get('input') || '';
     const storeId = searchParams.get('storeId');

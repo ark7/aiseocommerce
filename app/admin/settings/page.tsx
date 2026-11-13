@@ -2206,11 +2206,60 @@ function AdminSettingsContent() {
 
           {/* Cloudflare Turnstile */}
           <form onSubmit={saveTurnstile} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
-            <div className="border-b border-gray-100 pb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Cloudflare Turnstile (Anti-Bot / CAPTCHA)</h2>
-              <p className="text-sm text-gray-500">
-                Melindungi form checkout dan pendaftaran akun dari serangan bot otomatis.
-              </p>
+            <div className="border-b border-gray-100 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Cloudflare Turnstile (Anti-Bot / CAPTCHA)</h2>
+                <p className="text-sm text-gray-500">
+                  Melindungi seluruh halaman publik, form login/register/lupa password, cek ongkir, dan katalog dari bot scraper serta DDoS ringan.
+                </p>
+              </div>
+              {turnstileForm.turnstileEnabled && turnstileForm.turnstileSiteKey.trim() && turnstileForm.turnstileSecretKey.trim() ? (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                  🟢 PROTEKSI AKTIF DI SEMUA PATH PUBLIK
+                </span>
+              ) : turnstileForm.turnstileEnabled ? (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 whitespace-nowrap">
+                  🟡 MENUNGGU SITE KEY &amp; SECRET KEY
+                </span>
+              ) : (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200 whitespace-nowrap">
+                  ⚪ BELUM DIAKTIFKAN
+                </span>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3 text-sm text-slate-700">
+              <div className="font-semibold text-slate-900 flex items-center gap-2">
+                <span>📖</span>
+                <span>Panduan Cara Mendapatkan &amp; Mengaktifkan Cloudflare Turnstile Key</span>
+              </div>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs sm:text-sm text-slate-600">
+                <li>
+                  Masuk ke{' '}
+                  <a
+                    href="https://dash.cloudflare.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-600 font-medium underline hover:text-indigo-800"
+                  >
+                    Cloudflare Dashboard
+                  </a>
+                  , pilih menu <strong>Turnstile</strong> di sidebar kiri, lalu klik <strong>Add widget</strong>.
+                </li>
+                <li>
+                  Isi nama widget (misal: <em>Proteksi Toko Online</em>) dan tambahkan domain toko Anda di{' '}
+                  <strong>Add Hostnames</strong> (misal: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">demo.larismanis.online</code> atau domain kustom toko Anda).
+                </li>
+                <li>
+                  Pilih Widget Mode <strong>Managed (Recommended)</strong> agar pengunjung manusia terverifikasi otomatis tanpa puzzle mengganggu, lalu klik <strong>Create</strong>.
+                </li>
+                <li>
+                  Salin <strong>Site Key</strong> (diawali <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">0x4...</code>) dan <strong>Secret Key</strong> ke dua kolom di bawah ini, centang kotak aktivasi, lalu klik <strong>Simpan Turnstile</strong>.
+                </li>
+              </ol>
+              <div className="pt-2 border-t border-slate-200 text-xs text-slate-600 leading-relaxed">
+                <strong>Cakupan Proteksi Global &amp; Kenyamanan Pembeli:</strong> Setelah aktif, sistem otomatis memasang pelindung di seluruh path publik (Beranda <code className="bg-white px-1 rounded">/</code>, Katalog <code className="bg-white px-1 rounded">/products</code>, Detail Produk <code className="bg-white px-1 rounded">/product/*</code>, Kategori, Artikel, Penawaran/LP, Login/Register/Lupa Password, serta API Cek Ongkir &amp; Checkout). Pembeli cukup lolos verifikasi 1x dan mendapatkan cookie sesi terenkripsi <code className="bg-white px-1 rounded">cf_turnstile_pass</code> berlaku <strong>2 jam</strong> agar bebas menjelajah tanpa gangguan ulang.
+              </div>
             </div>
 
             <div className="flex items-center space-x-3">
@@ -2222,7 +2271,7 @@ function AdminSettingsContent() {
                 className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
               <label htmlFor="turnstileEnabled" className="text-sm font-medium text-gray-700">
-                Aktifkan proteksi bot Cloudflare Turnstile
+                Aktifkan proteksi bot Cloudflare Turnstile di seluruh path publik
               </label>
             </div>
 
@@ -2236,6 +2285,7 @@ function AdminSettingsContent() {
                   placeholder="0x4AAAAAA..."
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
+                <p className="mt-1 text-xs text-gray-400">Kunci publik yang digunakan widget Turnstile di browser pengunjung.</p>
               </div>
 
               <div>
@@ -2247,6 +2297,7 @@ function AdminSettingsContent() {
                   placeholder="0x4AAAAAA..."
                   className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
+                <p className="mt-1 text-xs text-gray-400">Kunci rahasia server-side untuk memvalidasi token anti-bot ke Cloudflare.</p>
               </div>
             </div>
 
