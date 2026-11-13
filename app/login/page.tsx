@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
+import { resolveTurnstileConfig } from '@/lib/turnstile';
 import { LoginForm } from '@/components/LoginForm';
 import { redirectPathFromUrl } from '@/lib/redirect';
 import Link from 'next/link';
@@ -33,6 +34,7 @@ export default async function LoginPage({
     effectiveStore?.domain === 'demo-store.local' ||
     effectiveStore?.domain === 'demo.larismanis.online'
   );
+  const turnstileConfig = resolveTurnstileConfig(effectiveStore.settings);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -54,7 +56,7 @@ export default async function LoginPage({
             storeId={effectiveStore.id}
             storeDomain={effectiveStore.domain}
             fromPath={fromPath || null}
-            siteKey={effectiveStore.settings?.turnstileEnabled ? (effectiveStore.settings?.turnstileSiteKey ?? undefined) : undefined}
+            siteKey={turnstileConfig.siteKey ?? undefined}
             isDemo={isDemo}
           />
 

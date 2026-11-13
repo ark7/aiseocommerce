@@ -1,13 +1,20 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { getCatalogDisplayPricing } from '@/lib/pricing';
+import {
+  resolveTurnstileConfig,
+  TURNSTILE_PASS_COOKIE,
+  verifyTurnstilePassToken,
+} from '@/lib/turnstile';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import Pagination from '@/components/common/Pagination';
+import TurnstileStorefrontShield from '@/components/security/TurnstileStorefrontShield';
 
 interface ProductsPageProps {
   searchParams: {
@@ -38,12 +45,22 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const store = await getActiveStore();
   if (!store) notFound();
 
-  const search = searchParams.search?.trim() || '';
+  const search = (searchParams.search?.trim() || '').slice(0, 100);
   const categoryId = searchParams.categoryId || '';
   const startDate = searchParams.startDate || '';
   const endDate = searchParams.endDate || '';
   const page = Math.max(1, Number(searchParams.page) || 1);
   const pageSize = store.settings?.defaultPageSize ?? 10;
+
+  let isTurnstileVerified = false;
+  try {
+    const cookieStore = cookies();
+    const passCookie = cookieStore.get(TURNSTILE_PASS_COOKIE)?.value;
+    isTurnstileVerified = verifyTurnstilePassToken(passCookie);
+  } catch {
+    isTurnstileVerified = false;
+  }
+  const turnstileConfig = resolveTurnstileConfig(store.settings);
 
   const where: Prisma.ProductWhereInput = { storeId: store.id, isPublished: true, sandboxEnabled: false };
   if (categoryId) where.categoryId = categoryId;
@@ -152,6 +169,17 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             Cari
           </button>
         </form>
+
+        {turnstileConfig.siteKey && (
+          <div className="mb-4">
+            <TurnstileStorefrontShield
+              siteKey={turnstileConfig.siteKey}
+              initiallyVerified={isTurnstileVerified}
+              storeDomain={store.domain}
+              context="listing"
+            />
+          </div>
+        )}
 
         {/* Date Filter Quick Links */}
         <div className="mb-6 flex flex-wrap items-center gap-1.5 text-xs">

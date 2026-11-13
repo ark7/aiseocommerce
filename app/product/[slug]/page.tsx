@@ -1,7 +1,13 @@
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { generateProductSEO, generateProductStructuredData, generateBreadcrumbStructuredData } from '@/lib/seo';
+import {
+  resolveTurnstileConfig,
+  TURNSTILE_PASS_COOKIE,
+  verifyTurnstilePassToken,
+} from '@/lib/turnstile';
 import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -158,6 +164,16 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const { store, product, relatedProducts, productStructuredData, breadcrumbStructuredData, formattedPrice, formattedDiscountPrice, unitPrice, saleLeft } = data;
 
+  let isTurnstileVerified = false;
+  try {
+    const cookieStore = cookies();
+    const passCookie = cookieStore.get(TURNSTILE_PASS_COOKIE)?.value;
+    isTurnstileVerified = verifyTurnstilePassToken(passCookie);
+  } catch {
+    isTurnstileVerified = false;
+  }
+  const turnstileConfig = resolveTurnstileConfig(store.settings);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: productStructuredData }} />
@@ -280,6 +296,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 minOrderQty={(product as any).minOrderQty ?? 1}
                 priceTiers={(product as any).priceTiers ?? []}
                 variants={product.variants}
+                turnstileSiteKey={turnstileConfig.siteKey}
+                turnstileVerified={isTurnstileVerified}
               />
               <ProductMarketplaceLinks
                 shopeeUrl={product.shopeeUrl}

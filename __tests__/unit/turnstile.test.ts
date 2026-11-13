@@ -1,4 +1,19 @@
-import { verifyTurnstile, isTurnstileRequired } from '@/lib/turnstile';
+import {
+  verifyTurnstile,
+  isTurnstileRequired,
+  resolveTurnstileConfig,
+  createTurnstilePassToken,
+  verifyTurnstilePassToken,
+} from '@/lib/turnstile';
+import {
+  isMaliciousScannerRequest,
+  checkCatalogAndSearchRateLimit,
+} from '@/middleware';
+
+jest.mock('@/lib/prisma', () => ({ prisma: {} }));
+jest.mock('@/lib/logger', () => ({
+  logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
+}));
 
 describe('Turnstile Verification & Requirement', () => {
   const originalFetch = global.fetch;
@@ -72,6 +87,108 @@ describe('Turnstile Verification & Requirement', () => {
 
       const result = await verifyTurnstile('secret-key', 'any-token', '127.0.0.1');
       expect(result).toBe(false);
+    });
+  });
+
+  describe('resolveTurnstileConfig', () => {
+    const origSite = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+    const origSecret = process.env.TURNSTILE_SECRET_KEY;
+
+    afterEach(() => {
+      if (origSite === undefined) delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+      else process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = origSite;
+
+      if (origSecret === undefined) delete process.env.TURNSTILE_SECRET_KEY;
+      else process.env.TURNSTILE_SECRET_KEY = origSecret;
+    });
+
+    it('returns disabled when store settings disable turnstile even if keys exist', () => {
+      const cfg = resolveTurnstileConfig({
+        turnstileEnabled: false,
+        turnstileSiteKey: '0xSITE',
+        turnstileSecretKey: '0xSECRET',
+      });
+      expect(cfg.enabled).toBe(false);
+      expect(cfg.siteKey).toBeNull();
+    });
+
+    it('falls back to environment variables when settings keys are null and enabled flag is omitted', () => {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0xENVSITE';
+      process.env.TURNSTILE_SECRET_KEY = '0xENVSECRET';
+
+      const cfg = resolveTurnstileConfig(undefined);
+      expect(cfg).toEqual({
+        enabled: true,
+        siteKey: '0xENVSITE',
+        secretKey: '0xENVSECRET',
+      });
+    });
+
+    it('prefers trimmed store settings over env variables when enabled', () => {
+      process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0xENVSITE';
+      const cfg = resolveTurnstileConfig({
+        turnstileEnabled: true,
+        turnstileSiteKey: '  0xSTORESITE  ',
+        turnstileSecretKey: '  0xSTORESECRET ',
+      });
+      expect(cfg).toEqual({
+        enabled: true,
+        siteKey: '0xSTORESITE',
+        secretKey: '0xSTORESECRET',
+      });
+    });
+  });
+
+  describe('Signed Turnstile Pass Cookie Token', () => {
+    it('creates and verifies a valid token for the same IP before expiry', () => {
+      const now = 1_700_000_000_000;
+      const token = createTurnstilePassToken('203.0.113.10', now);
+
+      expect(verifyTurnstilePassToken(token, '203.0.113.10', now + 60_000)).toBe(true);
+      expect(verifyTurnstilePassToken(token, undefined, now + 60_000)).toBe(true);
+    });
+
+    it('rejects expired, tampered, or mismatched-IP tokens', () => {
+      const now = 1_700_000_000_000;
+      const token = createTurnstilePassToken('203.0.113.10', now);
+
+      expect(verifyTurnstilePassToken(token, '198.51.100.7', now + 60_000)).toBe(false);
+      expect(verifyTurnstilePassToken(token, '203.0.113.10', now + 3 * 60 * 60 * 1000)).toBe(false);
+      expect(verifyTurnstilePassToken(`${token}tamper`, '203.0.113.10', now + 1_000)).toBe(false);
+      expect(verifyTurnstilePassToken(null, '203.0.113.10', now)).toBe(false);
+    });
+  });
+
+  describe('Anti-DDoS & Scanner Middleware Helpers', () => {
+    it('flags malicious scanners and sensitive probes while allowing Googlebot and real browsers', () => {
+      expect(isMaliciousScannerRequest('/products', 'sqlmap/1.7.2')).toBe(true);
+      expect(isMaliciousScannerRequest('/.env', 'Mozilla/5.0')).toBe(true);
+      expect(isMaliciousScannerRequest('/wp-config.php', 'curl/8.0')).toBe(true);
+
+      expect(
+        isMaliciousScannerRequest(
+          '/product/cetak-id-card-pvc-custom',
+          'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+        )
+      ).toBe(false);
+      expect(
+        isMaliciousScannerRequest('/products', 'WhatsApp/2.23.20 A')
+      ).toBe(false);
+    });
+
+    it('caps unverified search bursts at 15 req/min while verified Turnstile sessions get 60 req/min', () => {
+      const now = 1_700_000_000_000;
+      for (let i = 0; i < 15; i++) {
+        expect(checkCatalogAndSearchRateLimit('192.0.2.50', '/products', 'kartu', false, now).allowed).toBe(true);
+      }
+      const blocked = checkCatalogAndSearchRateLimit('192.0.2.50', '/products', 'kartu', false, now);
+      expect(blocked.allowed).toBe(false);
+      expect(blocked.retryAfterSec).toBeGreaterThan(0);
+
+      for (let i = 0; i < 60; i++) {
+        expect(checkCatalogAndSearchRateLimit('192.0.2.51', '/products', 'kartu', true, now).allowed).toBe(true);
+      }
+      expect(checkCatalogAndSearchRateLimit('192.0.2.51', '/products', 'kartu', true, now).allowed).toBe(false);
     });
   });
 });

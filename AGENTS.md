@@ -72,3 +72,35 @@ Perintah ini menjalankan validasi keamanan database (`db:safety`), sinkronisasi 
 | `npm run build` | Verifikasi build produksi Next.js |
 | `npm run dev` | Jalankan server pengembangan lokal (port 3000) |
 
+---
+
+## 4. Mekanisme Deployment Produksi (IDCloudHost VPS)
+
+> [!CAUTION]
+> **Dilarang keras menyimpan password atau private SSH key** di dalam `AGENTS.md`, `git`, atau file dokumentasi. Gunakan hanya alias SSH public-key lokal dan perintah Docker yang aman di bawah ini.
+
+### A. Akses SSH & Konfigurasi Lokal
+- **Host Alias:** `larismanis-prod` (terkonfigurasi di `~/.ssh/config` lokal mengarah ke `103.193.178.174`, user `adpagency`, menggunakan kunci publik `~/.ssh/id_ed25519` dengan `IdentitiesOnly yes`).
+- **Direktori Aplikasi VPS:** `/home/adpagency/aiseocommerce`
+- **Website Produksi:** `https://demo.larismanis.online` (Next.js SaaS) & `https://larismanis.online` (Marketing WordPress)
+
+### B. Alur Deployment Standar (`feat/*` -> `main` -> VPS `web` only)
+1. **Validasi Lokal:** Jalankan `npm run release:check` dan `npm run build` (pastikan `npm run dev` sedang berhenti terlebih dahulu).
+2. **Merge & Push:** Commit perubahan kode ke branch fitur, merge `--no-edit` ke `main`, lalu push ke `origin/main` (jangan masukkan file lokal untracked seperti `.agents/` atau `skills-lock.json`).
+3. **Rebuild Container `web` Saja di VPS (Detached):**
+   Jalankan rebuild hanya untuk service `web` menggunakan `nohup` agar proses `npm ci` + `next build` di VPS tidak terputus bila koneksi SSH idle-timeout, serta agar `marketing-wordpress` & `marketing-mariadb` tidak ikut di-restart:
+   ```bash
+   ssh -o BatchMode=yes larismanis-prod "cd ~/aiseocommerce && git pull origin main && nohup sudo docker compose up -d --build --force-recreate web > ~/deploy-web.log 2>&1 < /dev/null &"
+   ```
+4. **Verifikasi Status Container & Endpoint Live:**
+   - Cek status container (`aiseocommerce-web` harus `Up ... (healthy)`):
+     ```bash
+     ssh -o BatchMode=yes larismanis-prod "sudo docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}'"
+     ```
+   - Uji endpoint live:
+     ```bash
+     curl -fsS https://demo.larismanis.online/api/health
+     curl -s -o /dev/null -w "%{http_code}\n" https://demo.larismanis.online/products
+     ```
+
+
