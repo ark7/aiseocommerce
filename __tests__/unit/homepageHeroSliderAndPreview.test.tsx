@@ -221,4 +221,17 @@ describe('Homepage Hero Slider, Product Previews & SEO-Safe Turnstile', () => {
       expect(screen.queryByTestId('global-public-turnstile-guard')).not.toBeInTheDocument();
     });
   });
+
+  describe('Tailwind aspect-ratio utility preservation', () => {
+    it('preserves square and video aspectRatio tokens alongside @tailwindcss/aspect-ratio plugin', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const tailwindConfig = require('../../tailwind.config.js');
+      expect(tailwindConfig.theme?.extend?.aspectRatio).toEqual(
+        expect.objectContaining({
+          square: '1 / 1',
+          video: '16 / 9',
+        })
+      );
+    });
+  });
 });

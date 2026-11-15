@@ -179,7 +179,7 @@ export default function HeroSlider({
 
         {/* Sisi Kanan: Visual Banner Image / Showcase Card */}
         <div className="lg:col-span-5 relative">
-          <div className="relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-square w-full rounded-2xl overflow-hidden bg-gradient-to-tr from-gray-100 to-gray-200 border border-gray-200 shadow-md">
+          <div className="relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-square lg:aspect-[1/1] w-full rounded-2xl overflow-hidden bg-gradient-to-tr from-gray-100 to-gray-200 border border-gray-200 shadow-md">
             {hasValidImage ? (
               <Image
                 key={`${activeSlide.id}-${activeSlide.imageUrl}`}
