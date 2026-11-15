@@ -121,12 +121,16 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                     href={`/product/${product.slug}`}
                     className="group border rounded-lg p-3 hover:shadow-md transition bg-white block"
                   >
-                    <div className="aspect-square relative rounded bg-gray-100 overflow-hidden mb-2">
+                    <div
+                      style={{ aspectRatio: '1 / 1' }}
+                      className="aspect-square aspect-[1/1] w-full relative rounded bg-gray-100 overflow-hidden mb-2"
+                    >
                       {product.images[0] ? (
                         <Image
                           src={product.images[0].url}
                           alt={product.name}
                           fill
+                          unoptimized
                           className="object-cover group-hover:scale-105 transition-transform"
                         />
                       ) : (
