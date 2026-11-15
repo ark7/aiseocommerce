@@ -236,7 +236,10 @@ export default async function ArticlesListPage({ searchParams }: ArticlesListPag
                   href={`/articles/${article.slug}`}
                   className="group flex flex-col bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-lg transition-all"
                 >
-                  <div className="relative aspect-video w-full bg-gray-100 overflow-hidden">
+                  <div
+                    style={{ aspectRatio: '16 / 9' }}
+                    className="relative aspect-video aspect-[16/9] w-full bg-gray-100 overflow-hidden"
+                  >
                     {article.imageUrl ? (
                       <Image
                         src={article.imageUrl}

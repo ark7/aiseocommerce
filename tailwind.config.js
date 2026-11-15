@@ -8,6 +8,11 @@ module.exports = {
   ],
   theme: {
     extend: {
+      aspectRatio: {
+        auto: 'auto',
+        square: '1 / 1',
+        video: '16 / 9',
+      },
       colors: {
         primary: {
           50: '#eff6ff',

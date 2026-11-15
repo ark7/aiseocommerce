@@ -152,7 +152,10 @@ export default async function LandingPage() {
                   role={role}
                   className="group relative overflow-hidden rounded-2xl border border-gray-200 p-3.5 transition-all hover:shadow-lg hover:border-gray-300 bg-white block"
                 >
-                  <div className="aspect-square relative overflow-hidden rounded-xl bg-gray-100">
+                  <div
+                    style={{ aspectRatio: '1 / 1' }}
+                    className="aspect-square aspect-[1/1] w-full relative overflow-hidden rounded-xl bg-gray-100"
+                  >
                     <ProductPreviewThumb
                       imageUrl={product.images[0]?.url}
                       alt={product.images[0]?.altText || product.name}
@@ -242,7 +245,10 @@ export default async function LandingPage() {
                   role={role}
                   className="group flex flex-col rounded-2xl border border-gray-200 overflow-hidden bg-white hover:shadow-lg transition-all"
                 >
-                  <div className="aspect-[16/9] relative bg-gray-100 overflow-hidden">
+                  <div
+                    style={{ aspectRatio: '16 / 9' }}
+                    className="aspect-[16/9] w-full relative bg-gray-100 overflow-hidden"
+                  >
                     {article.imageUrl ? (
                       <Image
                         src={article.imageUrl}
