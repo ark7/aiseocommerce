@@ -371,7 +371,7 @@ function larismanis_render_leads_page() {
     <div class="wrap">
       <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
         <div>
-          <h1 style="margin:0 0 4px; font-weight:700;">📋 Data Pemesanan Lisensi &amp; Konsultasi (LarisManis.online)</h1>
+          <h1 style="margin:0 0 4px; font-weight:700;">📋 Data Pemesanan Lisensi Website (LarisManis.online)</h1>
           <p style="margin:0; color:#64748b;">Semua calon pembeli yang mengisi form di halaman utama masuk ke sini. Klik tombol <strong>💬 Chat WA</strong> pada baris pesanan untuk langsung menyapa calon klien.</p>
         </div>
         <div style="display:flex; gap:8px;">

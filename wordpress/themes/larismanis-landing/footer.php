@@ -42,7 +42,7 @@ $contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larism
         <ul>
           <li><a href="#fitur">Fitur Unggulan</a></li>
           <li><a href="#harga">Skema Harga</a></li>
-          <li><a href="#pesan">Form Pemesanan &amp; Konsultasi</a></li>
+          <li><a href="#pesan">Form Pemesanan Lisensi</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li><a href="mailto:<?php echo esc_attr($contact_email); ?>"><?php echo esc_html($contact_email); ?></a></li>
           <li><a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-leads')); ?>">Login CMS Admin</a></li>
