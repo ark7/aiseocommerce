@@ -106,7 +106,10 @@ PHP
 
 echo "[3/3] Verifying local WordPress response on http://127.0.0.1:8080/..."
 if command -v curl >/dev/null 2>&1; then
-  curl -fsS -H "Host: larismanis.online" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ | grep -q "larismanis-landing"
+  TMP_HTML="$(mktemp)"
+  curl -fsS -H "Host: larismanis.online" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ -o "${TMP_HTML}"
+  grep -q "larismanis-landing" "${TMP_HTML}"
+  rm -f "${TMP_HTML}"
 else
   ${DOCKER_CMD} exec "${CONTAINER_NAME}" php -r '
     $ctx = stream_context_create(["http" => ["header" => "Host: larismanis.online\r\nX-Forwarded-Proto: https\r\n"]]);
