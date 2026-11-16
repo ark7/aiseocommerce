@@ -12,7 +12,6 @@ if (!defined('ABSPATH')) {
 $demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
 $demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larismanis.online/login');
 $contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larismanis.online');
-$wa_url         = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin informasi lebih lanjut tentang layanan website toko online.');
 ?>
 
 <footer class="lm-footer" role="contentinfo">
@@ -39,13 +38,14 @@ $wa_url         = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingi
       </div>
 
       <div>
-        <h4>Navigasi &amp; Kontak</h4>
+        <h4>Navigasi &amp; Pendaftaran</h4>
         <ul>
           <li><a href="#fitur">Fitur Unggulan</a></li>
-          <li><a href="#harga">Paket Harga</a></li>
+          <li><a href="#harga">Skema Harga</a></li>
+          <li><a href="#pesan">Form Pemesanan &amp; Konsultasi</a></li>
           <li><a href="#faq">FAQ</a></li>
-          <li><a href="<?php echo esc_url($wa_url); ?>" target="_blank" rel="noopener">Chat WhatsApp Sales</a></li>
           <li><a href="mailto:<?php echo esc_attr($contact_email); ?>"><?php echo esc_html($contact_email); ?></a></li>
+          <li><a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-leads')); ?>">Login CMS Admin</a></li>
         </ul>
       </div>
     </div>

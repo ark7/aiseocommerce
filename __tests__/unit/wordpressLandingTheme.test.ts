@@ -5,7 +5,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
   const repoRoot = process.cwd();
   const themeDir = path.join(repoRoot, 'wordpress', 'themes', 'larismanis-landing');
 
-  it('contains all required WordPress theme files and deployment script', () => {
+  it('contains all required WordPress theme files, CMS module, and deployment script', () => {
     const requiredFiles = [
       'style.css',
       'functions.php',
@@ -13,6 +13,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
       'front-page.php',
       'index.php',
       'footer.php',
+      path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
     ];
 
@@ -23,27 +24,57 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
     expect(fs.existsSync(path.join(repoRoot, 'scripts', 'deploy-wp-landing.sh'))).toBe(true);
   });
 
-  it('defines valid WordPress theme metadata and responsive layout styles in style.css', () => {
+  it('defines valid WordPress theme metadata and responsive layout + order form styles in style.css', () => {
     const styleCss = fs.readFileSync(path.join(themeDir, 'style.css'), 'utf8');
     expect(styleCss).toContain('Theme Name: LarisManis.online Official Landing');
     expect(styleCss).toContain('Text Domain: larismanis-landing');
     expect(styleCss).toContain('.lm-header');
     expect(styleCss).toContain('.lm-mobile-drawer');
+    expect(styleCss).toContain('.lm-order-form-card');
     expect(styleCss).toContain('@media (min-width: 960px)');
   });
 
-  it('registers WP Customizer settings and SoftwareApplication SEO JSON-LD in functions.php', () => {
+  it('registers WP Customizer, JSON-LD SEO, CMS Leads (Klik to Chat WA), and Indonesian Pixel/Analytics in functions & cms-admin', () => {
     const functionsPhp = fs.readFileSync(path.join(themeDir, 'functions.php'), 'utf8');
+    const cmsAdminPhp = fs.readFileSync(path.join(themeDir, 'inc', 'cms-admin.php'), 'utf8');
+
+    expect(functionsPhp).toContain("require_once get_template_directory() . '/inc/cms-admin.php'");
     expect(functionsPhp).toContain('customize_register');
-    expect(functionsPhp).toContain('larismanis_wa_number');
     expect(functionsPhp).toContain('larismanis_demo_url');
     expect(functionsPhp).toContain('application/ld+json');
     expect(functionsPhp).toContain('SoftwareApplication');
+
+    // Public functions must NOT expose hardcoded WhatsApp numbers
+    expect(functionsPhp).not.toContain('6281288997711');
+    expect(functionsPhp).not.toContain('wa.me/');
+
+    // CMS Admin Leads + Click-to-Chat WA
+    expect(cmsAdminPhp).toContain('larismanis_submit_lead');
+    expect(cmsAdminPhp).toContain('larismanis-leads');
+    expect(cmsAdminPhp).toContain('Klik to Chat WA');
+    expect(cmsAdminPhp).toContain('https://wa.me/');
+    expect(cmsAdminPhp).toContain('larismanis_export_leads_csv');
+
+    // Indonesian Pixel & Analytics support (GTM, Google Ads, GA4, Meta Pixel, TikTok Pixel)
+    expect(cmsAdminPhp).toContain('larismanis-analytics');
+    expect(cmsAdminPhp).toContain('googletagmanager.com/gtm.js');
+    expect(cmsAdminPhp).toContain('gtag/js');
+    expect(cmsAdminPhp).toContain('gads_conversion_label');
+    expect(cmsAdminPhp).toContain('fbevents.js');
+    expect(cmsAdminPhp).toContain('analytics.tiktok.com');
   });
 
-  it('includes all key conversion sections and live demo links in front-page.php and index.php', () => {
+  it('routes public CTAs to the on-page #pesan order form without public wa.me links', () => {
+    const headerPhp = fs.readFileSync(path.join(themeDir, 'header.php'), 'utf8');
     const frontPagePhp = fs.readFileSync(path.join(themeDir, 'front-page.php'), 'utf8');
+    const footerPhp = fs.readFileSync(path.join(themeDir, 'footer.php'), 'utf8');
     const indexPhp = fs.readFileSync(path.join(themeDir, 'index.php'), 'utf8');
+
+    expect(headerPhp).toContain('#pesan');
+    expect(footerPhp).toContain('#pesan');
+    expect(headerPhp).not.toContain('wa.me');
+    expect(frontPagePhp).not.toContain('wa.me');
+    expect(footerPhp).not.toContain('wa.me');
 
     expect(frontPagePhp).toContain('Website komersial pemersatu jalur penjualan online Anda');
     expect(frontPagePhp).toContain('https://demo.larismanis.online');
@@ -54,13 +85,11 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
     expect(frontPagePhp).toContain('selama LarisManis.online beroperasi');
     expect(frontPagePhp).toContain('Domain &amp; Email Custom');
     expect(frontPagePhp).not.toContain('Starter UMKM');
-    expect(frontPagePhp).toContain('id="omnichannel"');
-    expect(frontPagePhp).toContain('id="masalah"');
-    expect(frontPagePhp).toContain('id="fitur"');
-    expect(frontPagePhp).toContain('id="demo"');
-    expect(frontPagePhp).toContain('id="harga"');
-    expect(frontPagePhp).toContain('id="faq"');
 
+    expect(frontPagePhp).toContain('id="pesan"');
+    expect(frontPagePhp).toContain('larismanis_submit_lead');
+    expect(frontPagePhp).toContain('name="whatsapp"');
+    expect(frontPagePhp).toContain('name="brand_name"');
     expect(indexPhp).toContain('front-page.php');
   });
 });
