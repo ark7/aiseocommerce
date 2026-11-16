@@ -47,10 +47,13 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
 
     expect(frontPagePhp).toContain('Website komersial pemersatu jalur penjualan online Anda');
     expect(frontPagePhp).toContain('https://demo.larismanis.online');
+    expect(frontPagePhp).toContain('Lisensi 1 Website');
+    expect(frontPagePhp).toContain('Biaya Operasional Bulanan');
     expect(frontPagePhp).toContain('Rp 150.000');
     expect(frontPagePhp).toContain('Rp 3.000.000');
     expect(frontPagePhp).toContain('selama LarisManis.online beroperasi');
     expect(frontPagePhp).toContain('Domain &amp; Email Custom');
+    expect(frontPagePhp).not.toContain('Starter UMKM');
     expect(frontPagePhp).toContain('id="omnichannel"');
     expect(frontPagePhp).toContain('id="masalah"');
     expect(frontPagePhp).toContain('id="fitur"');

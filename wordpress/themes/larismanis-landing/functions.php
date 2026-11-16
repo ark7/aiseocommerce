@@ -172,12 +172,12 @@ function larismanis_customize_register($wp_customize) {
             'type'    => 'email',
         ),
         'larismanis_price_monthly' => array(
-            'label'   => 'Harga Langganan Bulanan',
+            'label'   => 'Biaya Operasional Bulanan Website',
             'default' => 'Rp 150.000',
             'type'    => 'text',
         ),
         'larismanis_price_lifetime' => array(
-            'label'   => 'Harga Lisensi Website (Selama LarisManis.online Beroperasi)',
+            'label'   => 'Biaya Lisensi 1 Website (Selama LarisManis.online Beroperasi)',
             'default' => 'Rp 3.000.000',
             'type'    => 'text',
         ),
