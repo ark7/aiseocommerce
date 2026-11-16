@@ -9,9 +9,20 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_THEME_VERSION', '1.1.0');
+define('LARISMANIS_THEME_VERSION', '1.2.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
+
+/**
+ * Prevent stale browser or CDN HTML caching on the public landing page.
+ */
+function larismanis_send_nocache_headers() {
+    if (!is_admin()) {
+        nocache_headers();
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    }
+}
+add_action('send_headers', 'larismanis_send_nocache_headers');
 
 /**
  * Helper to fetch theme options configured via WP Customizer with safe defaults.
@@ -113,13 +124,13 @@ function larismanis_output_seo_head() {
 add_action('wp_head', 'larismanis_output_seo_head', 5);
 
 /**
- * WordPress Customizer settings so Admin can tweak texts, pricing, & WA without editing code.
+ * WordPress Customizer settings so Admin can tweak texts & pricing without editing code.
  */
 function larismanis_customize_register($wp_customize) {
     $wp_customize->add_section('larismanis_landing_section', array(
         'title'       => __('Pengaturan Landing Page LarisManis', 'larismanis-landing'),
         'priority'    => 25,
-        'description' => __('Sesuaikan teks headline, URL demo toko, nomor WhatsApp sales, dan harga paket tanpa perlu menyentuh kode.', 'larismanis-landing'),
+        'description' => __('Sesuaikan teks headline, URL demo toko, email kontak, dan rincian harga lisensi tanpa perlu menyentuh kode.', 'larismanis-landing'),
     ));
 
     $fields = array(

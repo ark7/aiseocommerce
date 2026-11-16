@@ -72,9 +72,16 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
 
     expect(headerPhp).toContain('#pesan');
     expect(footerPhp).toContain('#pesan');
-    expect(headerPhp).not.toContain('wa.me');
-    expect(frontPagePhp).not.toContain('wa.me');
-    expect(footerPhp).not.toContain('wa.me');
+    for (const content of [headerPhp, frontPagePhp, footerPhp]) {
+      expect(content).not.toContain('wa.me');
+      expect(content).not.toMatch(/0812|628[0-9]{4,}/);
+      expect(content).not.toMatch(/konsultasi|konsul/i);
+    }
+
+    const functionsPhp = fs.readFileSync(path.join(themeDir, 'functions.php'), 'utf8');
+    expect(functionsPhp).toContain('nocache_headers');
+    expect(functionsPhp).not.toMatch(/0812|628[0-9]{4,}/);
+    expect(functionsPhp).not.toMatch(/konsultasi|konsul/i);
 
     expect(frontPagePhp).toContain('Website komersial pemersatu jalur penjualan online Anda');
     expect(frontPagePhp).toContain('https://demo.larismanis.online');
