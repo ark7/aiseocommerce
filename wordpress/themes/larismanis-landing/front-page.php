@@ -17,13 +17,11 @@ $hero_subtitle  = larismanis_get_option('larismanis_hero_subtitle', 'Satukan kat
 $demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
 $demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larismanis.online/login');
 
-$price_starter    = larismanis_get_option('larismanis_price_starter', 'Rp 149.000');
-$price_growth     = larismanis_get_option('larismanis_price_growth', 'Rp 299.000');
-$price_enterprise = larismanis_get_option('larismanis_price_enterprise', 'Custom');
+$price_monthly  = larismanis_get_option('larismanis_price_monthly', 'Rp 150.000');
+$price_lifetime = larismanis_get_option('larismanis_price_lifetime', 'Rp 3.000.000');
 
-$wa_starter    = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik berlangganan Paket Starter UMKM (' . $price_starter . '/bln).');
-$wa_growth     = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik berlangganan Paket Growth Omnichannel & AI (' . $price_growth . '/bln).');
-$wa_enterprise = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin konsultasi Paket Enterprise / Custom Brand.');
+$wa_monthly  = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik berlangganan Paket Bulanan (' . $price_monthly . '/bulan).');
+$wa_lifetime = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik mengambil Lisensi Website (' . $price_lifetime . ' selama LarisManis.online beroperasi).');
 ?>
 
 <main id="primary">
@@ -249,79 +247,63 @@ $wa_enterprise = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin
   <section id="harga" class="lm-section lm-section-alt">
     <div class="lm-container">
       <div class="lm-section-header">
-        <span class="lm-eyebrow">Investasi Terukur</span>
-        <h2>Pilih Paket Website Komersial Sesuai Skala Bisnis Anda</h2>
-        <p>Semua paket sudah termasuk setup awal, domain &amp; SSL Cloudflare, panduan lengkap, serta dukungan teknis langsung di Indonesia.</p>
+        <span class="lm-eyebrow">Harga Transparan &amp; Tanpa Biaya Tersembunyi</span>
+        <h2>Pilih Skema Langganan Bulanan atau Lisensi Website Penuh</h2>
+        <p>Semua pilihan sudah mendapatkan akses lengkap fitur Webcommerce Omnichannel, AI SEO &amp; Foto Studio (BYOK), ongkir otomatis, dan sistem pembukuan.</p>
       </div>
 
-      <div class="lm-pricing-grid">
-        <!-- Starter -->
+      <div class="lm-pricing-grid lm-pricing-two">
+        <!-- Langganan Bulanan -->
         <div class="lm-price-card">
           <div>
-            <h3 class="lm-price-title">Starter UMKM</h3>
-            <p class="lm-price-desc">Untuk toko yang ingin punya website brand sendiri &amp; link marketplace terpusat.</p>
+            <h3 class="lm-price-title">Langganan Bulanan</h3>
+            <p class="lm-price-desc">Skema fleksibel per bulan tanpa kontrak panjang, cocok untuk langsung mulai berjualan online.</p>
             <div style="margin-bottom:20px;">
-              <span class="lm-price-amount"><?php echo esc_html($price_starter); ?></span>
+              <span class="lm-price-amount"><?php echo esc_html($price_monthly); ?></span>
               <span class="lm-price-period"> / bulan</span>
             </div>
             <ul class="lm-check-list">
-              <li><span>✅</span> Website toko mandiri + subdomain/custom domain</li>
-              <li><span>✅</span> Katalog produk, kategori, &amp; varian tanpa batas</li>
-              <li><span>✅</span> Integrasi tombol Shopee, Tokopedia, TikTok Shop</li>
-              <li><span>✅</span> Ongkir flat dalam/luar kota &amp; Biteship API</li>
-              <li><span>✅</span> Proteksi anti-bot Cloudflare Turnstile</li>
+              <li><span>✅</span> Akses seluruh fitur toko komersial &amp; katalog omnichannel</li>
+              <li><span>✅</span> Integrasi link Shopee, Tokopedia, TikTok Shop, Blibli, Lazada</li>
+              <li><span>✅</span> Matriks Harga Grosir Bertingkat, Varian, &amp; Pre-Order</li>
+              <li><span>✅</span> AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</li>
+              <li><span>✅</span> Ongkir Biteship + Flat Rate, Midtrans/Flip, Notifikasi WA/Telegram</li>
+              <li><span>✅</span> Pembukuan Kas, HPP, Laba Rugi, &amp; Proteksi Cloudflare Turnstile</li>
+              <li><span>🌐</span> <strong>Domain &amp; Email Custom:</strong> disiapkan oleh masing-masing pengguna</li>
             </ul>
           </div>
-          <a href="<?php echo esc_url($wa_starter); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline" style="width:100%;">
-            Pilih Paket Starter &rarr;
+          <a href="<?php echo esc_url($wa_monthly); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline" style="width:100%;">
+            Mulai Langganan <?php echo esc_html($price_monthly); ?>/bln &rarr;
           </a>
         </div>
 
-        <!-- Growth (Popular) -->
+        <!-- Lisensi Website Selama LarisManis.online Beroperasi -->
         <div class="lm-price-card is-featured">
-          <span class="lm-popular-pill">Paling Populer</span>
+          <span class="lm-popular-pill">Hemat Jangka Panjang</span>
           <div>
-            <h3 class="lm-price-title">Growth Omnichannel &amp; AI</h3>
-            <p class="lm-price-desc">Untuk bisnis bertumbuh yang memaksimalkan SEO, grosir B2B, dan otomatisasi AI.</p>
+            <h3 class="lm-price-title">Lisensi Website Penuh</h3>
+            <p class="lm-price-desc">Sekali bayar untuk lisensi penggunaan website selama platform LarisManis.online beroperasi — bebas iuran bulanan.</p>
             <div style="margin-bottom:20px;">
-              <span class="lm-price-amount"><?php echo esc_html($price_growth); ?></span>
-              <span class="lm-price-period"> / bulan</span>
+              <span class="lm-price-amount"><?php echo esc_html($price_lifetime); ?></span>
+              <span class="lm-price-period"> sekali bayar (selama LarisManis.online beroperasi)</span>
             </div>
             <ul class="lm-check-list">
-              <li><span>✅</span> Seluruh fitur <strong>Starter UMKM</strong></li>
-              <li><span>✅</span> Matriks Harga Grosir Bertingkat (Batch Pricing)</li>
-              <li><span>✅</span> AI SEO Copilot &amp; AI Product Image Studio (BYOK)</li>
-              <li><span>✅</span> Builder Artikel SEO &amp; Commercial Landing Page</li>
-              <li><span>✅</span> Pembayaran Midtrans/Flip + Notifikasi Telegram &amp; WA</li>
-              <li><span>✅</span> Laporan Pembukuan Kas, HPP, &amp; Laba Rugi</li>
+              <li><span>✅</span> Lisensi aktif penuh <strong>selama LarisManis.online beroperasi</strong></li>
+              <li><span>✅</span> Bebas biaya langganan bulanan Rp 150.000 seterusnya</li>
+              <li><span>✅</span> Seluruh fitur lengkap Webcommerce Omnichannel, Grosir, &amp; AI (BYOK)</li>
+              <li><span>✅</span> Pembaruan fitur &amp; keamanan platform secara berkala</li>
+              <li><span>✅</span> Pendampingan setup awal penyambungan DNS Domain &amp; Email SMTP</li>
+              <li><span>🌐</span> <strong>Domain &amp; Email Custom:</strong> disiapkan oleh masing-masing pengguna</li>
             </ul>
           </div>
-          <a href="<?php echo esc_url($wa_growth); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary" style="width:100%;">
-            Mulai Dengan Paket Growth &rarr;
+          <a href="<?php echo esc_url($wa_lifetime); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary" style="width:100%;">
+            Ambil Lisensi <?php echo esc_html($price_lifetime); ?> &rarr;
           </a>
         </div>
+      </div>
 
-        <!-- Enterprise -->
-        <div class="lm-price-card">
-          <div>
-            <h3 class="lm-price-title">Enterprise / Custom Brand</h3>
-            <p class="lm-price-desc">Untuk distributor besar, waralaba, atau agensi dengan kebutuhan integrasi khusus.</p>
-            <div style="margin-bottom:20px;">
-              <span class="lm-price-amount"><?php echo esc_html($price_enterprise); ?></span>
-              <span class="lm-price-period"> sesuai kebutuhan</span>
-            </div>
-            <ul class="lm-check-list">
-              <li><span>✅</span> Seluruh fitur <strong>Growth Omnichannel &amp; AI</strong></li>
-              <li><span>✅</span> Migrasi penuh ribuan SKU produk &amp; artikel lama</li>
-              <li><span>✅</span> Dukungan dedicated server &amp; SLA prioritas</li>
-              <li><span>✅</span> Penyesuaian alur kerja B2B &amp; webhook ERP khusus</li>
-              <li><span>✅</span> Sesi pelatihan tim admin &amp; staf gudang</li>
-            </ul>
-          </div>
-          <a href="<?php echo esc_url($wa_enterprise); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-emerald" style="width:100%;">
-            Hubungi Tim Enterprise &rarr;
-          </a>
-        </div>
+      <div class="lm-pricing-note">
+        <strong>📌 Ketentuan Domain &amp; Email Custom:</strong> Untuk menjaga kepemilikan brand 100% di tangan pemilik bisnis, <strong>nama domain sendiri</strong> (seperti <code>namatoko.com</code> atau <code>.id</code>) dan layanan <strong>Email Custom / SMTP</strong> disiapkan dan dikelola oleh masing-masing pengguna. Tim kami siap memandu konfigurasi DNS serta pengaturan SMTP agar website Anda langsung siap digunakan.
       </div>
     </div>
   </section>
@@ -336,9 +318,9 @@ $wa_enterprise = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin
 
       <div class="lm-faq-list">
         <details class="lm-faq-item" open>
-          <summary>Apakah toko bisa memakai nama domain brand sendiri (misalnya namatoko.com atau .id)?</summary>
+          <summary>Bagaimana ketentuan domain dan email custom pada kedua paket harga?</summary>
           <p class="lm-faq-answer">
-            Ya, tentu. Sistem mendukung arsitektur multi-tenant domain kustom penuh. Pengunjung yang mengakses domain toko Anda langsung melihat identitas, warna brand, logo, katalog, serta informasi toko milik Anda sendiri.
+            Domain brand sendiri (misalnya <code>namatoko.com</code> atau <code>.id</code>) serta akun email custom/SMTP disiapkan dan dibawa oleh masing-masing pengguna agar aset digital bisnis tetap 100% atas nama Anda. Anda dapat memilih skema <strong>Langganan Bulanan Rp 150.000/bulan</strong> atau <strong>Lisensi Website Rp 3.000.000 sekali bayar</strong> selama LarisManis.online beroperasi.
           </p>
         </details>
 
