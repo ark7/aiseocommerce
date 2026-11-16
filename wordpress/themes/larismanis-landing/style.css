@@ -1015,3 +1015,82 @@ img {
   padding: 24px;
   margin-bottom: 20px;
 }
+
+/* ========================
+   ORDER & CONSULTATION FORM (#pesan)
+   ======================== */
+.lm-order-form-card {
+  max-width: 880px;
+  margin: 0 auto;
+  background: var(--lm-white);
+  border: 1px solid var(--lm-slate-200);
+  border-radius: var(--lm-radius-xl);
+  padding: 32px 28px;
+  box-shadow: var(--lm-shadow-md);
+}
+
+.lm-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px 20px;
+}
+
+@media (min-width: 720px) {
+  .lm-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.lm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lm-field label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--lm-slate-800);
+}
+
+.lm-input,
+.lm-select,
+.lm-textarea {
+  width: 100%;
+  border: 1px solid var(--lm-slate-200);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--lm-slate-900);
+  background: var(--lm-white);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lm-input:focus,
+.lm-select:focus,
+.lm-textarea:focus {
+  outline: none;
+  border-color: var(--lm-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+}
+
+.lm-alert-success {
+  background: var(--lm-emerald-soft);
+  border: 1px solid #86efac;
+  color: #14532d;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  font-size: 0.94rem;
+}
+
+.lm-alert-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  font-size: 0.94rem;
+}

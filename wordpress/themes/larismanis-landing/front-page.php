@@ -20,7 +20,8 @@ $demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://de
 $price_monthly  = larismanis_get_option('larismanis_price_monthly', 'Rp 150.000');
 $price_lifetime = larismanis_get_option('larismanis_price_lifetime', 'Rp 3.000.000');
 
-$wa_order = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin membeli Lisensi 1 Website (' . $price_lifetime . ') dengan biaya operasional bulanan (' . $price_monthly . '/bulan).');
+$lead_submitted = isset($_GET['lead_submitted']) && $_GET['lead_submitted'] === '1';
+$lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_GET['lead_error'])) : '';
 ?>
 
 <main id="primary">
@@ -42,12 +43,12 @@ $wa_order = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin memb
         </p>
 
         <div class="lm-hero-cta">
-          <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary lm-btn-lg">
-            <span>Coba Live Storefront Demo</span>
+          <a href="#pesan" class="lm-btn lm-btn-primary lm-btn-lg">
+            <span>Pesan Lisensi Website</span>
             <span aria-hidden="true">&rarr;</span>
           </a>
-          <a href="<?php echo esc_url($demo_admin_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline lm-btn-lg">
-            <span>Coba Panel Admin Demo</span>
+          <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline lm-btn-lg">
+            <span>Coba Live Storefront Demo</span>
           </a>
         </div>
 
@@ -307,8 +308,8 @@ $wa_order = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin memb
         </div>
 
         <div class="lm-single-price-actions">
-          <a href="<?php echo esc_url($wa_order); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary lm-btn-lg" style="flex:1; min-width:240px;">
-            Pesan Lisensi Website Sekarang &rarr;
+          <a href="#pesan" class="lm-btn lm-btn-primary lm-btn-lg" style="flex:1; min-width:240px;">
+            Isi Form Pemesanan Lisensi &rarr;
           </a>
           <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline lm-btn-lg">
             Coba Demo Live Dulu
@@ -322,8 +323,104 @@ $wa_order = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya ingin memb
     </div>
   </section>
 
-  <!-- 7. FAQ & FINAL CTA -->
-  <section id="faq" class="lm-section">
+  <!-- 7. ORDER & CONSULTATION FORM (#pesan) -->
+  <section id="pesan" class="lm-section">
+    <div class="lm-container">
+      <div class="lm-section-header">
+        <span class="lm-eyebrow">Pendaftaran &amp; Pemesanan Lisensi</span>
+        <h2>Mulai Miliki Website Komersial Anda Sekarang</h2>
+        <p>Isi form di bawah ini untuk memesan Lisensi 1 Website (<strong><?php echo esc_html($price_lifetime); ?></strong> + operasional <strong><?php echo esc_html($price_monthly); ?>/bulan</strong>) atau menjadwalkan konsultasi teknis. Tim kami akan langsung menghubungi Anda melalui WhatsApp.</p>
+      </div>
+
+      <div class="lm-order-form-card">
+        <?php if ($lead_submitted) : ?>
+          <div class="lm-alert-success" role="status">
+            <strong>✅ Form Pemesanan Berhasil Dikirim!</strong>
+            <p style="margin:6px 0 0;">
+              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem kami dan tim LarisManis.online akan segera menghubungi nomor WhatsApp Anda.
+            </p>
+          </div>
+        <?php elseif ($lead_error !== '') : ?>
+          <div class="lm-alert-error" role="alert">
+            <strong>⚠️ Pengiriman Belum Berhasil</strong>
+            <p style="margin:6px 0 0;">
+              Pastikan Nama Lengkap, Nomor WhatsApp aktif, dan Nama Brand/Toko sudah diisi dengan benar lalu kirim ulang form.
+            </p>
+          </div>
+        <?php endif; ?>
+
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="lm-order-form">
+          <input type="hidden" name="action" value="larismanis_submit_lead">
+          <?php wp_nonce_field('larismanis_submit_lead_action', 'larismanis_submit_lead_nonce'); ?>
+          <input type="hidden" name="utm_source" id="lm-utm-source" value="">
+          <input type="hidden" name="utm_medium" id="lm-utm-medium" value="">
+          <input type="hidden" name="utm_campaign" id="lm-utm-campaign" value="">
+          <!-- Honeypot anti-spam -->
+          <div style="position:absolute; left:-9999px;" aria-hidden="true">
+            <label for="lm_hp_url">Website URL</label>
+            <input type="text" name="lm_hp_url" id="lm_hp_url" tabindex="-1" autocomplete="off">
+          </div>
+
+          <div class="lm-form-grid">
+            <div class="lm-field">
+              <label for="lm_full_name">Nama Lengkap <span style="color:#dc2626;">*</span></label>
+              <input type="text" id="lm_full_name" name="full_name" required class="lm-input" placeholder="Contoh: Budi Santoso">
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_whatsapp">Nomor WhatsApp Aktif <span style="color:#dc2626;">*</span></label>
+              <input type="tel" id="lm_whatsapp" name="whatsapp" required class="lm-input" placeholder="Contoh: 081234567890">
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_brand_name">Nama Brand / Toko <span style="color:#dc2626;">*</span></label>
+              <input type="text" id="lm_brand_name" name="brand_name" required class="lm-input" placeholder="Contoh: Batik Nusantara Jaya">
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_email">Alamat Email</label>
+              <input type="email" id="lm_email" name="email" class="lm-input" placeholder="Contoh: halo@namatoko.com">
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_custom_domain">Rencana Nama Domain (Opsional)</label>
+              <input type="text" id="lm_custom_domain" name="custom_domain" class="lm-input" placeholder="Contoh: namatoko.com (dibawa oleh user)">
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_business_category">Kategori Produk / Bisnis</label>
+              <select id="lm_business_category" name="business_category" class="lm-select">
+                <option value="Fashion &amp; Pakaian">Fashion &amp; Pakaian</option>
+                <option value="Kuliner &amp; F&amp;B">Kuliner, Kopi &amp; F&amp;B</option>
+                <option value="Percetakan &amp; Grosir B2B">Percetakan, Merchandise &amp; Grosir B2B</option>
+                <option value="Elektronik &amp; Gadget">Elektronik &amp; Gadget</option>
+                <option value="Kesehatan &amp; Kecantikan">Kesehatan, Herbal &amp; Kecantikan</option>
+                <option value="Rumah Tangga &amp; Furniture">Rumah Tangga &amp; Furniture</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="lm-field" style="margin-top:16px;">
+            <label for="lm_notes">Catatan / Kebutuhan Khusus (Opsional)</label>
+            <textarea id="lm_notes" name="notes" rows="3" class="lm-textarea" placeholder="Ceritakan jumlah produk, apakah ingin migrasi katalog, atau pertanyaan lainnya..."></textarea>
+          </div>
+
+          <div style="margin-top:22px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px;">
+            <p style="margin:0; font-size:0.84rem; color:#64748b;">
+              🔒 Data Anda aman dan hanya digunakan untuk menindaklanjuti pemesanan website Anda.
+            </p>
+            <button type="submit" class="lm-btn lm-btn-primary lm-btn-lg">
+              Kirim Form Pemesanan Lisensi &rarr;
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. FAQ & FINAL CTA -->
+  <section id="faq" class="lm-section lm-section-alt">
     <div class="lm-container">
       <div class="lm-section-header">
         <span class="lm-eyebrow">Pertanyaan Umum</span>

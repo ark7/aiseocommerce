@@ -10,7 +10,6 @@ if (!defined('ABSPATH')) {
 }
 
 $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
-$wa_url   = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik membuat website komersial untuk toko saya.');
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -36,7 +35,8 @@ $wa_url   = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik m
       <a href="#omnichannel" class="lm-nav-link">Integrasi</a>
       <a href="#fitur" class="lm-nav-link">Fitur</a>
       <a href="#demo" class="lm-nav-link">Demo Live</a>
-      <a href="#harga" class="lm-nav-link">Harga Paket</a>
+      <a href="#harga" class="lm-nav-link">Harga</a>
+      <a href="#pesan" class="lm-nav-link">Pesan Lisensi</a>
       <a href="#faq" class="lm-nav-link">FAQ</a>
     </nav>
 
@@ -44,8 +44,8 @@ $wa_url   = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik m
       <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline">
         Lihat Demo Toko
       </a>
-      <a href="<?php echo esc_url($wa_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary">
-        Konsultasi WA &rarr;
+      <a href="#pesan" class="lm-btn lm-btn-primary">
+        Pesan &amp; Konsultasi &rarr;
       </a>
     </div>
 
@@ -67,15 +67,16 @@ $wa_url   = larismanis_whatsapp_url('Halo Tim LarisManis.online, saya tertarik m
       <a href="#omnichannel" class="lm-mobile-nav-link">Integrasi Omnichannel</a>
       <a href="#fitur" class="lm-mobile-nav-link">6 Pilar Fitur</a>
       <a href="#demo" class="lm-mobile-nav-link">Coba Demo Live</a>
-      <a href="#harga" class="lm-mobile-nav-link">Paket Harga</a>
+      <a href="#harga" class="lm-mobile-nav-link">Skema Harga</a>
+      <a href="#pesan" class="lm-mobile-nav-link">Form Pemesanan Lisensi</a>
       <a href="#faq" class="lm-mobile-nav-link">Tanya Jawab (FAQ)</a>
     </nav>
     <div class="lm-mobile-actions">
       <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline">
         Lihat Demo Toko
       </a>
-      <a href="<?php echo esc_url($wa_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary">
-        Konsultasi WhatsApp &rarr;
+      <a href="#pesan" class="lm-btn lm-btn-primary">
+        Isi Form Pemesanan &rarr;
       </a>
     </div>
   </div>
