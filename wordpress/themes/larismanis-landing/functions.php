@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_THEME_VERSION', '1.2.0');
+define('LARISMANIS_THEME_VERSION', '1.2.1');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 

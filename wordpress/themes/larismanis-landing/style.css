@@ -4,7 +4,7 @@ Theme URI: https://larismanis.online
 Author: LarisManis.online Team
 Author URI: https://larismanis.online
 Description: Tema landing page pemasaran resmi untuk LarisManis.online — Website komersial pemersatu jalur penjualan online Anda. Ringan, cepat, responsif, dan ramah SEO.
-Version: 1.0.0
+Version: 1.2.1
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -517,21 +517,31 @@ img {
 .lm-compare-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 24px;
+  gap: 20px;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 860px) {
   .lm-compare-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px;
+    align-items: stretch;
   }
 }
 
 .lm-compare-card {
   border-radius: var(--lm-radius-lg);
-  padding: 28px;
+  padding: 22px 18px;
   border: 1px solid var(--lm-slate-200);
   background: var(--lm-white);
   box-shadow: var(--lm-shadow-sm);
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .lm-compare-card {
+    padding: 32px 30px;
+  }
 }
 
 .lm-compare-card.is-winner {
@@ -540,13 +550,45 @@ img {
   box-shadow: var(--lm-shadow-md);
 }
 
-.lm-compare-card h3 {
-  margin: 0 0 16px;
-  font-size: 1.2rem;
+.lm-compare-heading {
+  margin: 0 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--lm-slate-200);
+  font-size: clamp(1.08rem, 2.2vw, 1.28rem);
   font-weight: 800;
+  line-height: 1.3;
+  color: var(--lm-slate-900);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.lm-compare-card.is-winner .lm-compare-heading {
+  border-bottom-color: rgba(79, 70, 229, 0.18);
+}
+
+.lm-compare-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+}
+
+.lm-compare-icon.is-winner {
+  background: var(--lm-primary-soft);
+  border-color: rgba(79, 70, 229, 0.25);
+}
+
+.lm-compare-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lm-check-list {
@@ -559,11 +601,70 @@ img {
 }
 
 .lm-check-list li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: var(--lm-slate-50);
+  border: 1px solid var(--lm-slate-200);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.lm-compare-card.is-winner .lm-check-list li {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(79, 70, 229, 0.16);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.05);
+}
+
+.lm-check-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.lm-check-icon.is-negative {
+  background: #ffe4e6;
+  color: #e11d48;
+  border: 1px solid #fecdd3;
+}
+
+.lm-check-icon.is-positive {
+  background: #d1fae5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.lm-check-body {
+  min-width: 0;
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.95rem;
-  color: var(--lm-slate-700);
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lm-check-title {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--lm-slate-900);
+  letter-spacing: -0.01em;
+}
+
+.lm-check-desc {
+  display: block;
+  font-size: 0.9rem;
+  line-height: 1.58;
+  color: var(--lm-slate-600);
+  overflow-wrap: break-word;
 }
 
 /* ========================
@@ -881,10 +982,12 @@ img {
 }
 
 .lm-feature-checklist-2col li {
-  display: flex;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
   gap: 10px;
   font-size: 0.94rem;
+  line-height: 1.5;
   color: var(--lm-slate-700);
 }
 

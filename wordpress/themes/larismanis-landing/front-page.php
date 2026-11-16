@@ -127,24 +127,90 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
       <div class="lm-compare-grid">
         <div class="lm-compare-card">
-          <h3><span>⚠️</span> Hanya Bergantung pada Marketplace</h3>
+          <h3 class="lm-compare-heading">
+            <span class="lm-compare-icon is-warning" aria-hidden="true">⚠️</span>
+            <span class="lm-compare-title">Hanya Bergantung pada Marketplace</span>
+          </h3>
           <ul class="lm-check-list">
-            <li><span>❌</span> Biaya administrasi &amp; potongan komisi terus naik menekan margin keuntungan.</li>
-            <li><span>❌</span> Perang harga terbuka di halaman hasil pencarian memaksa diskon berlebih.</li>
-            <li><span>❌</span> Data kontak &amp; riwayat belanja pelanggan tidak dimiliki penuh oleh penjual.</li>
-            <li><span>❌</span> Sulit menerapkan skema harga grosir bertingkat per varian sekaligus menerima pre-order rapi.</li>
-            <li><span>❌</span> Traffic iklan (Meta/TikTok Ads) yang dikirim keluar langsung terpapar produk kompetitor.</li>
+            <li>
+              <span class="lm-check-icon is-negative" aria-hidden="true">✕</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Potongan Komisi Terus Naik</strong>
+                <span class="lm-check-desc">Biaya administrasi &amp; potongan platform terus meningkat sehingga menekan margin keuntungan bersih Anda.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-negative" aria-hidden="true">✕</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Perang Harga Terbuka</strong>
+                <span class="lm-check-desc">Rekomendasi produk kompetitor tepat di bawah etalase Anda memaksa diskon berlebih demi menjaga konversi.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-negative" aria-hidden="true">✕</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Data Pelanggan Tidak Dimiliki Penuh</strong>
+                <span class="lm-check-desc">Kontak &amp; riwayat belanja pelanggan dikuasai platform sehingga sulit membangun repeat order mandiri.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-negative" aria-hidden="true">✕</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Keterbatasan Grosir &amp; Pre-Order</strong>
+                <span class="lm-check-desc">Sulit menerapkan matriks harga grosir bertingkat per varian sekaligus menerima pesanan pre-order secara rapi.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-negative" aria-hidden="true">✕</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Traffic Iklan Bocor ke Kompetitor</strong>
+                <span class="lm-check-desc">Pengunjung dari iklan Meta/TikTok Ads yang masuk ke marketplace langsung terpapar toko serupa milik pesaing.</span>
+              </div>
+            </li>
           </ul>
         </div>
 
         <div class="lm-compare-card is-winner">
-          <h3><span>🚀</span> Website Komersial LarisManis.online</h3>
+          <h3 class="lm-compare-heading">
+            <span class="lm-compare-icon is-winner" aria-hidden="true">🚀</span>
+            <span class="lm-compare-title">Website Komersial LarisManis.online</span>
+          </h3>
           <ul class="lm-check-list">
-            <li><span>✅</span> <strong>Satukan Seluruh Kanal:</strong> Pembeli bisa checkout langsung di web atau klik tombol resmi ke Shopee/Tokopedia/TikTok Shop Anda.</li>
-            <li><span>✅</span> <strong>SEO Organik Google 24 Jam:</strong> Artikel panduan otomatis terhubung ke kartu produk katalog Anda untuk mendatangkan pembeli organik.</li>
-            <li><span>✅</span> <strong>Data &amp; Domain Milik Sendiri:</strong> Bebas atur warna brand, tipografi, pixel pelacakan (Meta, Google GA4, TikTok), dan banner slider.</li>
-            <li><span>✅</span> <strong>Grosir &amp; Retensi Lebih Tinggi:</strong> Matriks harga bertingkat per kuantitas dan landing page kampanye iklan terfokus konversi.</li>
-            <li><span>✅</span> <strong>Asisten AI &amp; Pembukuan Terpadu:</strong> Dari pembuatan foto produk studio, SEO artikel, hingga jurnal kas &amp; laba rugi dalam satu panel.</li>
+            <li>
+              <span class="lm-check-icon is-positive" aria-hidden="true">✓</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Satukan Seluruh Kanal</strong>
+                <span class="lm-check-desc">Pembeli bisa checkout langsung di web atau klik tombol resmi ke Shopee, Tokopedia, &amp; TikTok Shop Anda.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-positive" aria-hidden="true">✓</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">SEO Organik Google 24 Jam</strong>
+                <span class="lm-check-desc">Artikel panduan otomatis terhubung ke kartu produk katalog Anda untuk mendatangkan pembeli organik.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-positive" aria-hidden="true">✓</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Data &amp; Domain Milik Sendiri</strong>
+                <span class="lm-check-desc">Bebas atur warna brand, tipografi, pixel pelacakan (Meta, Google GA4, TikTok), dan banner slider.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-positive" aria-hidden="true">✓</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Grosir &amp; Retensi Lebih Tinggi</strong>
+                <span class="lm-check-desc">Matriks harga bertingkat per kuantitas dan landing page kampanye iklan terfokus konversi.</span>
+              </div>
+            </li>
+            <li>
+              <span class="lm-check-icon is-positive" aria-hidden="true">✓</span>
+              <div class="lm-check-body">
+                <strong class="lm-check-title">Asisten AI &amp; Pembukuan Terpadu</strong>
+                <span class="lm-check-desc">Dari pembuatan foto produk studio, SEO artikel, hingga jurnal kas &amp; laba rugi dalam satu panel.</span>
+              </div>
+            </li>
           </ul>
         </div>
       </div>
@@ -293,16 +359,16 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
               Seluruh Fitur yang Sudah Termasuk Tanpa Tambahan Biaya Paket:
             </p>
             <ul class="lm-feature-checklist-2col">
-              <li><span>✅</span> 1 Website toko komersial mandiri lengkap &amp; terisolasi</li>
-              <li><span>✅</span> Integrasi link Shopee, Tokopedia, TikTok Shop, Blibli, Lazada</li>
-              <li><span>✅</span> Katalog multi-varian, kategori, &amp; mode Pre-Order</li>
-              <li><span>✅</span> Matriks Harga Grosir Bertingkat (Batch Pricing)</li>
-              <li><span>✅</span> AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</li>
-              <li><span>✅</span> Cek Ongkir Biteship otomatis &amp; tarif flat dalam/luar kota</li>
-              <li><span>✅</span> Midtrans/Flip + verifikasi bukti transfer &amp; notifikasi WA/Telegram</li>
-              <li><span>✅</span> Pembukuan Kas, HPP, Laba Rugi, &amp; Proteksi Cloudflare Turnstile</li>
-              <li><span>🌐</span> <strong>Domain &amp; Email Custom:</strong> dibawa sendiri oleh pengguna</li>
-              <li><span>🤝</span> Pendampingan koneksi DNS domain &amp; SMTP saat onboarding</li>
+              <li><span aria-hidden="true">✅</span> <span>1 Website toko komersial mandiri lengkap &amp; terisolasi</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Integrasi link Shopee, Tokopedia, TikTok Shop, Blibli, Lazada</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Katalog multi-varian, kategori, &amp; mode Pre-Order</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Matriks Harga Grosir Bertingkat (Batch Pricing)</span></li>
+              <li><span aria-hidden="true">✅</span> <span>AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Cek Ongkir Biteship otomatis &amp; tarif flat dalam/luar kota</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Midtrans/Flip + verifikasi bukti transfer &amp; notifikasi WA/Telegram</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Pembukuan Kas, HPP, Laba Rugi, &amp; Proteksi Cloudflare Turnstile</span></li>
+              <li><span aria-hidden="true">🌐</span> <span><strong>Domain &amp; Email Custom:</strong> dibawa sendiri oleh pengguna</span></li>
+              <li><span aria-hidden="true">🤝</span> <span>Pendampingan koneksi DNS domain &amp; SMTP saat onboarding</span></li>
             </ul>
           </div>
         </div>
