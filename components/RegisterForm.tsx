@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface RegisterFormProps {
@@ -22,6 +22,7 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     if (!siteKey) return;
@@ -45,6 +46,8 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -77,6 +80,7 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
       setError('Terjadi kesalahan. Silahkan coba lagi.');
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   };
 

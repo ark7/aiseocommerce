@@ -14,6 +14,7 @@ import {
   verifyTurnstilePassToken,
 } from '@/lib/turnstile';
 import GlobalPublicTurnstileGuard from '@/components/security/GlobalPublicTurnstileGuard';
+import GlobalClickDebounceGuard from '@/components/GlobalClickDebounceGuard';
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getActiveStore();
@@ -149,6 +150,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           )}
           {children}
+          <GlobalClickDebounceGuard />
           <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
           <GlobalPublicTurnstileGuard
             siteKey={turnstileConfig.siteKey}

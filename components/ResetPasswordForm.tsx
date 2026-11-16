@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -15,9 +15,11 @@ export function ResetPasswordForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const submitLockRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
     setError(null);
 
     if (!token) {
@@ -35,6 +37,7 @@ export function ResetPasswordForm() {
       return;
     }
 
+    submitLockRef.current = true;
     setLoading(true);
 
     try {
@@ -56,6 +59,7 @@ export function ResetPasswordForm() {
       setError('Terjadi gangguan koneksi. Silakan coba kembali.');
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   };
 

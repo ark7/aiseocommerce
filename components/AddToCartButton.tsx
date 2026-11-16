@@ -1,8 +1,9 @@
 'use client';
 
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import TurnstileStorefrontShield from '@/components/security/TurnstileStorefrontShield';
+import { DEFAULT_CLICK_DEBOUNCE_MS } from '@/lib/clickDebounce';
 import { buildAddToCartCalls, getTrackingConfig, sendTrackingCalls } from '@/lib/tracking';
 import { trackFunnelEvent } from '@/lib/funnelEvents';
 import { addToCart } from '@/lib/cart';
@@ -105,6 +106,19 @@ export default function AddToCartButton({
   const [isBotVerified, setIsBotVerified] = useState<boolean>(
     () => !turnstileSiteKey || Boolean(turnstileVerified)
   );
+  const addingLockRef = useRef<string | null>(null);
+  const justAddedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (justAddedTimerRef.current) clearTimeout(justAddedTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (unlockTimerRef.current) clearTimeout(unlockTimerRef.current);
+      addingLockRef.current = null;
+    };
+  }, []);
 
   const fallbackPrice =
     selectedVariant?.price != null && selectedVariant.price > 0 ? selectedVariant.price : price;
@@ -162,12 +176,18 @@ export default function AddToCartButton({
   }, [hasBatchPricing, priceTiers, variants]);
 
   const setSyncedQuantity = (nextQty: number) => {
+    addingLockRef.current = null;
     setQuantity(nextQty);
     setQtyInput(String(nextQty));
     setJustAdded(false);
   };
 
   const handleAddToCart = async () => {
+    const selectionLockKey = `${selectedVariant?.id ?? 'default'}::${quantity}`;
+    if (addingLockRef.current === selectionLockKey) {
+      return;
+    }
+
     if (hasVariants && !selectedVariant) {
       setError('Harap pilih varian terlebih dahulu');
       return;
@@ -189,6 +209,15 @@ export default function AddToCartButton({
       setError('Mohon selesaikan verifikasi keamanan Cloudflare Turnstile terlebih dahulu.');
       return;
     }
+
+    addingLockRef.current = selectionLockKey;
+    if (unlockTimerRef.current) {
+      clearTimeout(unlockTimerRef.current);
+    }
+    unlockTimerRef.current = setTimeout(() => {
+      addingLockRef.current = null;
+      unlockTimerRef.current = null;
+    }, DEFAULT_CLICK_DEBOUNCE_MS);
 
     setIsLoading(true);
     setError(null);
@@ -229,12 +258,20 @@ export default function AddToCartButton({
       setJustAdded(true);
       setShowToast(true);
 
-      setTimeout(() => {
+      if (justAddedTimerRef.current) {
+        clearTimeout(justAddedTimerRef.current);
+      }
+      justAddedTimerRef.current = setTimeout(() => {
         setJustAdded(false);
+        justAddedTimerRef.current = null;
       }, 2500);
 
-      setTimeout(() => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      toastTimerRef.current = setTimeout(() => {
         setShowToast(false);
+        toastTimerRef.current = null;
       }, 5000);
     } catch {
       setError('Gagal menambahkan ke keranjang');
@@ -261,6 +298,7 @@ export default function AddToCartButton({
   };
 
   const handleQuantityInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addingLockRef.current = null;
     const raw = e.target.value;
     setQtyInput(raw);
     setError(null);

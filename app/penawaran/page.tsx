@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import StoreHeader from '@/components/StoreHeader';
@@ -63,6 +63,7 @@ export default function OffersPage() {
   const [claimsLoaded, setClaimsLoaded] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const claimLockRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const authHeaders = useCallback((): Record<string, string> | null => {
@@ -134,6 +135,8 @@ export default function OffersPage() {
   }, []);
 
   const handleClaim = async (voucher: OfferVoucher) => {
+    if (claimLockRef.current) return;
+    claimLockRef.current = true;
     setClaimError(null);
     setClaimingId(voucher.id);
 
@@ -167,6 +170,7 @@ export default function OffersPage() {
       setClaimError('Gagal mengklaim voucher. Coba lagi sebentar.');
     } finally {
       setClaimingId(null);
+      claimLockRef.current = false;
     }
   };
 
