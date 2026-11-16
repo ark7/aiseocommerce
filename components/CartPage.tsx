@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import StoreHeader from '@/components/StoreHeader'
@@ -105,6 +105,9 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
   const [problematicProduct, setProblematicProduct] = useState<ProblematicProduct | null>(null)
 
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const checkoutLockRef = useRef(false)
+  const voucherLockRef = useRef(false)
+  const shippingLockRef = useRef(false)
 
   useEffect(() => {
     setIsLoggedIn(Boolean(localStorage.getItem('token')))
@@ -187,7 +190,8 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
   }
 
   const fetchShippingRates = async (destPostal?: string) => {
-    if (!hasPhysicalItems || cartItems.length === 0) return
+    if (!hasPhysicalItems || cartItems.length === 0 || shippingLockRef.current) return
+    shippingLockRef.current = true
     setLoadingRates(true)
     try {
       const res = await fetch('/api/shipping/rates', {
@@ -217,6 +221,7 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
       // Ignore fetch errors
     } finally {
       setLoadingRates(false)
+      shippingLockRef.current = false
     }
   }
 
@@ -240,8 +245,9 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
    */
   const applyVoucher = async () => {
     const code = voucherInput.trim()
-    if (!code) return
+    if (!code || voucherLockRef.current) return
 
+    voucherLockRef.current = true
     setIsCheckingVoucher(true)
     setVoucherMessage(null)
 
@@ -265,6 +271,7 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
       setVoucherMessage('Gagal memeriksa voucher')
     } finally {
       setIsCheckingVoucher(false)
+      voucherLockRef.current = false
     }
   }
 
@@ -275,7 +282,7 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
   }
 
   const handleCheckout = async () => {
-    if (!storeId || !cartItems.length) return
+    if (!storeId || !cartItems.length || checkoutLockRef.current) return
 
     // An order needs an owner, so checkout is for signed-in customers. Send the
     // visitor to sign in and back to this cart; the cart is in localStorage, so
@@ -320,6 +327,7 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
       trackFunnelEvent('CHECKOUT_START', { productId: item.productId, storeDomain })
     }
 
+    checkoutLockRef.current = true
     setIsLoading(true)
     setError(null)
 
@@ -462,6 +470,7 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
       setError(err instanceof Error ? err.message : 'Checkout failed')
     } finally {
       setIsLoading(false)
+      checkoutLockRef.current = false
     }
   }
 
