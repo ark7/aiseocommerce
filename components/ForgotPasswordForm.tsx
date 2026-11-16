@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import TurnstileStorefrontShield from '@/components/security/TurnstileStorefrontShield';
 
@@ -26,9 +26,12 @@ export function ForgotPasswordForm({
   const [isTurnstileVerified, setIsTurnstileVerified] = useState<boolean>(
     !turnstileSiteKey || Boolean(initiallyVerified)
   );
+  const submitLockRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setError(null);
     setSuccessMessage(null);
     setResetUrl(null);
@@ -60,6 +63,7 @@ export function ForgotPasswordForm({
       setError('Terjadi kesalahan jaringan. Silakan coba kembali.');
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   };
 
