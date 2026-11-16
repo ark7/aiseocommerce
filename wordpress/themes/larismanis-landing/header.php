@@ -45,7 +45,7 @@ $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larismani
         Lihat Demo Toko
       </a>
       <a href="#pesan" class="lm-btn lm-btn-primary">
-        Pesan &amp; Konsultasi &rarr;
+        Pesan Lisensi &rarr;
       </a>
     </div>
 
