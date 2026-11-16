@@ -9,7 +9,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_THEME_VERSION', '1.0.0');
+define('LARISMANIS_THEME_VERSION', '1.1.0');
+
+require_once get_template_directory() . '/inc/cms-admin.php';
 
 /**
  * Helper to fetch theme options configured via WP Customizer with safe defaults.
@@ -20,21 +22,6 @@ function larismanis_get_option($key, $default = '') {
         return $default;
     }
     return $val;
-}
-
-/**
- * Builds pre-filled WhatsApp consultation link.
- */
-function larismanis_whatsapp_url($message = 'Halo Tim LarisManis.online, saya ingin konsultasi pembuatan website toko online omnichannel.') {
-    $raw_phone = larismanis_get_option('larismanis_wa_number', '6281288997711');
-    $clean_phone = preg_replace('/[^0-9]/', '', (string) $raw_phone);
-    if (strpos($clean_phone, '0') === 0) {
-        $clean_phone = '62' . substr($clean_phone, 1);
-    }
-    if (empty($clean_phone)) {
-        $clean_phone = '6281288997711';
-    }
-    return 'https://wa.me/' . $clean_phone . '?text=' . rawurlencode($message);
 }
 
 /**
@@ -160,11 +147,6 @@ function larismanis_customize_register($wp_customize) {
             'label'   => 'URL Login Admin Demo',
             'default' => 'https://demo.larismanis.online/login',
             'type'    => 'url',
-        ),
-        'larismanis_wa_number' => array(
-            'label'   => 'Nomor WhatsApp Konsultasi (contoh: 6281288997711)',
-            'default' => '6281288997711',
-            'type'    => 'text',
         ),
         'larismanis_contact_email' => array(
             'label'   => 'Email Kontak Resmi',
