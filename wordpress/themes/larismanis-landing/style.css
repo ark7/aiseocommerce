@@ -734,6 +734,25 @@ img {
   .lm-pricing-grid {
     grid-template-columns: repeat(3, 1fr);
   }
+  .lm-pricing-grid.lm-pricing-two {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 920px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.lm-pricing-note {
+  max-width: 920px;
+  margin: 28px auto 0;
+  background: var(--lm-white);
+  border: 1px solid rgba(79, 70, 229, 0.22);
+  border-left: 4px solid var(--lm-primary);
+  border-radius: 14px;
+  padding: 18px 22px;
+  font-size: 0.93rem;
+  color: var(--lm-slate-700);
+  box-shadow: var(--lm-shadow-sm);
 }
 
 .lm-price-card {

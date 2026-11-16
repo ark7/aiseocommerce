@@ -116,7 +116,7 @@ function larismanis_output_seo_head() {
         'description' => $desc,
         'offers' => array(
             '@type' => 'Offer',
-            'price' => '149000',
+            'price' => '150000',
             'priceCurrency' => 'IDR',
             'url' => $demo_url,
         ),
@@ -171,19 +171,14 @@ function larismanis_customize_register($wp_customize) {
             'default' => 'halo@larismanis.online',
             'type'    => 'email',
         ),
-        'larismanis_price_starter' => array(
-            'label'   => 'Harga Paket Starter UMKM',
-            'default' => 'Rp 149.000',
+        'larismanis_price_monthly' => array(
+            'label'   => 'Harga Langganan Bulanan',
+            'default' => 'Rp 150.000',
             'type'    => 'text',
         ),
-        'larismanis_price_growth' => array(
-            'label'   => 'Harga Paket Growth Omnichannel & AI',
-            'default' => 'Rp 299.000',
-            'type'    => 'text',
-        ),
-        'larismanis_price_enterprise' => array(
-            'label'   => 'Harga Paket Enterprise Custom',
-            'default' => 'Custom',
+        'larismanis_price_lifetime' => array(
+            'label'   => 'Harga Lisensi Website (Selama LarisManis.online Beroperasi)',
+            'default' => 'Rp 3.000.000',
             'type'    => 'text',
         ),
     );
