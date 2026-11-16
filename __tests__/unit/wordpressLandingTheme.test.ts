@@ -31,6 +31,10 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
     expect(styleCss).toContain('.lm-header');
     expect(styleCss).toContain('.lm-mobile-drawer');
     expect(styleCss).toContain('.lm-order-form-card');
+    expect(styleCss).toContain('.lm-compare-heading');
+    expect(styleCss).toContain('.lm-check-body');
+    expect(styleCss).toContain('.lm-check-title');
+    expect(styleCss).toContain('.lm-check-desc');
     expect(styleCss).toContain('@media (min-width: 960px)');
   });
 
@@ -97,6 +101,10 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
     expect(frontPagePhp).toContain('larismanis_submit_lead');
     expect(frontPagePhp).toContain('name="whatsapp"');
     expect(frontPagePhp).toContain('name="brand_name"');
+    expect(frontPagePhp).toContain('lm-compare-heading');
+    expect(frontPagePhp).toContain('lm-check-body');
+    expect(frontPagePhp).toContain('lm-check-title');
+    expect(frontPagePhp).toContain('lm-check-desc');
     expect(indexPhp).toContain('front-page.php');
   });
 });
