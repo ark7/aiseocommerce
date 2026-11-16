@@ -323,13 +323,13 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
     </div>
   </section>
 
-  <!-- 7. ORDER & CONSULTATION FORM (#pesan) -->
+  <!-- 7. ORDER FORM (#pesan) -->
   <section id="pesan" class="lm-section">
     <div class="lm-container">
       <div class="lm-section-header">
         <span class="lm-eyebrow">Pendaftaran &amp; Pemesanan Lisensi</span>
         <h2>Mulai Miliki Website Komersial Anda Sekarang</h2>
-        <p>Isi form di bawah ini untuk memesan Lisensi 1 Website (<strong><?php echo esc_html($price_lifetime); ?></strong> + operasional <strong><?php echo esc_html($price_monthly); ?>/bulan</strong>) atau menjadwalkan konsultasi teknis. Tim kami akan langsung menghubungi Anda melalui WhatsApp.</p>
+        <p>Isi form pemesanan di bawah ini untuk memiliki Lisensi 1 Website (<strong><?php echo esc_html($price_lifetime); ?></strong> + operasional <strong><?php echo esc_html($price_monthly); ?>/bulan</strong>). Data pemesanan Anda langsung tercatat di sistem CMS kami untuk segera ditindaklanjuti.</p>
       </div>
 
       <div class="lm-order-form-card">
@@ -337,7 +337,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
           <div class="lm-alert-success" role="status">
             <strong>✅ Form Pemesanan Berhasil Dikirim!</strong>
             <p style="margin:6px 0 0;">
-              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem kami dan tim LarisManis.online akan segera menghubungi nomor WhatsApp Anda.
+              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem CMS kami dan tim LarisManis.online akan segera menindaklanjuti pesanan Anda.
             </p>
           </div>
         <?php elseif ($lead_error !== '') : ?>
@@ -369,7 +369,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
             <div class="lm-field">
               <label for="lm_whatsapp">Nomor WhatsApp Aktif <span style="color:#dc2626;">*</span></label>
-              <input type="tel" id="lm_whatsapp" name="whatsapp" required class="lm-input" placeholder="Contoh: 081234567890">
+              <input type="tel" id="lm_whatsapp" name="whatsapp" required class="lm-input" placeholder="Masukkan nomor WhatsApp aktif Anda">
             </div>
 
             <div class="lm-field">

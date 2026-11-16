@@ -95,6 +95,7 @@ if (!$theme->exists()) {
 }
 
 switch_theme('larismanis-landing');
+remove_theme_mod('larismanis_wa_number');
 
 echo wp_json_encode(array(
     'status' => 'ok',
