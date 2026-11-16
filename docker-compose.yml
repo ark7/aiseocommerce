@@ -89,6 +89,7 @@ services:
       WORDPRESS_TABLE_PREFIX: lm_
     volumes:
       - wp_content_data:/var/www/html/wp-content
+      - ./wordpress/themes/larismanis-landing:/var/www/html/wp-content/themes/larismanis-landing
     deploy:
       resources:
         limits:
