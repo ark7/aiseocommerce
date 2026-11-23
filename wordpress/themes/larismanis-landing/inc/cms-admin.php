@@ -1,6 +1,6 @@
 <?php
 /**
- * LarisManis CMS Admin Module:
+ * LarisDari CMS Admin Module:
  * - On-Page Order/Lead Submission Storage (`lm_lead`)
  * - WP Admin Menu: Data Pemesanan + Klik to Chat WA + Export CSV
  * - WP Admin Menu: Pixel & Analytics Indonesia (GTM, Google Ads, GA4, Meta Pixel, TikTok Pixel)
@@ -66,7 +66,7 @@ function larismanis_format_wa_click_url($phone, $name = '', $brand = '', $domain
     $greeting_brand = trim((string) $brand) !== '' ? trim((string) $brand) : 'toko online Kakak';
     $domain_note    = trim((string) $domain) !== '' ? ' (rencana domain: ' . trim((string) $domain) . ')' : '';
 
-    $message = "Halo Kak {$greeting_name}, terima kasih telah mengisi form pemesanan Lisensi Website LarisManis.online untuk brand *{$greeting_brand}*{$domain_note}. Kami dari tim LarisManis.online siap membantu proses setup website toko online Kakak. Apakah ada waktu untuk diskusi sebentar?";
+    $message = "Halo Kak {$greeting_name}, terima kasih telah mengisi form pemesanan Lisensi Website LarisDari.web.id untuk brand *{$greeting_brand}*{$domain_note}. Kami dari tim LarisDari.web.id siap membantu proses setup website toko online Kakak. Apakah ada waktu untuk diskusi sebentar?";
 
     return 'https://wa.me/' . $digits . '?text=' . rawurlencode($message);
 }
@@ -228,7 +228,7 @@ function larismanis_handle_export_leads_csv() {
     ));
 
     header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="larismanis-pemesanan-' . gmdate('Y-m-d') . '.csv"');
+    header('Content-Disposition: attachment; filename="larisdari-pemesanan-' . gmdate('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
     fputcsv($out, array('Tanggal', 'Nama Lengkap', 'Nama Brand', 'Nomor WhatsApp', 'Email', 'Rencana Domain', 'Kategori Bisnis', 'Catatan', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Status', 'Link Chat WA'));
@@ -262,7 +262,7 @@ function larismanis_handle_export_leads_csv() {
 add_action('admin_post_larismanis_export_leads_csv', 'larismanis_handle_export_leads_csv');
 
 /**
- * Registers the top-level "LarisManis CMS" admin menu with Leads & Pixel/Analytics submenus.
+ * Registers the top-level "LarisDari CMS" admin menu with Leads & Pixel/Analytics submenus.
  */
 function larismanis_register_admin_menus() {
     $new_leads = get_posts(array(
@@ -281,8 +281,8 @@ function larismanis_register_admin_menus() {
     $badge     = $new_count > 0 ? ' <span class="awaiting-mod count-' . $new_count . '"><span class="pending-count">' . $new_count . '</span></span>' : '';
 
     add_menu_page(
-        __('LarisManis CMS', 'larismanis-landing'),
-        'LarisManis CMS' . $badge,
+        __('LarisDari CMS', 'larismanis-landing'),
+        'LarisDari CMS' . $badge,
         'manage_options',
         'larismanis-leads',
         'larismanis_render_leads_page',
@@ -371,7 +371,7 @@ function larismanis_render_leads_page() {
     <div class="wrap">
       <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
         <div>
-          <h1 style="margin:0 0 4px; font-weight:700;">📋 Data Pemesanan Lisensi Website (LarisManis.online)</h1>
+          <h1 style="margin:0 0 4px; font-weight:700;">📋 Data Pemesanan Lisensi Website (LarisDari.web.id)</h1>
           <p style="margin:0; color:#64748b;">Semua calon pembeli yang mengisi form di halaman utama masuk ke sini. Klik tombol <strong>💬 Chat WA</strong> pada baris pesanan untuk langsung menyapa calon klien.</p>
         </div>
         <div style="display:flex; gap:8px;">
@@ -454,7 +454,7 @@ function larismanis_render_leads_page() {
           <?php if (empty($filtered_leads)) : ?>
             <tr>
               <td colspan="7" style="text-align:center; padding:32px; color:#64748b;">
-                Belum ada data pemesanan yang cocok. Bagikan <code>https://larismanis.online/</code> ke kampanye iklan Anda!
+                Belum ada data pemesanan yang cocok. Bagikan <code>https://larisdari.web.id/</code> ke kampanye iklan Anda!
               </td>
             </tr>
           <?php else : ?>
@@ -611,13 +611,13 @@ function larismanis_render_analytics_page() {
     };
     ?>
     <div class="wrap" style="max-width:960px;">
-      <h1 style="font-weight:700;">📊 Pengaturan Pixel &amp; Analytics Indonesia (`larismanis.online`)</h1>
+      <h1 style="font-weight:700;">📊 Pengaturan Pixel &amp; Analytics Indonesia (<code>larisdari.web.id</code>)</h1>
       <p style="color:#475569;">
         Pasang ID Google Tag Manager, Google Analytics 4, Google Ads, Meta Pixel (Facebook/Instagram), dan TikTok Pixel langsung dari sini. Ketika calon pembeli mengirim Form Pemesanan (<code>#pesan</code>), landing page otomatis mengirim event konversi ke seluruh platform aktif.
       </p>
 
       <?php if (isset($_GET['saved'])) : ?>
-        <div class="notice notice-success is-dismissible"><p><strong>Berhasil disimpan!</strong> Seluruh key Pixel &amp; Analytics telah aktif di halaman <code>https://larismanis.online/</code>.</p></div>
+        <div class="notice notice-success is-dismissible"><p><strong>Berhasil disimpan!</strong> Seluruh key Pixel &amp; Analytics telah aktif di halaman <code>https://larisdari.web.id/</code>.</p></div>
       <?php endif; ?>
 
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:24px; margin-top:16px;">
@@ -796,7 +796,7 @@ window.dataLayer.push({ event: 'larismanis_lead_submitted', currency: 'IDR', val
 fbq('init', '<?php echo esc_js($meta_id); ?>');
 fbq('track', 'PageView');
 <?php if ($lead_success) : ?>
-fbq('track', 'Lead', { content_name: 'Lisensi Website LarisManis.online', currency: 'IDR', value: 3000000 });
+fbq('track', 'Lead', { content_name: 'Lisensi Website LarisDari.web.id', currency: 'IDR', value: 3000000 });
 <?php endif; ?>
 </script>
     <?php endif;
@@ -809,7 +809,7 @@ fbq('track', 'Lead', { content_name: 'Lisensi Website LarisManis.online', curren
   ttq.load('<?php echo esc_js($tiktok_id); ?>');
   ttq.page();
   <?php if ($lead_success) : ?>
-  ttq.track('SubmitForm', { content_name: 'Lisensi Website LarisManis.online', currency: 'IDR', value: 3000000 });
+  ttq.track('SubmitForm', { content_name: 'Lisensi Website LarisDari.web.id', currency: 'IDR', value: 3000000 });
   <?php endif; ?>
 }(window, document, 'ttq');
 </script>

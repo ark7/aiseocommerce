@@ -35,8 +35,8 @@ tar -C "${THEME_SRC}" -cf - . | ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" bash -
 echo "[2/3] Ensuring WordPress core is initialized and activating theme '${TARGET_THEME}'..."
 ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" php <<'PHP'
 <?php
-$_SERVER['HTTP_HOST'] = 'larismanis.online';
-$_SERVER['SERVER_NAME'] = 'larismanis.online';
+$_SERVER['HTTP_HOST'] = 'larisdari.web.id';
+$_SERVER['SERVER_NAME'] = 'larisdari.web.id';
 $_SERVER['HTTPS'] = 'on';
 
 $wp_config = '/var/www/html/wp-config.php';
@@ -75,17 +75,17 @@ if (!$already_installed) {
     require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $random_password = wp_generate_password(20, true, true);
     wp_install(
-        'LarisManis.online — Website komersial pemersatu jalur penjualan online Anda',
+        'LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda',
         'admin_larismanis',
-        'halo@larismanis.online',
+        'halo@larisdari.web.id',
         true,
         '',
         $random_password
     );
-    update_option('siteurl', 'https://larismanis.online');
-    update_option('home', 'https://larismanis.online');
+    update_option('siteurl', 'https://larisdari.web.id');
+    update_option('home', 'https://larisdari.web.id');
     update_option('blogdescription', 'Website komersial pemersatu jalur penjualan online Anda');
-    echo "[INFO] WordPress auto-installed with siteurl https://larismanis.online.\n";
+    echo "[INFO] WordPress auto-installed with siteurl https://larisdari.web.id.\n";
 }
 
 $theme = wp_get_theme('larismanis-landing');
@@ -96,6 +96,26 @@ if (!$theme->exists()) {
 
 switch_theme('larismanis-landing');
 remove_theme_mod('larismanis_wa_number');
+
+// Always sync siteurl, home, blogname, and legacy theme_mods on live deploys
+update_option('siteurl', 'https://larisdari.web.id');
+update_option('home', 'https://larisdari.web.id');
+$current_blogname = (string) get_option('blogname', '');
+if (trim($current_blogname) === '' || stripos($current_blogname, 'larismanis') !== false) {
+    update_option('blogname', 'LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda');
+}
+
+$legacy_mod_updates = array(
+    'larismanis_demo_url'       => 'https://demo.larisdari.web.id',
+    'larismanis_demo_admin_url' => 'https://demo.larisdari.web.id/login',
+    'larismanis_contact_email'  => 'halo@larisdari.web.id',
+);
+foreach ($legacy_mod_updates as $mod_key => $mod_target) {
+    $existing_mod = get_theme_mod($mod_key);
+    if (is_string($existing_mod) && stripos($existing_mod, 'larismanis.online') !== false) {
+        set_theme_mod($mod_key, $mod_target);
+    }
+}
 
 echo wp_json_encode(array(
     'status' => 'ok',
@@ -108,12 +128,12 @@ PHP
 echo "[3/3] Verifying local WordPress response on http://127.0.0.1:8080/..."
 if command -v curl >/dev/null 2>&1; then
   TMP_HTML="$(mktemp)"
-  curl -fsS -H "Host: larismanis.online" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ -o "${TMP_HTML}"
+  curl -fsS -H "Host: larisdari.web.id" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ -o "${TMP_HTML}"
   grep -q "larismanis-landing" "${TMP_HTML}"
   rm -f "${TMP_HTML}"
 else
   ${DOCKER_CMD} exec "${CONTAINER_NAME}" php -r '
-    $ctx = stream_context_create(["http" => ["header" => "Host: larismanis.online\r\nX-Forwarded-Proto: https\r\n"]]);
+    $ctx = stream_context_create(["http" => ["header" => "Host: larisdari.web.id\r\nX-Forwarded-Proto: https\r\n"]]);
     $html = file_get_contents("http://127.0.0.1/", false, $ctx);
     if (strpos($html, "larismanis-landing") === false) exit(1);
   '

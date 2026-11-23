@@ -88,13 +88,20 @@ describe('Demo Read-Only Guard & Multi-Tenant CRUD Isolation', () => {
       });
       expect(await isDemoStore('store-custom-demo')).toBe(true);
 
-      // 3. Berdasarkan domain demo.larismanis.online
+      // 3. Berdasarkan domain demo.larisdari.web.id & alias demo.larismanis.online
       (prisma.store.findUnique as jest.Mock).mockResolvedValueOnce({
         id: 'store-subdomain-demo',
-        domain: 'demo.larismanis.online',
+        domain: 'demo.larisdari.web.id',
         isDemo: false,
       });
       expect(await isDemoStore('store-subdomain-demo')).toBe(true);
+
+      (prisma.store.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'store-legacy-demo',
+        domain: 'demo.larismanis.online',
+        isDemo: false,
+      });
+      expect(await isDemoStore('store-legacy-demo')).toBe(true);
 
       // 4. Toko klien nyata (produksi) menghasilkan false
       (prisma.store.findUnique as jest.Mock).mockResolvedValueOnce({

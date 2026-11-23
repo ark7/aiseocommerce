@@ -22,8 +22,8 @@ export default async function RegisterPage({
 
   const effectiveStore = store || {
     id: 'demo-store-001',
-    name: 'LarisManis Demo Store',
-    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online',
+    name: 'LarisDari Demo Store',
+    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };
 

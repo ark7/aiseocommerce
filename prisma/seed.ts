@@ -20,8 +20,8 @@ import { upsertIdCardShowcaseProduct } from './batchShowcaseData';
 const prisma = new PrismaClient();
 
 // Configuration
-const STORE_DOMAIN = process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online';
-const STORE_NAME = 'LarisManis Demo Store';
+const STORE_DOMAIN = process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id';
+const STORE_NAME = 'LarisDari Demo Store';
 
 interface CuratedProduct {
   name: string;
@@ -476,7 +476,7 @@ async function main() {
   // 1. Clean existing demo store data
   console.log('🧹 Membersihkan data demo lama...');
   const demoStore = await prisma.store.findFirst({ 
-    where: { OR: [{ domain: STORE_DOMAIN }, { domain: 'demo-store.local' }, { domain: 'demo.larismanis.online' }] } 
+    where: { OR: [{ domain: STORE_DOMAIN }, { domain: 'demo-store.local' }, { domain: 'demo.larisdari.web.id' }, { domain: 'demo.larismanis.online' }] } 
   });
   
   if (demoStore) {
@@ -522,7 +522,7 @@ async function main() {
           businessPhone: '+62 812 8899 7711',
           tagline: 'Website komersial pemersatu jalur penjualan online Anda',
           heroTitle: 'Website komersial pemersatu jalur penjualan online Anda',
-          heroSubtitle: 'Satu toko online mandiri terintegrasi langsung dengan Shopee, Tokopedia, TikTok Shop, kurir ekspedisi nasional Biteship, dan payment gateway. Dikelola tuntas oleh LarisManis.online.',
+          heroSubtitle: 'Satu toko online mandiri terintegrasi langsung dengan Shopee, Tokopedia, TikTok Shop, kurir ekspedisi nasional Biteship, dan payment gateway. Dikelola tuntas oleh LarisDari.web.id.',
           heroCtaText: 'Belanja Sekarang',
           heroCtaLink: '/products',
           heroCtaSecondaryText: 'Produk Terlaris',
@@ -530,7 +530,7 @@ async function main() {
           heroImageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
           primaryColor: '#4F46E5',
           fontFamily: 'inter',
-          defaultSeoTitle: 'LarisManis Demo Store — Website komersial pemersatu jalur penjualan online Anda',
+          defaultSeoTitle: 'LarisDari Demo Store — Website komersial pemersatu jalur penjualan online Anda',
           defaultSeoDescription: 'Platform website komersial modern pemersatu jalur penjualan online Anda dengan integrasi omnichannel marketplace, optimasi SEO otomatis, dan asisten AI pintar.',
           // Tarif Ongkir Flat Manual
           shippingOriginCity: 'Jakarta Selatan',

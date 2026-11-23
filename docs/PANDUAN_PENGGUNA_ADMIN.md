@@ -1,7 +1,7 @@
 # 📘 Buku Panduan Pengguna Admin Dashboard (User Guide)
 ## Platform E-Commerce SaaS & Managed Web Service
 
-**Edisi Resmi — Didukung oleh LarisManis.online**  
+**Edisi Resmi — Didukung oleh LarisDari.web.id**  
 *Versi Sistem: 1.0.0 (Production Ready)*  
 *Target Pembaca: Pemilik Toko (Merchant Owner), Manajer Operasional, Tim Customer Service (CS), Staf Gudang, Akuntan, dan Tim Pemasaran.*
 
@@ -31,7 +31,7 @@
 ### 1.1 Cara Masuk ke Dashboard (Login)
 1. Buka peramban web (Google Chrome, Safari, atau Firefox) lalu akses URL:
    `https://demo.tokoanda.com/login` (atau alamat domain toko Anda).
-2. Masukkan **Alamat Email** dan **Kata Sandi** yang telah didaftarkan oleh Administrator / LarisManis.online.
+2. Masukkan **Alamat Email** dan **Kata Sandi** yang telah didaftarkan oleh Administrator / LarisDari.web.id.
 3. Klik tombol **"Masuk ke Dashboard"**.
 4. Sistem secara otomatis memeriksa hak akses Anda dan mengarahkan ke halaman Beranda Dashboard sesuai izin peran (*role*) Anda.
 
@@ -279,7 +279,7 @@ Menu Pengaturan ([`/admin/settings`](file:///home/ngabsenid/aiseocommerce/aiseoc
 * Pasang kode pelacak iklan: **Meta / Facebook Pixel ID**, **Google Analytics 4 (GA4) Measurement ID**, dan **TikTok Pixel ID**.
 * **Panduan Konfigurasi Cloudflare Turnstile (Proteksi Anti-Bot & DDoS Seluruh Path Publik):**
   1. Login ke [Cloudflare Dashboard](https://dash.cloudflare.com), pilih menu **Turnstile**, lalu klik **Add widget**.
-  2. Beri nama widget dan masukkan hostname domain toko Anda (contoh: `demo.larismanis.online` atau domain kustom Anda) di bagian **Add Hostnames**.
+  2. Beri nama widget dan masukkan hostname domain toko Anda (contoh: `demo.larisdari.web.id` atau domain kustom Anda) di bagian **Add Hostnames**.
   3. Pilih **Widget Mode: Managed (Recommended)** agar pembeli asli diverifikasi mulus di latar belakang, lalu klik **Create**.
   4. Salin **Site Key** (`0x4...`) dan **Secret Key** (`0x4...`), masuk ke menu **Pengaturan -> 🛡️ Pixel & Keamanan** di Admin Panel, tempelkan kedua kunci di panel **Cloudflare Turnstile (Anti-Bot / CAPTCHA)**, centang kotak **Aktifkan proteksi bot Cloudflare Turnstile di seluruh path publik**, lalu klik **Simpan Turnstile**.
   5. **Cakupan Proteksi Global & Kenyamanan Pembeli:**
@@ -364,7 +364,7 @@ Sore Hari (16:30 - 18:00):
 * **Q: Apakah saya bisa mengubah harga produk saat ada pesanan yang sedang berjalan?**  
   *A: Bisa. Sistem menyimpan data harga produk secara historis pada saat transaksi dibuat, sehingga perubahan harga di masa depan tidak akan mengubah nominal pesanan lama.*
 * **Q: Ke mana saya harus menghubungi jika membutuhkan bantuan teknis tambahan?**  
-  *A: Layanan managed service toko online ini didukung penuh oleh **LarisManis.online**. Anda dapat menghubungi account manager LarisManis.online Anda kapan saja untuk bantuan server, domain, maupun pengembangan fitur baru.*
+  *A: Layanan managed service toko online ini didukung penuh oleh **LarisDari.web.id**. Anda dapat menghubungi account manager LarisDari.web.id Anda kapan saja untuk bantuan server, domain, maupun pengembangan fitur baru.*
 
 ---
 
@@ -403,5 +403,5 @@ Setelah gambar selesai digenerate:
 
 ---
 *Dokumen ini disusun untuk memberikan pengalaman operasional terbaik bagi Anda dan seluruh tim bisnis Anda.*  
-*Hak Cipta © 2026 LarisManis.online. Seluruh hak cipta dilindungi undang-undang.*
+*Hak Cipta © 2026 LarisDari.web.id. Seluruh hak cipta dilindungi undang-undang.*
 

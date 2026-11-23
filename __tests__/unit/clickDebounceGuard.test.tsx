@@ -211,7 +211,7 @@ describe('GlobalClickDebounceGuard & Interactive Lock Protection', () => {
       render(
         <AddToCartButton
           productId="prod-1"
-          storeDomain="demo.larismanis.online"
+          storeDomain="demo.larisdari.web.id"
           price={50000}
           name="Produk Uji"
           stock={20}
@@ -239,7 +239,7 @@ describe('GlobalClickDebounceGuard & Interactive Lock Protection', () => {
       const { unmount } = render(
         <AddToCartButton
           productId="prod-2"
-          storeDomain="demo.larismanis.online"
+          storeDomain="demo.larisdari.web.id"
           price={25000}
           name="Produk Cleanup"
           stock={10}

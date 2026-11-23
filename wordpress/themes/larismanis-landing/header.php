@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
+$demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -27,7 +27,7 @@ $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larismani
   <div class="lm-container lm-nav-wrap">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="lm-brand">
       <span class="lm-brand-icon" aria-hidden="true">L</span>
-      <span>LarisManis<span class="lm-brand-domain">.online</span></span>
+      <span>LarisDari<span class="lm-brand-domain">.web.id</span></span>
     </a>
 
     <nav class="lm-nav-desktop" aria-label="Navigasi Utama">

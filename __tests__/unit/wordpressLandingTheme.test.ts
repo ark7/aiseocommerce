@@ -21,12 +21,14 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
       expect(fs.existsSync(path.join(themeDir, file))).toBe(true);
     }
 
-    expect(fs.existsSync(path.join(repoRoot, 'scripts', 'deploy-wp-landing.sh'))).toBe(true);
+    const deployScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'deploy-wp-landing.sh'), 'utf8');
+    expect(deployScript).toContain('https://larisdari.web.id');
+    expect(deployScript).toContain('https://demo.larisdari.web.id');
   });
 
   it('defines valid WordPress theme metadata and responsive layout + order form styles in style.css', () => {
     const styleCss = fs.readFileSync(path.join(themeDir, 'style.css'), 'utf8');
-    expect(styleCss).toContain('Theme Name: LarisManis.online Official Landing');
+    expect(styleCss).toContain('Theme Name: LarisDari.web.id Official Landing');
     expect(styleCss).toContain('Text Domain: larismanis-landing');
     expect(styleCss).toContain('.lm-header');
     expect(styleCss).toContain('.lm-mobile-drawer');
@@ -88,12 +90,12 @@ describe('WordPress Landing Page Theme (wordpress/themes/larismanis-landing)', (
     expect(functionsPhp).not.toMatch(/konsultasi|konsul/i);
 
     expect(frontPagePhp).toContain('Website komersial pemersatu jalur penjualan online Anda');
-    expect(frontPagePhp).toContain('https://demo.larismanis.online');
+    expect(frontPagePhp).toContain('https://demo.larisdari.web.id');
     expect(frontPagePhp).toContain('Lisensi 1 Website');
     expect(frontPagePhp).toContain('Biaya Operasional Bulanan');
     expect(frontPagePhp).toContain('Rp 150.000');
     expect(frontPagePhp).toContain('Rp 3.000.000');
-    expect(frontPagePhp).toContain('selama LarisManis.online beroperasi');
+    expect(frontPagePhp).toContain('selama LarisDari.web.id beroperasi');
     expect(frontPagePhp).toContain('Domain &amp; Email Custom');
     expect(frontPagePhp).not.toContain('Starter UMKM');
 

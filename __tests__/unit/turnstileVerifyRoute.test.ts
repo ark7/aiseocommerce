@@ -42,14 +42,14 @@ describe('POST /api/security/turnstile-verify', () => {
   }
 
   it('returns 400 when Turnstile token is missing', async () => {
-    const res = await POST(makeReq({ storeDomain: 'demo.larismanis.online' }));
+    const res = await POST(makeReq({ storeDomain: 'demo.larisdari.web.id' }));
     expect(res.status).toBe(400);
   });
 
   it('returns 200 with bypassed: true when Turnstile is disabled on the store', async () => {
     (getActiveStore as jest.Mock).mockResolvedValue({
       id: 'store-1',
-      domain: 'demo.larismanis.online',
+      domain: 'demo.larisdari.web.id',
       settings: {
         turnstileEnabled: false,
         turnstileSiteKey: null,
@@ -57,7 +57,7 @@ describe('POST /api/security/turnstile-verify', () => {
       },
     });
 
-    const res = await POST(makeReq({ token: 'cf-token-123', storeDomain: 'demo.larismanis.online' }));
+    const res = await POST(makeReq({ token: 'cf-token-123', storeDomain: 'demo.larisdari.web.id' }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ verified: true, bypassed: true });
@@ -67,7 +67,7 @@ describe('POST /api/security/turnstile-verify', () => {
   it('returns 400 when Cloudflare siteverify rejects the token', async () => {
     (getActiveStore as jest.Mock).mockResolvedValue({
       id: 'store-1',
-      domain: 'demo.larismanis.online',
+      domain: 'demo.larisdari.web.id',
       settings: {
         turnstileEnabled: true,
         turnstileSiteKey: '0xSITE',
@@ -84,7 +84,7 @@ describe('POST /api/security/turnstile-verify', () => {
   it('returns 200 and sets HttpOnly signed cf_turnstile_pass cookie when Turnstile succeeds', async () => {
     (getActiveStore as jest.Mock).mockResolvedValue({
       id: 'store-1',
-      domain: 'demo.larismanis.online',
+      domain: 'demo.larisdari.web.id',
       settings: {
         turnstileEnabled: true,
         turnstileSiteKey: '0xSITE',
@@ -93,7 +93,7 @@ describe('POST /api/security/turnstile-verify', () => {
     });
     (verifyTurnstile as jest.Mock).mockResolvedValue(true);
 
-    const res = await POST(makeReq({ token: 'good-token', storeDomain: 'demo.larismanis.online' }));
+    const res = await POST(makeReq({ token: 'good-token', storeDomain: 'demo.larisdari.web.id' }));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toEqual({ verified: true });

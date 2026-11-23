@@ -25,13 +25,13 @@ describe('StoreHeader & StoreFooter Layout Behavior', () => {
   it('does not render storeAddress in StoreHeader even when storeAddress prop is provided', () => {
     const { container } = render(
       <StoreHeader
-        storeDomain="demo.larismanis.online"
-        storeName="LarisManis Demo Store"
+        storeDomain="demo.larisdari.web.id"
+        storeName="LarisDari Demo Store"
         storeAddress="Jl. Jend. Sudirman No. 123, Jakarta Selatan"
       />
     );
 
-    expect(screen.getByText('LarisManis Demo Store')).toBeInTheDocument();
+    expect(screen.getByText('LarisDari Demo Store')).toBeInTheDocument();
     expect(container.querySelector('header')).not.toHaveTextContent(
       'Jl. Jend. Sudirman No. 123, Jakarta Selatan'
     );
@@ -40,8 +40,8 @@ describe('StoreHeader & StoreFooter Layout Behavior', () => {
   it('renders desktop nav links and toggles mobile navlist with navigation and auth links', () => {
     render(
       <StoreHeader
-        storeDomain="demo.larismanis.online"
-        storeName="LarisManis Demo Store"
+        storeDomain="demo.larisdari.web.id"
+        storeName="LarisDari Demo Store"
       />
     );
 
@@ -75,8 +75,8 @@ describe('StoreHeader & StoreFooter Layout Behavior', () => {
 
     render(
       <StoreHeader
-        storeDomain="demo.larismanis.online"
-        storeName="LarisManis Demo Store"
+        storeDomain="demo.larisdari.web.id"
+        storeName="LarisDari Demo Store"
       />
     );
 
@@ -90,10 +90,10 @@ describe('StoreHeader & StoreFooter Layout Behavior', () => {
   it('renders the store address cleanly inside StoreFooter', () => {
     render(
       <StoreFooter
-        storeName="LarisManis Demo Store"
+        storeName="LarisDari Demo Store"
         address="Jl. Jend. Sudirman No. 123, Jakarta Selatan"
         phone="081234567890"
-        email="halo@larismanis.online"
+        email="halo@larisdari.web.id"
       />
     );
 
@@ -101,6 +101,6 @@ describe('StoreHeader & StoreFooter Layout Behavior', () => {
     expect(footer).toHaveTextContent('Alamat:');
     expect(footer).toHaveTextContent('Jl. Jend. Sudirman No. 123, Jakarta Selatan');
     expect(footer).toHaveTextContent('081234567890');
-    expect(footer).toHaveTextContent('halo@larismanis.online');
+    expect(footer).toHaveTextContent('halo@larisdari.web.id');
   });
 });

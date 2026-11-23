@@ -1,8 +1,8 @@
-# Panduan Hosting LarisManis.online di IDCloudHost VPS + Cloudflare
-**Website komersial pemersatu jalur penjualan online Anda — Didukung oleh LarisManis.online**  
+# Panduan Hosting LarisDari.web.id di IDCloudHost VPS + Cloudflare
+**Website komersial pemersatu jalur penjualan online Anda — Didukung oleh LarisDari.web.id**  
 *Dual-Host Architecture: WordPress Marketing (:8080) + Next.js E-Commerce SaaS (:3000)*
 
-Panduan komprehensif untuk meluncurkan platform **LarisManis.online** di layanan Cloud VPS IDCloudHost dengan jaringan lokal Indonesia (low-latency) dan perlindungan Cloudflare Edge.
+Panduan komprehensif untuk meluncurkan platform **LarisDari.web.id** di layanan Cloud VPS IDCloudHost dengan jaringan lokal Indonesia (low-latency) dan perlindungan Cloudflare Edge.
 
 ---
 
@@ -12,10 +12,10 @@ Platform ini menggunakan konfigurasi dual-host yang efisien dalam 1 server VPS:
 
 | Domain / URL | Peran & Layanan | Teknologi | Port Internal |
 | :--- | :--- | :--- | :--- |
-| **`https://larismanis.online`** | **Landing Page Pemasaran Managed Webcommerce** | WordPress 6.7 Apache | `127.0.0.1:8080` |
-| **`https://www.larismanis.online`** | Alias resmi landing page pemasaran | WordPress 6.7 Apache | `127.0.0.1:8080` |
-| **`https://demo.larismanis.online`** | **Demo E-Commerce SaaS Storefront & Admin** | Next.js 14 Standalone | `127.0.0.1:3000` |
-| **`https://*.larismanis.online`** | Wildcard multi-tenant toko klien | Next.js 14 Standalone | `127.0.0.1:3000` |
+| **`https://larisdari.web.id`** | **Landing Page Pemasaran Managed Webcommerce** | WordPress 6.7 Apache | `127.0.0.1:8080` |
+| **`https://www.larisdari.web.id`** | Alias resmi landing page pemasaran | WordPress 6.7 Apache | `127.0.0.1:8080` |
+| **`https://demo.larisdari.web.id`** | **Demo E-Commerce SaaS Storefront & Admin** | Next.js 14 Standalone | `127.0.0.1:3000` |
+| **`https://*.larisdari.web.id`** | Wildcard multi-tenant toko klien | Next.js 14 Standalone | `127.0.0.1:3000` |
 
 ---
 
@@ -40,7 +40,7 @@ Untuk menjalankan Next.js SaaS, WordPress, MariaDB, dan Nginx secara optimal dan
 
 ## 3. Pengaturan DNS & SSL di Cloudflare
 
-Buka akun Cloudflare Anda pada domain **`larismanis.online`**:
+Buka akun Cloudflare Anda pada domain **`larisdari.web.id`**:
 
 ### A. Konfigurasi DNS Records
 Masuk ke menu **DNS** > **Records** dan tambahkan entri berikut:
@@ -48,9 +48,9 @@ Masuk ke menu **DNS** > **Records** dan tambahkan entri berikut:
 | Tipe | Nama Host | Target / Alamat IPv4 | Proxy Status | TTL |
 | :--- | :--- | :--- | :--- | :--- |
 | **`A`** | `@` | `<IP_PUBLIC_VPS_IDCLOUDHOST>` | **Proxied (Awan Oranye)** | Auto |
-| **`CNAME`** | `www` | `larismanis.online` | **Proxied (Awan Oranye)** | Auto |
-| **`CNAME`** | `demo` | `larismanis.online` | **Proxied (Awan Oranye)** | Auto |
-| **`CNAME`** | `*` | `larismanis.online` | **Proxied (Awan Oranye)** | Auto |
+| **`CNAME`** | `www` | `larisdari.web.id` | **Proxied (Awan Oranye)** | Auto |
+| **`CNAME`** | `demo` | `larisdari.web.id` | **Proxied (Awan Oranye)** | Auto |
+| **`CNAME`** | `*` | `larisdari.web.id` | **Proxied (Awan Oranye)** | Auto |
 
 > [!IMPORTANT]
 > Pastikan seluruh record berstatus **Proxied (Awan Oranye)** agar pengunjung mendapatkan akselerasi CDN Cloudflare dan sertifikat SSL otomatis tanpa perlu pengaturan manual.
@@ -86,13 +86,13 @@ Pastikan variabel kunci berikut terisi:
 ```ini
 NODE_ENV=production
 PORT=3000
-DEFAULT_STORE_DOMAIN="demo.larismanis.online"
+DEFAULT_STORE_DOMAIN="demo.larisdari.web.id"
 
 # Koneksi Database Neon PostgreSQL Cloud
 DATABASE_URL="postgresql://<NEON_USER>:<NEON_PASSWORD>@<NEON_POOLER_HOST>/neondb?sslmode=require&connect_timeout=15&pgbouncer=true"
 
 # NextAuth Authentication Secret
-NEXTAUTH_URL="https://demo.larismanis.online"
+NEXTAUTH_URL="https://demo.larisdari.web.id"
 NEXTAUTH_SECRET="kunci-secret-acak-minimal-32-karakter-keamanan"
 ```
 
@@ -105,7 +105,7 @@ Script akan mengeksekusi secara otomatis:
 1. Memperbarui paket sistem Ubuntu.
 2. Memasang Docker Engine & Docker Compose plugin.
 3. Membuka port firewall (SSH 22, HTTP 80, HTTPS 443).
-4. Memasang Nginx Reverse Proxy Dual Virtual Host (`larismanis.online` & `demo.larismanis.online`).
+4. Memasang Nginx Reverse Proxy Dual Virtual Host (`larisdari.web.id` & `demo.larisdari.web.id`).
 5. Membangun dan menjalankan 3 container:
    - `aiseocommerce-web` (Next.js SaaS)
    - `marketing-wp` (WordPress Landing Page)
@@ -114,22 +114,22 @@ Script akan mengeksekusi secara otomatis:
 
 ---
 
-## 5. Setup Awal WordPress Landing Page (`larismanis.online`)
+## 5. Setup Awal WordPress Landing Page (`larisdari.web.id`)
 
 Setelah script selesai berjalan:
-1. Buka browser dan akses: `https://larismanis.online`.
+1. Buka browser dan akses: `https://larisdari.web.id`.
 2. Halaman wizard instalasi WordPress akan muncul:
    - **Pilih Bahasa:** Bahasa Indonesia / English.
-   - **Judul Situs:** `LarisManis.online — Website komersial pemersatu jalur penjualan online Anda`
+   - **Judul Situs:** `LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda`
    - **Nama Pengguna Admin:** `admin_larismanis` (atau sesuai pilihan Anda)
    - **Kata Sandi:** Masukkan kata sandi yang kuat.
    - **Email:** Email kontak Anda.
 3. Klik **Install WordPress**.
-4. Di dasbor WordPress, Anda dapat memasang tema ringan (seperti *Astra*, *Kadence*, atau *GeneratePress*) dan mendesain landing page dengan tombol Call to Action mengarah ke `https://demo.larismanis.online`.
+4. Di dasbor WordPress, Anda dapat memasang tema ringan (seperti *Astra*, *Kadence*, atau *GeneratePress*) dan mendesain landing page dengan tombol Call to Action mengarah ke `https://demo.larisdari.web.id`.
 
 ---
 
-## 6. Reset & Seed Data Demo Toko (`demo.larismanis.online`)
+## 6. Reset & Seed Data Demo Toko (`demo.larisdari.web.id`)
 
 Untuk menyinkronkan data katalog produk realistis, Pre-Order, variasi, dan integrasi omnichannel ke database toko demo:
 
@@ -138,13 +138,13 @@ docker compose exec web npx ts-node prisma/seed.ts
 ```
 
 ### Akun Login Demo Toko Siap Pakai:
-* **Portal Admin Toko:** `https://demo.larismanis.online/login`
+* **Portal Admin Toko:** `https://demo.larisdari.web.id/login`
   * Email: `admin@demo-store.local`
   * Password: `password`
-* **Portal Staff Toko:** `https://demo.larismanis.online/login`
+* **Portal Staff Toko:** `https://demo.larisdari.web.id/login`
   * Email: `staff@demo-store.local`
   * Password: `password`
-* **Akun Pelanggan (Customer):** `https://demo.larismanis.online/login`
+* **Akun Pelanggan (Customer):** `https://demo.larisdari.web.id/login`
   * Email: `customer1@demo-store.local`
   * Password: `password`
 
@@ -173,5 +173,5 @@ ssh larismanis-prod "tail -f ~/deploy-web.log"
 ```
 
 ---
-*LarisManis.online — Website komersial pemersatu jalur penjualan online Anda*  
-*Didukung oleh LarisManis.online.*
+*LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda*  
+*Didukung oleh LarisDari.web.id.*

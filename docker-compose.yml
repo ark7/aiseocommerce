@@ -1,7 +1,7 @@
 services:
   # ==============================================================================
   # 1. Aplikasi E-Commerce SaaS (Next.js 14 Standalone Engine)
-  # Melayani: demo.larismanis.online dan subdomain multi-tenant klien
+  # Melayani: demo.larisdari.web.id dan subdomain multi-tenant klien
   # ==============================================================================
   web:
     build:
@@ -19,7 +19,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      - DEFAULT_STORE_DOMAIN=demo.larismanis.online
+      - DEFAULT_STORE_DOMAIN=demo.larisdari.web.id
     deploy:
       resources:
         limits:
@@ -70,7 +70,7 @@ services:
 
   # ==============================================================================
   # 3. WordPress Marketing Landing Page
-  # Melayani: https://larismanis.online dan https://www.larismanis.online
+  # Melayani: https://larisdari.web.id dan https://www.larisdari.web.id
   # ==============================================================================
   marketing-wp:
     image: wordpress:6.7-apache

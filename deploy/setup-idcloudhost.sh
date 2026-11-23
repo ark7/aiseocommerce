@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # Script Otomasi Deployment IDCloudHost VPS (Ubuntu 22.04 / 24.04 LTS)
-# Brand: LarisManis.online — Website komersial pemersatu jalur penjualan online Anda
+# Brand: LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda
 # Stack: Next.js 14 Standalone (demo.) + WordPress 6.7 (apex) + MariaDB + Nginx + Cloudflare
 # ==============================================================================
 
@@ -15,9 +15,9 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}==================================================================${NC}"
-echo -e "${BLUE}   LarisManis.online - IDCloudHost VPS Setup & Deploy             ${NC}"
+echo -e "${BLUE}   LarisDari.web.id - IDCloudHost VPS Setup & Deploy             ${NC}"
 echo -e "${BLUE}   Website komersial pemersatu jalur penjualan online Anda        ${NC}"
-echo -e "${BLUE}   Didukung oleh LarisManis.online                                ${NC}"
+echo -e "${BLUE}   Didukung oleh LarisDari.web.id                                ${NC}"
 echo -e "${BLUE}==================================================================${NC}\n"
 
 # 1. Validasi Akses Root / Sudo
@@ -69,7 +69,8 @@ if [ ! -f /etc/nginx/ssl/larismanis.crt ] || [ ! -f /etc/nginx/ssl/larismanis.ke
   openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/larismanis.key \
     -out /etc/nginx/ssl/larismanis.crt \
-    -subj "/CN=larismanis.online/O=LarisManis/C=ID" 2>/dev/null
+    -subj "/CN=larisdari.web.id/O=LarisDari/C=ID" \
+    -addext "subjectAltName=DNS:larisdari.web.id,DNS:*.larisdari.web.id,DNS:larismanis.online,DNS:*.larismanis.online" 2>/dev/null
 fi
 
 if [ -f "${APP_DIR}/nginx/idcloudhost-nginx.conf" ]; then
@@ -78,7 +79,7 @@ if [ -f "${APP_DIR}/nginx/idcloudhost-nginx.conf" ]; then
   rm -f /etc/nginx/sites-enabled/default
   nginx -t
   systemctl restart nginx
-  echo -e "${GREEN}✓ Nginx reverse proxy aktif (larismanis.online & demo.larismanis.online).${NC}"
+  echo -e "${GREEN}✓ Nginx reverse proxy aktif (larisdari.web.id & demo.larisdari.web.id).${NC}"
 else
   echo -e "${RED}[WARNING] File nginx/idcloudhost-nginx.conf tidak ditemukan.${NC}"
 fi
@@ -98,9 +99,9 @@ if [ ! -f .env.production ]; then
   fi
 fi
 
-# Pastikan DEFAULT_STORE_DOMAIN diset ke demo.larismanis.online
+# Pastikan DEFAULT_STORE_DOMAIN diset ke demo.larisdari.web.id
 if ! grep -q "DEFAULT_STORE_DOMAIN" .env.production; then
-  echo "DEFAULT_STORE_DOMAIN=\"demo.larismanis.online\"" >> .env.production
+  echo "DEFAULT_STORE_DOMAIN=\"demo.larisdari.web.id\"" >> .env.production
 fi
 
 # 7. Build dan Jalankan Container Docker (Next.js + WordPress + MariaDB)
@@ -128,18 +129,18 @@ else
 fi
 
 echo -e "${GREEN}==================================================================${NC}"
-echo -e "${GREEN}   DEPLOYMENT LARISMANIS.ONLINE SELESAI DENGAN SUKSES!            ${NC}"
+echo -e "${GREEN}   DEPLOYMENT LARISDARI.WEB.ID SELESAI DENGAN SUKSES!            ${NC}"
 echo -e "${GREEN}==================================================================${NC}"
 echo -e "Langkah selanjutnya di Dashboard Cloudflare DNS:"
 echo -e "1. Tambahkan DNS Records:"
 echo -e "   - A Record:     @    -> IP Public VPS IDCloudHost (Proxy ON / Awan Oranye)"
-echo -e "   - CNAME Record: www  -> larismanis.online (Proxy ON)"
-echo -e "   - CNAME Record: demo -> larismanis.online (Proxy ON)"
-echo -e "   - CNAME Record: *    -> larismanis.online (Proxy ON - Wildcard tenant)"
+echo -e "   - CNAME Record: www  -> larisdari.web.id (Proxy ON)"
+echo -e "   - CNAME Record: demo -> larisdari.web.id (Proxy ON)"
+echo -e "   - CNAME Record: *    -> larisdari.web.id (Proxy ON - Wildcard tenant)"
 echo -e "2. Di Cloudflare SSL/TLS:"
 echo -e "   - Set mode enkripsi ke 'Full' (atau 'Flexible')"
 echo -e "   - Aktifkan 'Always Use HTTPS'"
 echo -e "3. Akses Website Anda:"
-echo -e "   - Landing Page Pemasaran: https://larismanis.online"
-echo -e "   - Toko Demo E-Commerce : https://demo.larismanis.online"
+echo -e "   - Landing Page Pemasaran: https://larisdari.web.id"
+echo -e "   - Toko Demo E-Commerce : https://demo.larisdari.web.id"
 echo -e "==================================================================\n"

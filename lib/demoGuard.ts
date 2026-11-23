@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export const DEMO_STORE_ID = 'demo-store-001';
-export const DEMO_DOMAINS = ['demo.larismanis.online', 'demo-store.local'];
+export const DEMO_DOMAINS = ['demo.larisdari.web.id', 'demo.larismanis.online', 'demo-store.local'];
 
 export const DEMO_READ_ONLY_MESSAGE =
   'Aksi dibatasi pada Akun Demo: Mode pratinjau hanya-baca (Read-Only). Pada website toko Anda, seluruh fungsi CRUD beroperasi normal 100%.';

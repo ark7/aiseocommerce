@@ -28,7 +28,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <div className="mt-6 text-center text-xs text-gray-500">
-          Didukung oleh <strong className="text-gray-700">LarisManis.online</strong> — Webcommerce Pemersatu Jalur Pemasaran Anda.
+          Didukung oleh <strong className="text-gray-700">LarisDari.web.id</strong> — Webcommerce Pemersatu Jalur Pemasaran Anda.
         </div>
       </div>
     </div>

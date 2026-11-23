@@ -198,7 +198,7 @@ export const ADMIN_GUIDE_CHAPTERS: GuideChapter[] = [
       },
       {
         title: '5. Cetak Invoice & Label Pengiriman',
-        desc: 'Klik "Cetak Invoice" untuk mencetak dokumen nota pesanan berstandar LarisManis.online yang rapi untuk diselipkan ke dalam paket pembeli.',
+        desc: 'Klik "Cetak Invoice" untuk mencetak dokumen nota pesanan berstandar LarisDari.web.id yang rapi untuk diselipkan ke dalam paket pembeli.',
       },
     ],
     tips: [

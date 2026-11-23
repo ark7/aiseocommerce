@@ -261,12 +261,12 @@ export default function StoreFooter({
             <p className="text-gray-400">
               Didukung oleh{' '}
               <a
-                href="https://larismanis.online"
+                href="https://larisdari.web.id"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold text-gray-300 hover:text-white transition underline decoration-gray-600 underline-offset-2"
               >
-                LarisManis.online
+                LarisDari.web.id
               </a>
             </p>
             <ThemeToggle className="text-gray-400 hover:text-white hover:bg-gray-800" />

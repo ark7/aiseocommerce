@@ -39,7 +39,7 @@ jest.mock('@/components/StoreHeader', () => () => <header data-testid="store-hea
 jest.mock('@/components/StoreFooter', () => () => <footer data-testid="store-footer" />);
 jest.mock('@/components/AddressLocationSelector', () => () => <div data-testid="address-selector" />);
 
-const STORE_DOMAIN = 'demo.larismanis.online';
+const STORE_DOMAIN = 'demo.larisdari.web.id';
 
 const EKONOMIS_TIERS: PriceTierInput[] = [
   { minQty: 1, maxQty: 10, unitPrice: 5250 },

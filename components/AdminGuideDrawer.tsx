@@ -353,7 +353,7 @@ export default function AdminGuideDrawer({
         <div className="p-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
           <div className="text-slate-500 dark:text-slate-400 text-[11px]">
             <span>Didukung oleh </span>
-            <strong className="text-slate-700 dark:text-slate-200">LarisManis.online</strong>
+            <strong className="text-slate-700 dark:text-slate-200">LarisDari.web.id</strong>
           </div>
           <div className="flex items-center gap-2">
             <button

@@ -282,7 +282,7 @@ export default function AdminAiStudioPage() {
             <span className="text-2xl">✨</span>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">AI Studio Toko</h1>
             <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              LarisManis AI Engine
+              LarisDari AI Engine
             </span>
           </div>
           <p className="mt-1 text-sm text-gray-600 dark:text-slate-400">
