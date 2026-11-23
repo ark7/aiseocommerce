@@ -54,6 +54,59 @@ function getBeekeeperKey() {
   return decrypted.encryptionKey;
 }
 
+function loadEnvVarFromDotEnv(key) {
+  if (process.env[key]) {
+    return process.env[key].trim();
+  }
+
+  const envFiles = ['.env.local', '.env'];
+  for (const file of envFiles) {
+    const envPath = path.join(process.cwd(), file);
+    if (!fs.existsSync(envPath)) continue;
+
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eqIdx = line.indexOf('=');
+      if (eqIdx === -1) continue;
+      const name = line.slice(0, eqIdx).trim();
+      if (name !== key) continue;
+      let val = line.slice(eqIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (val) return val;
+    }
+  }
+
+  return '';
+}
+
+function parsePostgresUrl(connectionUrl, label) {
+  let parsed;
+  try {
+    parsed = new URL(connectionUrl);
+  } catch {
+    throw new Error(`${label} tidak valid. Pastikan format postgresql://user:password@host:port/dbname benar.`);
+  }
+
+  if (!parsed.hostname || !parsed.username || !parsed.password) {
+    throw new Error(`${label} harus menyertakan host, username, dan password.`);
+  }
+
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number(parsed.port) : 5432,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    defaultDatabase: parsed.pathname.replace(/^\//, '') || 'neondb',
+  };
+}
+
 function now() {
   const d = new Date();
   return d.toISOString().replace('T', ' ').substring(0, 19);
@@ -66,21 +119,38 @@ export async function setupConnections() {
     throw new Error(`Beekeeper Studio database not found at: ${DB_PATH}`);
   }
 
+  const remoteDatabaseUrl = loadEnvVarFromDotEnv('DATABASE_URL');
+  if (!remoteDatabaseUrl) {
+    throw new Error(
+      'Environment variable DATABASE_URL belum diset. Tambahkan DATABASE_URL ke file .env lokal (jangan commit ke Git) sebelum menjalankan script ini.'
+    );
+  }
+
+  const remoteConfig = parsePostgresUrl(remoteDatabaseUrl, 'DATABASE_URL');
+
+  const localDatabaseUrl = loadEnvVarFromDotEnv('LOCAL_DATABASE_URL');
+  const localConfig = localDatabaseUrl
+    ? parsePostgresUrl(localDatabaseUrl, 'LOCAL_DATABASE_URL')
+    : {
+        host: 'localhost',
+        port: 5432,
+        username: loadEnvVarFromDotEnv('LOCAL_DB_USER') || 'postgres',
+        password: loadEnvVarFromDotEnv('LOCAL_DB_PASSWORD') || '',
+        defaultDatabase: loadEnvVarFromDotEnv('LOCAL_DB_NAME') || 'aiseocommerce_local',
+      };
+
   const appKey = getBeekeeperKey();
   const encryptor = createEncryptor(appKey);
-
-  const remotePassword = process.env.NEON_DB_PASSWORD || '';
-  const localPassword = process.env.LOCAL_DB_PASSWORD || '';
 
   const connections = [
     {
       name: 'AI SEO E-Commerce - Remote Neon DB (AWS Singapore)',
       connectionType: 'postgres',
-      host: process.env.NEON_DB_HOST || 'ep-example-pooler.ap-southeast-1.aws.neon.tech',
-      port: 5432,
-      username: process.env.NEON_DB_USER || 'neondb_owner',
-      password: encryptor.encrypt(remotePassword),
-      defaultDatabase: 'neondb',
+      host: remoteConfig.host,
+      port: remoteConfig.port,
+      username: remoteConfig.username,
+      password: encryptor.encrypt(remoteConfig.password),
+      defaultDatabase: remoteConfig.defaultDatabase,
       ssl: 1,
       sslRejectUnauthorized: 0,
       labelColor: 'red',
@@ -89,11 +159,11 @@ export async function setupConnections() {
     {
       name: 'AI SEO E-Commerce - Local PostgreSQL',
       connectionType: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: encryptor.encrypt(localPassword),
-      defaultDatabase: 'aiseocommerce_local',
+      host: localConfig.host,
+      port: localConfig.port,
+      username: localConfig.username,
+      password: encryptor.encrypt(localConfig.password),
+      defaultDatabase: localConfig.defaultDatabase,
       ssl: 0,
       sslRejectUnauthorized: 0,
       labelColor: 'green',
