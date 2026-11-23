@@ -5,12 +5,21 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { nextStatuses, STATUS_LABELS, type OrderStatus } from '@/lib/orderStatus';
+import {
+  calculateOrderPricing,
+  parseCustomFeesConfig,
+  parseOrderCustomFees,
+  type CustomFeeConfigItem,
+  type CustomFeeType,
+} from '@/lib/invoicePricing';
+import OrderInvoiceModal, { type InvoiceModalStoreInfo } from '@/components/OrderInvoiceModal';
 
 interface OrderItem {
   id: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  variation?: string | null;
   product: {
     id: string;
     name: string;
@@ -41,6 +50,16 @@ interface OrderDetail {
   shippingZone?: string | null;
   discount?: number;
   subtotal: number;
+  taxAmount?: number;
+  taxLabel?: string | null;
+  taxRate?: number;
+  customFeesAmount?: number;
+  customFeesSnapshot?: unknown;
+  invoiceShowTax?: boolean;
+  invoiceShowCustomFees?: boolean;
+  invoiceRevision?: number;
+  lastInvoiceSentAt?: string | null;
+  notes?: string | null;
   totalAmount: number;
   trackingUrl: string | null;
   shippedAt: string | null;
@@ -59,6 +78,15 @@ interface OrderDetail {
   attribution: Attribution | null;
   orderItems: OrderItem[];
   payments: PaymentInfo[];
+}
+
+interface InvoiceDefaults {
+  taxEnabled: boolean;
+  taxLabel: string;
+  taxRate: number;
+  invoiceShowTax: boolean;
+  invoiceShowCustomFees: boolean;
+  customFeesConfig: CustomFeeConfigItem[];
 }
 
 interface Attribution {
@@ -111,10 +139,57 @@ export default function AdminOrderDetailPage() {
   const [trackingInfo, setTrackingInfo] = useState<any | null>(null);
   const [isLoadingTracking, setIsLoadingTracking] = useState(false);
 
+  // Invoice & Pricing Revision states
+  const [storeInfo, setStoreInfo] = useState<InvoiceModalStoreInfo | null>(null);
+  const [smtpReady, setSmtpReady] = useState(false);
+  const [invoiceDefaults, setInvoiceDefaults] = useState<InvoiceDefaults | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [sendingInvoice, setSendingInvoice] = useState(false);
+
+  const [revShippingCost, setRevShippingCost] = useState<string>('0');
+  const [revShippingZone, setRevShippingZone] = useState<string>('MANUAL');
+  const [revCourierName, setRevCourierName] = useState<string>('');
+  const [revTaxEnabled, setRevTaxEnabled] = useState<boolean>(false);
+  const [revTaxLabel, setRevTaxLabel] = useState<string>('PPN');
+  const [revTaxRate, setRevTaxRate] = useState<string>('0');
+  const [revInvoiceShowTax, setRevInvoiceShowTax] = useState<boolean>(true);
+  const [revInvoiceShowCustomFees, setRevInvoiceShowCustomFees] = useState<boolean>(true);
+  const [revCustomFees, setRevCustomFees] = useState<CustomFeeConfigItem[]>([]);
+  const [revNewStatus, setRevNewStatus] = useState<string>('');
+  const [revAdjustmentNote, setRevAdjustmentNote] = useState<string>('');
+  const [revResendEmail, setRevResendEmail] = useState<boolean>(false);
+  const [savingPricing, setSavingPricing] = useState<boolean>(false);
+
   const authHeaders = () => {
     const token = localStorage.getItem('token');
     return token ? { Authorization: `Bearer ${token}` } : null;
   };
+
+  const syncRevisionFormFromOrder = useCallback(
+    (ord: OrderDetail, defaults: InvoiceDefaults | null) => {
+      setRevShippingCost(String(ord.shippingCost ?? 0));
+      setRevShippingZone(ord.shippingZone || 'MANUAL');
+      setRevCourierName(ord.courierServiceName || '');
+      const hasOrderTax = Number(ord.taxRate || 0) > 0 || Number(ord.taxAmount || 0) > 0;
+      setRevTaxEnabled(hasOrderTax);
+      setRevTaxLabel(ord.taxLabel || defaults?.taxLabel || 'PPN');
+      setRevTaxRate(String(ord.taxRate ?? (hasOrderTax ? defaults?.taxRate ?? 0 : 0)));
+      setRevInvoiceShowTax(ord.invoiceShowTax ?? true);
+      setRevInvoiceShowCustomFees(ord.invoiceShowCustomFees ?? true);
+      const snapFees = parseOrderCustomFees(ord.customFeesSnapshot).map((line) => ({
+        id: line.id,
+        name: line.name,
+        type: line.type,
+        amount: line.rateOrAmount,
+        enabled: true,
+        showOnInvoice: line.showOnInvoice,
+      }));
+      setRevCustomFees(snapFees);
+      setRevNewStatus('');
+      setRevAdjustmentNote('');
+    },
+    []
+  );
 
   const fetchOrder = useCallback(async () => {
     try {
@@ -135,13 +210,21 @@ export default function AdminOrderDetailPage() {
 
       const data = await response.json();
       setOrder(data.order);
+      setStoreInfo(data.storeInfo || null);
+      const isSmtpReady = Boolean(data.smtpReady);
+      setSmtpReady(isSmtpReady);
+      setInvoiceDefaults(data.invoiceDefaults || null);
       setTrackingUrl(data.order?.trackingUrl || '');
+      if (data.order) {
+        syncRevisionFormFromOrder(data.order, data.invoiceDefaults || null);
+        setRevResendEmail(isSmtpReady && Boolean(data.order.customerEmail));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat pesanan');
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, syncRevisionFormFromOrder]);
 
   useEffect(() => {
     if (orderId) fetchOrder();
@@ -278,6 +361,117 @@ export default function AdminOrderDetailPage() {
     );
   };
 
+  const handleSendInvoiceEmail = async () => {
+    if (!order) return;
+    const headers = authHeaders();
+    if (!headers) return;
+
+    setSendingInvoice(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${order.id}/invoice/send`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: revAdjustmentNote.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mengirim invoice via SMTP');
+      }
+      setNotice(data.message || 'Invoice berhasil dikirim ulang ke email pelanggan.');
+      await fetchOrder();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal mengirim invoice');
+    } finally {
+      setSendingInvoice(false);
+    }
+  };
+
+  const handleLoadCmsDefaultsToOrder = () => {
+    if (!invoiceDefaults) return;
+    setRevTaxEnabled(invoiceDefaults.taxEnabled);
+    setRevTaxLabel(invoiceDefaults.taxLabel || 'PPN');
+    setRevTaxRate(String(invoiceDefaults.taxRate ?? 0));
+    setRevInvoiceShowTax(invoiceDefaults.invoiceShowTax);
+    setRevInvoiceShowCustomFees(invoiceDefaults.invoiceShowCustomFees);
+    setRevCustomFees(parseCustomFeesConfig(invoiceDefaults.customFeesConfig));
+  };
+
+  const handleSavePricingRevision = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!order) return;
+    const headers = authHeaders();
+    if (!headers) return;
+
+    const shippingNum = Number(revShippingCost);
+    if (!Number.isFinite(shippingNum) || shippingNum < 0) {
+      setError('Ongkos kirim manual harus berupa angka >= 0');
+      return;
+    }
+
+    const taxRateNum = Number(revTaxRate);
+    if (!Number.isFinite(taxRateNum) || taxRateNum < 0 || taxRateNum > 100) {
+      setError('Tarif PPN harus antara 0% dan 100%');
+      return;
+    }
+
+    setSavingPricing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const cleanedCustomFees = revCustomFees
+        .map((fee, idx) => ({
+          id: fee.id || `fee-${idx + 1}`,
+          name: fee.name.trim(),
+          type: fee.type,
+          amount: Math.max(0, Number(fee.amount) || 0),
+          enabled: fee.enabled !== false,
+          showOnInvoice: fee.showOnInvoice !== false,
+        }))
+        .filter((f) => f.name.length > 0);
+
+      const res = await fetch(`/api/admin/orders/${order.id}/pricing`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shippingCost: shippingNum,
+          shippingZone: revShippingZone,
+          courierServiceName: revCourierName.trim() || null,
+          taxEnabled: revTaxEnabled,
+          taxLabel: revTaxLabel.trim() || 'PPN',
+          taxRate: revTaxRate ? taxRateNum : 0,
+          invoiceShowTax: revInvoiceShowTax,
+          invoiceShowCustomFees: revInvoiceShowCustomFees,
+          customFees: cleanedCustomFees,
+          ...(revNewStatus ? { newStatus: revNewStatus } : {}),
+          adjustmentNote: revAdjustmentNote.trim() || null,
+          resendInvoiceEmail: revResendEmail,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Gagal menyimpan penyesuaian harga & ongkir manual');
+      }
+
+      const emailFeedback = data.emailResult
+        ? data.emailResult.sent
+          ? ` Email invoice berhasil dikirim ke ${data.emailResult.recipient}.`
+          : ` Catatan email: ${data.emailResult.message}`
+        : '';
+
+      setNotice(
+        `Tagihan & Invoice berhasil diperbarui (Rev #${data.order?.invoiceRevision || (order.invoiceRevision || 1) + 1}).${emailFeedback}`
+      );
+      await fetchOrder();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memperbarui tagihan');
+    } finally {
+      setSavingPricing(false);
+    }
+  };
+
   const loadProof = async (paymentId: string) => {
     if (proofDataUri) {
       setProofDataUri(null);
@@ -329,6 +523,17 @@ export default function AdminOrderDetailPage() {
   }
 
   const payment = order.payments[0];
+  const canRevisePricing = !['CANCELLED', 'REFUNDED', 'COMPLETED'].includes(order.status);
+  const revisionPricingPreview = calculateOrderPricing({
+    subtotal: order.subtotal,
+    discount: order.discount || 0,
+    shippingCost: Number(revShippingCost) || 0,
+    taxEnabled: revTaxEnabled,
+    taxLabel: revTaxLabel,
+    taxRate: Number(revTaxRate) || 0,
+    customFees: revCustomFees,
+  });
+  const previewDiff = revisionPricingPreview.totalAmount - order.totalAmount;
 
   return (
     <div className="container mx-auto">
@@ -336,16 +541,52 @@ export default function AdminOrderDetailPage() {
         &larr; Kembali ke daftar pesanan
       </Link>
 
-      <div className="flex items-center justify-between mt-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{order.orderNumber}</h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl font-bold text-gray-900">{order.orderNumber}</h1>
+            {Boolean(order.invoiceRevision && order.invoiceRevision > 1) && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                Invoice Rev #{order.invoiceRevision}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500">
             Dibuat {new Date(order.createdAt).toLocaleString('id-ID')}
+            {order.lastInvoiceSentAt && (
+              <span className="ml-2 text-xs text-emerald-700">
+                • Invoice terakhir dikirim {new Date(order.lastInvoiceSentAt).toLocaleString('id-ID')}
+              </span>
+            )}
           </p>
         </div>
-        <span className="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-          {order.status}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setInvoiceModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition"
+          >
+            🧾 Lihat / Cetak Invoice
+          </button>
+          <button
+            type="button"
+            onClick={handleSendInvoiceEmail}
+            disabled={sendingInvoice || !smtpReady || !order.customerEmail}
+            title={
+              !smtpReady
+                ? 'SMTP belum aktif di Pengaturan > Email & SMTP'
+                : !order.customerEmail
+                  ? 'Pelanggan tidak memiliki email'
+                  : 'Kirim ulang invoice HTML ke email pelanggan'
+            }
+            className="px-3.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-semibold transition disabled:opacity-50"
+          >
+            {sendingInvoice ? 'Mengirim...' : '✉️ Kirim Ulang Invoice'}
+          </button>
+          <span className="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+            {order.status}
+          </span>
+        </div>
       </div>
 
       {error && <div className="mb-4 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
@@ -390,7 +631,12 @@ export default function AdminOrderDetailPage() {
               <tbody className="divide-y divide-gray-100">
                 {order.orderItems.map((item) => (
                   <tr key={item.id}>
-                    <td className="py-3 text-sm text-gray-900">{item.product?.name || '(produk dihapus)'}</td>
+                    <td className="py-3 text-sm text-gray-900">
+                      <span>{item.product?.name || '(produk dihapus)'}</span>
+                      {item.variation && (
+                        <span className="block text-xs text-gray-500">{item.variation}</span>
+                      )}
+                    </td>
                     <td className="py-3 text-sm text-gray-700 text-right">{item.quantity}</td>
                     <td className="py-3 text-sm text-gray-700 text-right">{formatIDR(item.unitPrice)}</td>
                     <td className="py-3 text-sm text-gray-900 text-right">{formatIDR(item.totalPrice)}</td>
@@ -420,16 +666,376 @@ export default function AdminOrderDetailPage() {
                     ? ' (Bebas Ongkir)'
                     : order.shippingZone === 'DIGITAL'
                     ? ' (Digital)'
+                    : order.courierServiceName
+                    ? ` (${order.courierServiceName})`
+                    : order.shippingZone === 'MANUAL'
+                    ? ' (Manual Admin)'
                     : ''}
                 </span>
                 <span>{order.shippingCost ? formatIDR(order.shippingCost) : 'Rp 0'}</span>
               </div>
+              {Boolean(order.taxAmount && order.taxAmount > 0) && (
+                <div className="flex justify-between items-center">
+                  <span>
+                    {order.taxLabel || 'PPN'}
+                    {Number(order.taxRate || 0) > 0 ? ` (${Number(order.taxRate)}%)` : ''}
+                    {order.invoiceShowTax === false && (
+                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">
+                        Disembunyikan di Invoice
+                      </span>
+                    )}
+                  </span>
+                  <span>{formatIDR(order.taxAmount!)}</span>
+                </div>
+              )}
+              {parseOrderCustomFees(order.customFeesSnapshot).map((fee) => (
+                <div key={fee.id} className="flex justify-between items-center">
+                  <span>
+                    {fee.name}
+                    {fee.type === 'PERCENT' ? ` (${fee.rateOrAmount}%)` : ''}
+                    {(order.invoiceShowCustomFees === false || !fee.showOnInvoice) && (
+                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">
+                        Disembunyikan di Invoice
+                      </span>
+                    )}
+                  </span>
+                  <span>{formatIDR(fee.computedAmount)}</span>
+                </div>
+              ))}
               <div className="pt-2 border-t flex justify-between text-base font-semibold text-gray-900">
                 <span>Total Pesanan</span>
                 <span className="text-indigo-600">{formatIDR(order.totalAmount)}</span>
               </div>
             </div>
           </div>
+
+          {canRevisePricing && (
+            <form onSubmit={handleSavePricingRevision} className="bg-white p-6 rounded-lg shadow border space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">
+                    🚚 Penyesuaian Ongkir Manual, PPN &amp; Biaya Tambahan
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Tambahkan ongkir manual, atur PPN/biaya kustom di invoice, ubah status order, dan kirim ulang invoice via email.
+                  </p>
+                </div>
+                {invoiceDefaults && (
+                  <button
+                    type="button"
+                    onClick={handleLoadCmsDefaultsToOrder}
+                    className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold shrink-0"
+                  >
+                    Muat Default CMS
+                  </button>
+                )}
+              </div>
+
+              {/* Manual Shipping Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Ongkos Kirim Manual (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="500"
+                    value={revShippingCost}
+                    onChange={(e) => setRevShippingCost(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Zona / Tipe Ongkir
+                  </label>
+                  <select
+                    value={revShippingZone}
+                    onChange={(e) => setRevShippingZone(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="MANUAL">Ongkir Manual</option>
+                    <option value="INNER">Dalam Kota</option>
+                    <option value="OUTER">Luar Kota</option>
+                    <option value="BITESHIP">Kurir Ekspedisi</option>
+                    <option value="FREE">Bebas Ongkir</option>
+                    <option value="DIGITAL">Digital / Tanpa Ongkir</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Nama Kurir / Keterangan Layanan
+                  </label>
+                  <input
+                    type="text"
+                    value={revCourierName}
+                    onChange={(e) => setRevCourierName(e.target.value)}
+                    placeholder="Contoh: JNE Cargo / Kurir Toko"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* PPN Adjustment Row */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="inline-flex items-center gap-2 text-xs font-bold text-gray-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={revTaxEnabled}
+                      onChange={(e) => setRevTaxEnabled(e.target.checked)}
+                      className="rounded text-indigo-600"
+                    />
+                    <span>Kenakan PPN pada pesanan ini</span>
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={revInvoiceShowTax}
+                      onChange={(e) => setRevInvoiceShowTax(e.target.checked)}
+                      className="rounded text-indigo-600"
+                    />
+                    <span>Tampilkan baris PPN pada Invoice</span>
+                  </label>
+                </div>
+
+                {revTaxEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Label Pajak
+                      </label>
+                      <input
+                        type="text"
+                        value={revTaxLabel}
+                        onChange={(e) => setRevTaxLabel(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">
+                        Tarif PPN (%)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step="0.1"
+                        value={revTaxRate}
+                        onChange={(e) => setRevTaxRate(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Fees Adjustment Row */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-gray-800">Biaya Tambahan Kustom</span>
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={revInvoiceShowCustomFees}
+                        onChange={(e) => setRevInvoiceShowCustomFees(e.target.checked)}
+                        className="rounded text-indigo-600"
+                      />
+                      <span>Tampilkan di Invoice</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRevCustomFees((prev) => [
+                          ...prev,
+                          {
+                            id: `fee-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                            name: '',
+                            type: 'FIXED',
+                            amount: 0,
+                            enabled: true,
+                            showOnInvoice: true,
+                          },
+                        ])
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-50"
+                    >
+                      + Tambah Biaya
+                    </button>
+                  </div>
+                </div>
+
+                {revCustomFees.map((fee) => (
+                  <div key={fee.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center bg-white p-2.5 rounded-lg border border-gray-200">
+                    <input
+                      type="text"
+                      value={fee.name}
+                      onChange={(e) =>
+                        setRevCustomFees((prev) =>
+                          prev.map((it) => (it.id === fee.id ? { ...it, name: e.target.value } : it))
+                        )
+                      }
+                      placeholder="Nama biaya (mis. Packing Kayu)"
+                      className="sm:col-span-5 px-2.5 py-1.5 border border-gray-300 rounded text-xs"
+                    />
+                    <select
+                      value={fee.type}
+                      onChange={(e) =>
+                        setRevCustomFees((prev) =>
+                          prev.map((it) =>
+                            it.id === fee.id ? { ...it, type: e.target.value as CustomFeeType } : it
+                          )
+                        )
+                      }
+                      className="sm:col-span-2 px-2 py-1.5 border border-gray-300 rounded text-xs bg-white"
+                    >
+                      <option value="FIXED">Rp</option>
+                      <option value="PERCENT">%</option>
+                    </select>
+                    <input
+                      type="number"
+                      min={0}
+                      value={fee.amount}
+                      onChange={(e) =>
+                        setRevCustomFees((prev) =>
+                          prev.map((it) =>
+                            it.id === fee.id
+                              ? { ...it, amount: Math.max(0, Number(e.target.value) || 0) }
+                              : it
+                          )
+                        )
+                      }
+                      className="sm:col-span-2 px-2.5 py-1.5 border border-gray-300 rounded text-xs"
+                    />
+                    <label className="sm:col-span-2 inline-flex items-center gap-1 text-[11px] text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={fee.showOnInvoice}
+                        onChange={(e) =>
+                          setRevCustomFees((prev) =>
+                            prev.map((it) =>
+                              it.id === fee.id ? { ...it, showOnInvoice: e.target.checked } : it
+                            )
+                          )
+                        }
+                        className="rounded text-indigo-600"
+                      />
+                      <span>Di Invoice</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRevCustomFees((prev) => prev.filter((it) => it.id !== fee.id))
+                      }
+                      className="sm:col-span-1 text-rose-600 text-xs font-bold hover:underline"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Status Update & Note */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Update Status Pesanan Setelah Perubahan
+                  </label>
+                  <select
+                    value={revNewStatus}
+                    onChange={(e) => setRevNewStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs bg-white"
+                  >
+                    <option value="">
+                      Pertahankan Status Saat Ini ({STATUS_LABELS[order.status as OrderStatus] || order.status})
+                    </option>
+                    {['PENDING', 'MANUAL_VERIFICATION', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED']
+                      .filter((st) => st !== order.status)
+                      .map((st) => (
+                        <option key={st} value={st}>
+                          Ubah ke: {STATUS_LABELS[st as OrderStatus] || st}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Catatan Perubahan (Tampil di Email Invoice)
+                  </label>
+                  <input
+                    type="text"
+                    value={revAdjustmentNote}
+                    onChange={(e) => setRevAdjustmentNote(e.target.value)}
+                    placeholder="Contoh: Penambahan ongkir kargo manual 25 kg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* SMTP Email Resend Toggle */}
+              <div className="p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/40 space-y-1.5">
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-gray-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={revResendEmail}
+                    onChange={(e) => setRevResendEmail(e.target.checked)}
+                    disabled={!smtpReady || !order.customerEmail}
+                    className="rounded text-indigo-600 disabled:opacity-50"
+                  />
+                  <span>Kirim ulang invoice terbaru ke email pelanggan via SMTP</span>
+                </label>
+                <p className="text-[11px] text-gray-600 pl-6">
+                  {!order.customerEmail ? (
+                    'Email pelanggan tidak tercatat pada pesanan ini.'
+                  ) : !smtpReady ? (
+                    <>
+                      SMTP belum tersambung.{' '}
+                      <Link href="/admin/settings?tab=email" className="text-indigo-600 underline font-semibold">
+                        Konfigurasi Email &amp; SMTP di Pengaturan
+                      </Link>
+                      .
+                    </>
+                  ) : (
+                    `Invoice revisi akan dikirim ke ${order.customerEmail}.`
+                  )}
+                </p>
+              </div>
+
+              {/* Preview Old vs New Total */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t">
+                <div className="text-xs text-gray-600">
+                  <span>Total Saat Ini: </span>
+                  <strong className="text-gray-900">{formatIDR(order.totalAmount)}</strong>
+                  <span className="mx-2">&rarr;</span>
+                  <span>Total Baru: </span>
+                  <strong className="text-indigo-700 text-sm">
+                    {formatIDR(revisionPricingPreview.totalAmount)}
+                  </strong>
+                  {previewDiff !== 0 && (
+                    <span
+                      className={`ml-2 font-semibold ${
+                        previewDiff > 0 ? 'text-amber-700' : 'text-emerald-700'
+                      }`}
+                    >
+                      ({previewDiff > 0 ? '+' : ''}
+                      {formatIDR(previewDiff)})
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={savingPricing}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs disabled:opacity-50 transition shrink-0"
+                >
+                  {savingPricing ? 'Menyimpan...' : 'Simpan Ongkir & Perbarui Invoice'}
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="bg-white p-6 rounded-lg shadow border">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Pembayaran</h2>
@@ -730,6 +1336,13 @@ export default function AdminOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <OrderInvoiceModal
+        open={invoiceModalOpen}
+        onClose={() => setInvoiceModalOpen(false)}
+        order={order}
+        storeInfo={storeInfo}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import ImageUploader from '@/components/ImageUploader';
 import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector';
 import { getDefaultTerms, getDefaultPrivacy, DEFAULT_COOKIE_TITLE, DEFAULT_COOKIE_TEXT } from '@/lib/legalDefaults';
 import { createEmptyHeroSlide, type HeroSlideItem } from '@/lib/heroSlides';
+import TaxAndInvoiceSettingsPanel from '@/components/admin/TaxAndInvoiceSettingsPanel';
 
 interface SocialLinks {
   instagram?: string;
@@ -292,7 +293,7 @@ const EMPTY_EMAIL_FORM: EmailForm = {
   smtpVerifiedAt: null,
 };
 
-type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications' | 'shipping' | 'email';
+type SettingsTab = 'general' | 'hero' | 'theme' | 'integrations' | 'legal' | 'ai' | 'notifications' | 'shipping' | 'email' | 'invoice';
 
 interface SettingsCategory {
   id: SettingsTab;
@@ -359,6 +360,13 @@ const SETTINGS_CATEGORIES: SettingsCategory[] = [
     title: 'Email & SMTP',
     subtitle: 'Server SMTP, verifikasi domain & DNS',
     icon: '✉️',
+    badge: 'Baru',
+  },
+  {
+    id: 'invoice',
+    title: 'PPN, Biaya & Invoice',
+    subtitle: 'Tarif PPN, biaya kustom & tampilan faktur',
+    icon: '🧾',
     badge: 'Baru',
   },
 ];
@@ -4015,7 +4023,7 @@ function AdminSettingsContent() {
                 className={`p-3.5 rounded-lg text-xs leading-relaxed ${
                   emailTestResult.success
                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
-                    : 'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    : 'bg-red-50 dark:bg-rose-950/40 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
                 }`}
               >
                 <strong>{emailTestResult.success ? 'Berhasil: ' : 'Gagal: '}</strong>
@@ -4024,6 +4032,14 @@ function AdminSettingsContent() {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === 'invoice' && (
+        <TaxAndInvoiceSettingsPanel
+          onSaved={loadSettings}
+          onNotice={(msg) => setNotice(msg)}
+          onError={(msg) => setError(msg)}
+        />
       )}
         </div>
       </div>

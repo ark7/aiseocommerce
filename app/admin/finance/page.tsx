@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DateRangeFilter from '@/components/common/DateRangeFilter';
 import Pagination from '@/components/common/Pagination';
+import TaxBookkeepingPanel from '@/components/admin/TaxBookkeepingPanel';
 
 const IDR = new Intl.NumberFormat('id-ID', {
   style: 'currency',
@@ -399,6 +400,8 @@ export default function FinancePage() {
           <p className="text-xs text-gray-400">produk terbit dengan stok ≤ 5</p>
         </div>
       </div>
+
+      <TaxBookkeepingPanel onTaxPaymentRecorded={reload} />
 
       <div className="bg-white rounded-lg shadow border">
         <button

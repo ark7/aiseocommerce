@@ -132,6 +132,15 @@ model StoreSettings {
   smtpVerified             Boolean   @default(false)
   smtpVerifiedAt           DateTime?
   smtpVerificationToken    String?
+  // === PPN, Biaya Tambahan Kustom & Pengaturan Invoice ===
+  taxEnabled               Boolean   @default(false)
+  taxLabel                 String?   @default("PPN")
+  taxRate                  Float     @default(0)
+  taxApplyOnCheckout       Boolean   @default(true)
+  invoiceShowTax           Boolean   @default(true)
+  invoiceShowCustomFees    Boolean   @default(true)
+  customFeesConfig         Json?
+  invoiceNotes             String?   @db.Text
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -358,9 +367,17 @@ model Order {
   totalAmount     Float
   subtotal        Float
   taxAmount       Float       @default(0)
+  taxLabel        String?
+  taxRate         Float       @default(0)
   shippingCost    Float       @default(0)
   shippingZone    String?
   discount        Float       @default(0)
+  customFeesAmount Float      @default(0)
+  customFeesSnapshot Json?
+  invoiceShowTax  Boolean     @default(true)
+  invoiceShowCustomFees Boolean @default(true)
+  invoiceRevision Int         @default(1)
+  lastInvoiceSentAt DateTime?
   status          OrderStatus @default(PENDING)
   attribution     Json?
   notes           String?     @db.Text

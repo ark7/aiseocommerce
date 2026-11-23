@@ -9,6 +9,16 @@ import {
   mergeHeroSlidesIntoSocialLinks,
   resolveStoreHeroSlides,
 } from '@/lib/heroSlides';
+import { parseCustomFeesConfig } from '@/lib/invoiceService';
+
+const CustomFeeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, 'Nama biaya tidak boleh kosong').max(100),
+  type: z.enum(['FIXED', 'PERCENT']),
+  amount: z.coerce.number().min(0, 'Nominal/persentase tidak boleh negatif'),
+  enabled: z.boolean().default(true),
+  showOnInvoice: z.boolean().default(true),
+});
 
 const SocialLinksSchema = z.object({
   instagram: z.string().optional().nullable(),
@@ -124,6 +134,16 @@ const GeneralSettingsUpdateSchema = z.object({
   smtpFromName: z.string().optional().nullable(),
   smtpFromEmail: z.string().email('Format email pengirim tidak valid').optional().nullable().or(z.literal('')),
   smtpReplyTo: z.string().email('Format email reply-to tidak valid').optional().nullable().or(z.literal('')),
+
+  // PPN, Biaya Tambahan Kustom & Invoice
+  taxEnabled: z.boolean().optional(),
+  taxLabel: z.string().max(60).optional().nullable(),
+  taxRate: z.coerce.number().min(0, 'Tarif PPN tidak boleh negatif').max(100, 'Tarif PPN maksimal 100%').optional(),
+  taxApplyOnCheckout: z.boolean().optional(),
+  invoiceShowTax: z.boolean().optional(),
+  invoiceShowCustomFees: z.boolean().optional(),
+  customFeesConfig: z.array(CustomFeeSchema).max(20).optional().nullable(),
+  invoiceNotes: z.string().max(2000).optional().nullable(),
 });
 
 export async function GET(request: Request) {
@@ -241,6 +261,16 @@ export async function GET(request: Request) {
         smtpReplyTo: s?.smtpReplyTo ?? null,
         smtpVerified: s?.smtpVerified ?? false,
         smtpVerifiedAt: s?.smtpVerifiedAt ?? null,
+
+        // PPN, Biaya Tambahan Kustom & Invoice
+        taxEnabled: s?.taxEnabled ?? false,
+        taxLabel: s?.taxLabel ?? 'PPN',
+        taxRate: s?.taxRate ?? 0,
+        taxApplyOnCheckout: s?.taxApplyOnCheckout ?? true,
+        invoiceShowTax: s?.invoiceShowTax ?? true,
+        invoiceShowCustomFees: s?.invoiceShowCustomFees ?? true,
+        customFeesConfig: parseCustomFeesConfig(s?.customFeesConfig),
+        invoiceNotes: s?.invoiceNotes ?? null,
       },
     });
   } catch (error) {
@@ -437,6 +467,16 @@ export async function PUT(request: Request) {
       }
     }
     if (data.smtpReplyTo !== undefined) settingsUpdateData.smtpReplyTo = data.smtpReplyTo ? data.smtpReplyTo.trim() : null;
+
+    // PPN, Biaya Tambahan Kustom & Invoice
+    if (data.taxEnabled !== undefined) settingsUpdateData.taxEnabled = data.taxEnabled;
+    if (data.taxLabel !== undefined) settingsUpdateData.taxLabel = data.taxLabel ? data.taxLabel.trim() : 'PPN';
+    if (data.taxRate !== undefined) settingsUpdateData.taxRate = data.taxRate;
+    if (data.taxApplyOnCheckout !== undefined) settingsUpdateData.taxApplyOnCheckout = data.taxApplyOnCheckout;
+    if (data.invoiceShowTax !== undefined) settingsUpdateData.invoiceShowTax = data.invoiceShowTax;
+    if (data.invoiceShowCustomFees !== undefined) settingsUpdateData.invoiceShowCustomFees = data.invoiceShowCustomFees;
+    if (data.customFeesConfig !== undefined) settingsUpdateData.customFeesConfig = data.customFeesConfig ?? [];
+    if (data.invoiceNotes !== undefined) settingsUpdateData.invoiceNotes = data.invoiceNotes ? data.invoiceNotes.trim() : null;
 
     if (Object.keys(settingsUpdateData).length > 0) {
       await prisma.storeSettings.upsert({

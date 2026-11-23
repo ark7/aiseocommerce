@@ -11,6 +11,11 @@ import { z } from 'zod'
 import { updateCartQuantity, removeFromCart, clearCart, dispatchCartUpdated, type CartItemPriceTier } from '@/lib/cart'
 import { formatTierRangeLabel, resolveBatchUnitPrice } from '@/lib/pricing'
 import AddressLocationSelector, { SelectedLocationData } from '@/components/AddressLocationSelector'
+import {
+  calculateOrderPricing,
+  parseCustomFeesConfig,
+  type CustomFeeConfigItem,
+} from '@/lib/invoicePricing'
 
 interface CartItem {
   productId: string
@@ -81,13 +86,22 @@ export interface CourierOption {
   isFreeShipping?: boolean
 }
 
+interface BillingConfigProps {
+  taxEnabled?: boolean
+  taxLabel?: string | null
+  taxRate?: number | null
+  taxApplyOnCheckout?: boolean
+  customFeesConfig?: CustomFeeConfigItem[]
+}
+
 interface CartPageProps {
   storeId: string
   storeDomain: string
   shippingConfig?: ShippingConfigProps
+  billingConfig?: BillingConfigProps
 }
 
-const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
+const CartPage = ({ storeId, storeDomain, shippingConfig, billingConfig }: CartPageProps) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -226,7 +240,21 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
   }
 
   const shippingCost = calculateShippingFee()
-  const calculatePayable = () => Math.max(0, subtotal - (appliedVoucher?.discount ?? 0)) + shippingCost
+  const activeCustomFees = parseCustomFeesConfig(billingConfig?.customFeesConfig).filter(
+    (fee) => fee.enabled
+  )
+  const applyTaxOnCheckout =
+    Boolean(billingConfig?.taxEnabled) && billingConfig?.taxApplyOnCheckout !== false
+  const billingPreview = calculateOrderPricing({
+    subtotal,
+    discount: appliedVoucher?.discount ?? 0,
+    shippingCost,
+    taxEnabled: applyTaxOnCheckout,
+    taxLabel: billingConfig?.taxLabel || 'PPN',
+    taxRate: typeof billingConfig?.taxRate === 'number' ? billingConfig.taxRate : 0,
+    customFees: activeCustomFees,
+  })
+  const calculatePayable = () => billingPreview.totalAmount
 
   /**
    * The voucher rules are per-customer (a claim belongs to a person), so the
@@ -955,6 +983,25 @@ const CartPage = ({ storeId, storeDomain, shippingConfig }: CartPageProps) => {
                     </span>
                   </div>
                 )}
+
+                {billingPreview.taxAmount > 0 && (
+                  <div className="flex justify-between text-gray-700">
+                    <span>
+                      {billingPreview.taxLabel} ({billingPreview.taxRate}%)
+                    </span>
+                    <span>Rp {billingPreview.taxAmount.toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+
+                {billingPreview.customFees.map((fee) => (
+                  <div key={fee.id} className="flex justify-between text-gray-700">
+                    <span>
+                      {fee.name}
+                      {fee.type === 'PERCENT' ? ` (${fee.rateOrAmount}%)` : ''}
+                    </span>
+                    <span>Rp {fee.computedAmount.toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
 
                 <div className="pt-3 border-t flex justify-between font-bold text-lg text-gray-900">
                   <span>Total Pembayaran</span>

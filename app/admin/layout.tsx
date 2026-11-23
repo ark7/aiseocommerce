@@ -105,6 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { id: 'ai', name: 'AI Assistant', icon: '✨' },
     { id: 'notifications', name: 'Notifikasi (WA/TG)', icon: '📲' },
     { id: 'email', name: 'Email & SMTP', icon: '✉️' },
+    { id: 'invoice', name: 'PPN, Biaya & Invoice', icon: '🧾' },
   ];
 
   // Filter navigation items based on user role and permissions

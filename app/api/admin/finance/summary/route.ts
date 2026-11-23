@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
 import { getFinanceSummary } from '@/services/transactionService';
-import { isConfiguredCategory } from '@/lib/ledgerCategory';
+import { isConfiguredCategory, TAX_PAYMENT_CATEGORY } from '@/lib/ledgerCategory';
+import { REVENUE_STATUSES } from '@/lib/orderStatus';
+import { LedgerType, type OrderStatus } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
@@ -17,34 +19,45 @@ export async function GET(request: Request) {
     
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
+    const startDateParam = searchParams.get('startDate');
+    const endDateParam = searchParams.get('endDate');
     const includeSandbox = searchParams.get('includeSandbox') === 'true';
     const now = new Date();
     let start: Date | undefined, end: Date | undefined;
-    
-    switch (period) {
-      case 'day':
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-        break;
-      case 'week':
-        const dayOfWeek = now.getDay();
-        const diff = now.getDate() - dayOfWeek;
-        start = new Date(now.getFullYear(), now.getMonth(), diff);
-        end = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59);
-        break;
-      case 'month':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-        break;
-      case 'year':
-        start = new Date(now.getFullYear(), 0, 1);
-        end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
-        break;
+
+    if (period === 'custom' && (startDateParam || endDateParam)) {
+      start = startDateParam ? new Date(startDateParam) : new Date(now.getFullYear(), now.getMonth(), 1);
+      end = endDateParam ? new Date(endDateParam) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      if (isNaN(start.getTime())) start = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (isNaN(end.getTime())) end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      switch (period) {
+        case 'day':
+          start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+          break;
+        case 'week':
+          const dayOfWeek = now.getDay();
+          const diff = now.getDate() - dayOfWeek;
+          start = new Date(now.getFullYear(), now.getMonth(), diff);
+          end = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59);
+          break;
+        case 'month':
+          start = new Date(now.getFullYear(), now.getMonth(), 1);
+          end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+          break;
+        case 'year':
+          start = new Date(now.getFullYear(), 0, 1);
+          end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+          break;
+      }
     }
     
     const summary = await getFinanceSummary(user.storeId, start, end, { includeSandbox });
     
-    const [recentTransactions, lowStockProducts, pendingPayments, todaySales] = await Promise.all([
+    const [recentTransactions, lowStockProducts, pendingPayments, todaySales, taxOrdersAgg, taxPaidAgg] = await Promise.all([
       prisma.ledger.findMany({
         where: {
           storeId: user.storeId,
@@ -67,11 +80,39 @@ export async function GET(request: Request) {
         _sum: { totalAmount: true },
         _count: { _all: true },
       }),
+      prisma.order.aggregate({
+        where: {
+          storeId: user.storeId,
+          status: { in: REVENUE_STATUSES as OrderStatus[] },
+          createdAt: { gte: start, lte: end },
+          ...(includeSandbox ? {} : { isSandbox: false }),
+        },
+        _sum: { taxAmount: true },
+      }),
+      prisma.ledger.aggregate({
+        where: {
+          storeId: user.storeId,
+          type: LedgerType.EXPENSE,
+          category: TAX_PAYMENT_CATEGORY,
+          createdAt: { gte: start, lte: end },
+          ...(includeSandbox ? {} : { isSandbox: false }),
+        },
+        _sum: { amount: true },
+      }),
     ]);
+
+    const totalTaxCollected = Math.round(taxOrdersAgg._sum.taxAmount || 0);
+    const totalTaxPaid = Math.round(Math.abs(taxPaidAgg._sum.amount || 0));
+    const taxPayable = Math.max(0, totalTaxCollected - totalTaxPaid);
     
     return NextResponse.json({
       success: true,
       summary,
+      taxSummary: {
+        totalTaxCollected,
+        totalTaxPaid,
+        taxPayable,
+      },
       recentTransactions,
       alerts: { lowStockProducts, pendingPayments },
       todaySales: { count: todaySales._count._all, amount: todaySales._sum.totalAmount || 0 },
