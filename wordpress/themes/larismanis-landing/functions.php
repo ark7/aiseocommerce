@@ -1,6 +1,6 @@
 <?php
 /**
- * LarisManis.online Official Landing Theme Functions
+ * LarisDari.web.id Official Landing Theme Functions
  *
  * @package larismanis-landing
  */
@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_THEME_VERSION', '1.2.1');
+define('LARISMANIS_THEME_VERSION', '1.3.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 
@@ -94,20 +94,20 @@ function larismanis_output_seo_head() {
         'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu website komersial.'
     );
     $url   = home_url('/');
-    $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
+    $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
 
     echo '<meta name="description" content="' . esc_attr($desc) . '">' . "\n";
     echo '<meta property="og:type" content="website">' . "\n";
     echo '<meta property="og:title" content="' . esc_attr($title) . '">' . "\n";
     echo '<meta property="og:description" content="' . esc_attr($desc) . '">' . "\n";
     echo '<meta property="og:url" content="' . esc_url($url) . '">' . "\n";
-    echo '<meta property="og:site_name" content="LarisManis.online">' . "\n";
+    echo '<meta property="og:site_name" content="LarisDari.web.id">' . "\n";
     echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
 
     $schema = array(
         '@context' => 'https://schema.org',
         '@type' => 'SoftwareApplication',
-        'name' => 'LarisManis.online',
+        'name' => 'LarisDari.web.id',
         'applicationCategory' => 'BusinessApplication',
         'operatingSystem' => 'Web',
         'url' => $url,
@@ -128,7 +128,7 @@ add_action('wp_head', 'larismanis_output_seo_head', 5);
  */
 function larismanis_customize_register($wp_customize) {
     $wp_customize->add_section('larismanis_landing_section', array(
-        'title'       => __('Pengaturan Landing Page LarisManis', 'larismanis-landing'),
+        'title'       => __('Pengaturan Landing Page LarisDari', 'larismanis-landing'),
         'priority'    => 25,
         'description' => __('Sesuaikan teks headline, URL demo toko, email kontak, dan rincian harga lisensi tanpa perlu menyentuh kode.', 'larismanis-landing'),
     ));
@@ -151,17 +151,17 @@ function larismanis_customize_register($wp_customize) {
         ),
         'larismanis_demo_url' => array(
             'label'   => 'URL Live Storefront Demo',
-            'default' => 'https://demo.larismanis.online',
+            'default' => 'https://demo.larisdari.web.id',
             'type'    => 'url',
         ),
         'larismanis_demo_admin_url' => array(
             'label'   => 'URL Login Admin Demo',
-            'default' => 'https://demo.larismanis.online/login',
+            'default' => 'https://demo.larisdari.web.id/login',
             'type'    => 'url',
         ),
         'larismanis_contact_email' => array(
             'label'   => 'Email Kontak Resmi',
-            'default' => 'halo@larismanis.online',
+            'default' => 'halo@larisdari.web.id',
             'type'    => 'email',
         ),
         'larismanis_price_monthly' => array(
@@ -170,7 +170,7 @@ function larismanis_customize_register($wp_customize) {
             'type'    => 'text',
         ),
         'larismanis_price_lifetime' => array(
-            'label'   => 'Biaya Lisensi 1 Website (Selama LarisManis.online Beroperasi)',
+            'label'   => 'Biaya Lisensi 1 Website (Selama LarisDari.web.id Beroperasi)',
             'default' => 'Rp 3.000.000',
             'type'    => 'text',
         ),

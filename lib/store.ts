@@ -5,7 +5,7 @@ import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 
 const safeCache = typeof cache === 'function' ? cache : <T extends (...args: any[]) => any>(fn: T) => fn;
 
-export const DEMO_HOST_ALIASES = ['demo.larismanis.online', 'demo-store.local'];
+export const DEMO_HOST_ALIASES = ['demo.larisdari.web.id', 'demo.larismanis.online', 'demo-store.local'];
 
 async function findDemoAliasStore() {
   return prisma.store.findFirst({

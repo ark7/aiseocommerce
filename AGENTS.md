@@ -82,7 +82,7 @@ Perintah ini menjalankan validasi keamanan database (`db:safety`), sinkronisasi 
 ### A. Akses SSH & Konfigurasi Lokal
 - **Host Alias:** `larismanis-prod` (terkonfigurasi di `~/.ssh/config` lokal mengarah ke `103.193.178.174`, user `adpagency`, menggunakan kunci publik `~/.ssh/id_ed25519` dengan `IdentitiesOnly yes`).
 - **Direktori Aplikasi VPS:** `/home/adpagency/aiseocommerce`
-- **Website Produksi:** `https://demo.larismanis.online` (Next.js SaaS) & `https://larismanis.online` (Marketing WordPress)
+- **Website Produksi:** `https://demo.larisdari.web.id` (Next.js SaaS) & `https://larisdari.web.id` (Marketing WordPress)
 
 ### B. Alur Deployment Standar (`feat/*` -> `main` -> VPS `web` only)
 1. **Validasi Lokal:** Jalankan `npm run release:check` dan `npm run build` (pastikan `npm run dev` sedang berhenti terlebih dahulu).
@@ -99,8 +99,8 @@ Perintah ini menjalankan validasi keamanan database (`db:safety`), sinkronisasi 
      ```
    - Uji endpoint live:
      ```bash
-     curl -fsS https://demo.larismanis.online/api/health
-     curl -s -o /dev/null -w "%{http_code}\n" https://demo.larismanis.online/products
+     curl -fsS https://demo.larisdari.web.id/api/health
+     curl -s -o /dev/null -w "%{http_code}\n" https://demo.larisdari.web.id/products
      ```
 
 

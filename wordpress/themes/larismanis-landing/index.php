@@ -33,7 +33,7 @@ get_header();
   <?php else : ?>
     <div class="lm-post-card">
       <h1 style="margin-top:0;">Halaman Tidak Ditemukan</h1>
-      <p>Silakan kembali ke <a href="<?php echo esc_url(home_url('/')); ?>" style="color:#4f46e5; font-weight:700;">beranda LarisManis.online</a>.</p>
+      <p>Silakan kembali ke <a href="<?php echo esc_url(home_url('/')); ?>" style="color:#4f46e5; font-weight:700;">beranda LarisDari.web.id</a>.</p>
     </div>
   <?php endif; ?>
 </main>

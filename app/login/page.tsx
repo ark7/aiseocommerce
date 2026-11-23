@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
+import { DEMO_DOMAINS } from '@/lib/demoGuard';
 import { resolveTurnstileConfig } from '@/lib/turnstile';
 import { LoginForm } from '@/components/LoginForm';
 import { redirectPathFromUrl } from '@/lib/redirect';
@@ -23,16 +24,15 @@ export default async function LoginPage({
 
   const effectiveStore = store || {
     id: 'demo-store-001',
-    name: 'LarisManis Demo Store',
-    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online',
+    name: 'LarisDari Demo Store',
+    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
     isDemo: true,
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };
 
   const isDemo = Boolean(
     effectiveStore?.isDemo === true ||
-    effectiveStore?.domain === 'demo-store.local' ||
-    effectiveStore?.domain === 'demo.larismanis.online'
+    DEMO_DOMAINS.includes((effectiveStore?.domain || '').toLowerCase().trim())
   );
   const turnstileConfig = resolveTurnstileConfig(effectiveStore.settings);
 

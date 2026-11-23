@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyToken, getUserById } from '@/lib/auth';
 import { normalizePermissions } from '@/lib/rbac';
+import { DEMO_DOMAINS } from '@/lib/demoGuard';
 
 export async function GET(request: Request) {
   try {
@@ -25,8 +26,7 @@ export async function GET(request: Request) {
     const store = (user as any).store;
     const isDemo = Boolean(
       store?.isDemo ||
-      store?.domain === 'demo.larismanis.online' ||
-      store?.domain === 'demo-store.local' ||
+      DEMO_DOMAINS.includes((store?.domain || '').toLowerCase().trim()) ||
       user.storeId === 'demo-store-001' ||
       user.email.endsWith('@demo-store.local')
     );

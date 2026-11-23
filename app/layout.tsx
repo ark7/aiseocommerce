@@ -35,7 +35,7 @@ export async function generateMetadata(): Promise<Metadata> {
     // Ignore outside request context
   }
 
-  const rawDomain = store?.domain || process.env.DEFAULT_STORE_DOMAIN || 'demo.larismanis.online';
+  const rawDomain = store?.domain || process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id';
   const domain = rawDomain.endsWith('.local') && requestHost ? requestHost : rawDomain;
   const siteUrl = domain.startsWith('localhost') || domain.startsWith('127.0.0.1')
     ? `http://${domain}`

@@ -253,8 +253,8 @@ describe('AI BYOK Security & Customer Isolation (100% Back-Office Only)', () => 
       // Setup mock data di mana database menyimpan aiApiKey rahasia milik merchant
       const mockDbStore = {
         id: mockStoreId,
-        name: 'Toko Demo LarisManis',
-        domain: 'demo.larismanis.online',
+        name: 'Toko Demo LarisDari',
+        domain: 'demo.larisdari.web.id',
         logo: '/logo.png',
         address: 'Jl. Merdeka No. 1',
         phone: '081234567890',
@@ -263,10 +263,10 @@ describe('AI BYOK Security & Customer Isolation (100% Back-Office Only)', () => 
           id: 'settings-1',
           storeId: mockStoreId,
           midtransMerchantId: 'M-12345',
-          defaultSeoTitle: 'Toko Demo LarisManis Online',
+          defaultSeoTitle: 'Toko Demo LarisDari Web',
           defaultSeoDescription: 'Toko online resmi terpercaya',
           googleTagId: 'G-XYZ123',
-          businessName: 'PT Laris Manis Sukses',
+          businessName: 'PT Laris Dari Sukses',
           businessAddress: 'Jakarta',
           businessPhone: '081234567890',
           // Data sensitif AI yang TIDAK BOLEH bocor ke publik
@@ -284,9 +284,9 @@ describe('AI BYOK Security & Customer Isolation (100% Back-Office Only)', () => 
       (prisma.product.count as jest.Mock).mockResolvedValueOnce(0);
       (prisma.category.count as jest.Mock).mockResolvedValueOnce(0);
 
-      const request = new Request('http://localhost:3000/api/stores/demo.larismanis.online');
+      const request = new Request('http://localhost:3000/api/stores/demo.larisdari.web.id');
       const response = await handlePublicStore(request, {
-        params: Promise.resolve({ domain: 'demo.larismanis.online' }),
+        params: Promise.resolve({ domain: 'demo.larisdari.web.id' }),
       });
 
       expect(response.status).toBe(200);
@@ -294,7 +294,7 @@ describe('AI BYOK Security & Customer Isolation (100% Back-Office Only)', () => 
 
       // Verifikasi toko berhasil dimuat
       expect(data.success).toBe(true);
-      expect(data.store.name).toBe('Toko Demo LarisManis');
+      expect(data.store.name).toBe('Toko Demo LarisDari');
 
       // Verifikasi settings publik tidak mengandung aiApiKey atau properti rahasia AI lainnya
       const publicSettings = data.store.settings;

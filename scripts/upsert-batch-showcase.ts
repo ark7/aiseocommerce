@@ -8,6 +8,7 @@ async function run() {
     where: {
       OR: [
         { id: 'demo-store-001' },
+        { domain: 'demo.larisdari.web.id' },
         { domain: 'demo.larismanis.online' },
         { domain: 'demo-store.local' },
       ],

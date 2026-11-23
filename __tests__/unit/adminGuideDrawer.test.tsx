@@ -152,7 +152,7 @@ describe('AdminGuideDrawer Component (components/AdminGuideDrawer)', () => {
     expect(screen.getByText(/Hubungkan Link Marketplace/i)).toBeInTheDocument();
   });
 
-  it('renders LarisManis.online brand in the drawer footer', () => {
+  it('renders LarisDari.web.id brand in the drawer footer', () => {
     render(
       <AdminGuideDrawer
         isOpen={true}
@@ -161,6 +161,6 @@ describe('AdminGuideDrawer Component (components/AdminGuideDrawer)', () => {
       />
     );
 
-    expect(screen.getByText(/LarisManis\.online/i)).toBeInTheDocument();
+    expect(screen.getByText(/LarisDari\.web\.id/i)).toBeInTheDocument();
   });
 });

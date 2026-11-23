@@ -94,14 +94,14 @@ describe('Homepage Hero Slider, Product Previews & SEO-Safe Turnstile', () => {
   describe('HeroSlider component', () => {
     it('renders Slide 1 with <h1> for SEO and switches cards via buttons and strip', () => {
       const slides = resolveStoreHeroSlides({
-        storeName: 'LarisManis Demo',
+        storeName: 'LarisDari Demo',
         settings: {
           heroTitle: 'Card Hero Pertama',
           heroImageUrl: '/images/hero-1.jpg',
         },
       });
 
-      render(<HeroSlider slides={slides} storeName="LarisManis Demo" autoPlayMs={60000} />);
+      render(<HeroSlider slides={slides} storeName="LarisDari Demo" autoPlayMs={60000} />);
 
       const h1 = screen.getByRole('heading', { level: 1 });
       expect(h1).toHaveTextContent('Card Hero Pertama');
@@ -183,7 +183,7 @@ describe('Homepage Hero Slider, Product Previews & SEO-Safe Turnstile', () => {
         <GlobalPublicTurnstileGuard
           siteKey="1x00000000000000000000AA"
           initiallyVerified={false}
-          storeDomain="demo.larismanis.online"
+          storeDomain="demo.larisdari.web.id"
         />
       );
 
@@ -209,7 +209,7 @@ describe('Homepage Hero Slider, Product Previews & SEO-Safe Turnstile', () => {
         <GlobalPublicTurnstileGuard
           siteKey="1x00000000000000000000AA"
           initiallyVerified={false}
-          storeDomain="demo.larismanis.online"
+          storeDomain="demo.larisdari.web.id"
         />
       );
 

@@ -25,8 +25,8 @@ export default async function ForgotPasswordPage({
 
   const effectiveStore = store || {
     id: 'demo-store-001',
-    name: 'LarisManis.online Store',
-    domain: 'demo.larismanis.online',
+    name: 'LarisDari.web.id Store',
+    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
   };
 
   const turnstileConfig = resolveTurnstileConfig(store?.settings);
@@ -63,7 +63,7 @@ export default async function ForgotPasswordPage({
         </div>
 
         <div className="mt-6 text-center text-xs text-gray-500">
-          Didukung oleh <strong className="text-gray-700">LarisManis.online</strong> — Webcommerce Pemersatu Jalur Pemasaran Anda.
+          Didukung oleh <strong className="text-gray-700">LarisDari.web.id</strong> — Webcommerce Pemersatu Jalur Pemasaran Anda.
         </div>
       </div>
     </div>

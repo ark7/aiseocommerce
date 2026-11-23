@@ -9,9 +9,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
-$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larismanis.online/login');
-$contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larismanis.online');
+$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
+$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larisdari.web.id/login');
+$contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larisdari.web.id');
 ?>
 
 <footer class="lm-footer" role="contentinfo">
@@ -20,7 +20,7 @@ $contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larism
       <div>
         <a href="<?php echo esc_url(home_url('/')); ?>" class="lm-brand" style="color:#ffffff; margin-bottom:14px;">
           <span class="lm-brand-icon" aria-hidden="true">L</span>
-          <span>LarisManis<span style="color:#818cf8;">.online</span></span>
+          <span>LarisDari<span style="color:#818cf8;">.web.id</span></span>
         </a>
         <p style="margin:0; font-size:0.92rem; max-width:420px; color:#94a3b8;">
           Website komersial pemersatu jalur penjualan online Anda. Menggabungkan kebebasan katalog mandiri dengan integrasi marketplace, AI SEO, kurir nasional Biteship, dan sistem pembayaran lengkap dalam satu platform.
@@ -51,7 +51,7 @@ $contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larism
     </div>
 
     <div class="lm-footer-bottom">
-      <span>&copy; <?php echo esc_html(date('Y')); ?> LarisManis.online — Seluruh hak cipta dilindungi.</span>
+      <span>&copy; <?php echo esc_html(date('Y')); ?> LarisDari.web.id — Seluruh hak cipta dilindungi.</span>
       <span>Didukung oleh arsitektur Managed Webcommerce Omnichannel Indonesia</span>
     </div>
   </div>

@@ -337,7 +337,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       Mode Pratinjau Demo (Read-Only)
                     </h3>
                     <p className="text-xs text-amber-800/90 dark:text-amber-300/90 mt-0.5 leading-relaxed">
-                      Anda sedang menjelajahi akun demo <strong>LarisManis.online</strong>. Semua menu, analitik, dan AI Studio dapat dicoba bebas, namun fungsi penambahan, pengubahan, dan penghapusan data (CRUD) dibatasi agar pratinjau tetap bersih.
+                      Anda sedang menjelajahi akun demo <strong>LarisDari.web.id</strong>. Semua menu, analitik, dan AI Studio dapat dicoba bebas, namun fungsi penambahan, pengubahan, dan penghapusan data (CRUD) dibatasi agar pratinjau tetap bersih.
                       <span className="font-semibold ml-1">Pada website toko Anda, seluruh fungsi CRUD beroperasi normal 100%.</span>
                     </p>
                   </div>

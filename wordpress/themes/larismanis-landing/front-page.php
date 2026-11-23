@@ -1,6 +1,6 @@
 <?php
 /**
- * Main Landing Page Template for larismanis.online
+ * Main Landing Page Template for larisdari.web.id
  *
  * @package larismanis-landing
  */
@@ -14,8 +14,8 @@ get_header();
 $badge_text     = larismanis_get_option('larismanis_badge_text', 'Platform Webcommerce Omnichannel #1 untuk Brand & UMKM Indonesia');
 $hero_title     = larismanis_get_option('larismanis_hero_title', 'Website komersial pemersatu jalur penjualan online Anda');
 $hero_subtitle  = larismanis_get_option('larismanis_hero_subtitle', 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.');
-$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larismanis.online');
-$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larismanis.online/login');
+$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
+$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larisdari.web.id/login');
 
 $price_monthly  = larismanis_get_option('larismanis_price_monthly', 'Rp 150.000');
 $price_lifetime = larismanis_get_option('larismanis_price_lifetime', 'Rp 3.000.000');
@@ -60,12 +60,12 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
       </div>
 
       <!-- Visual Interactive Commerce Card -->
-      <div class="lm-mockup-card" aria-label="Pratinjau Ekosistem Toko LarisManis.online">
+      <div class="lm-mockup-card" aria-label="Pratinjau Ekosistem Toko LarisDari.web.id">
         <div class="lm-mockup-topbar">
           <div class="lm-dots" aria-hidden="true">
             <span></span><span></span><span></span>
           </div>
-          <div class="lm-mockup-url">https://demo.larismanis.online</div>
+          <div class="lm-mockup-url">https://demo.larisdari.web.id</div>
           <span style="font-size:0.75rem; font-weight:700; color:#10b981;">● Online</span>
         </div>
 
@@ -120,7 +120,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
   <section id="masalah" class="lm-section lm-section-alt">
     <div class="lm-container">
       <div class="lm-section-header">
-        <span class="lm-eyebrow">Mengapa LarisManis.online?</span>
+        <span class="lm-eyebrow">Mengapa LarisDari.web.id?</span>
         <h2>Jangan Taruh Masa Depan Brand Anda di Tangan Algoritma Orang Lain</h2>
         <p>Marketplace tetap penting untuk mendatangkan trafik awal, namun brand yang bertumbuh selalu memiliki website komersial sebagai rumah pusatnya.</p>
       </div>
@@ -173,7 +173,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <div class="lm-compare-card is-winner">
           <h3 class="lm-compare-heading">
             <span class="lm-compare-icon is-winner" aria-hidden="true">🚀</span>
-            <span class="lm-compare-title">Website Komersial LarisManis.online</span>
+            <span class="lm-compare-title">Website Komersial LarisDari.web.id</span>
           </h3>
           <ul class="lm-check-list">
             <li>
@@ -273,7 +273,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <div style="max-width:740px;">
           <span class="lm-eyebrow" style="color:#a5b4fc;">Coba Langsung Sekarang</span>
           <h2 style="margin:0 0 12px; font-size:clamp(1.65rem, 3vw, 2.25rem); font-weight:800; color:#ffffff;">
-            Rasakan Sendiri Pengalaman Storefront &amp; Panel Admin LarisManis.online
+            Rasakan Sendiri Pengalaman Storefront &amp; Panel Admin LarisDari.web.id
           </h2>
           <p style="margin:0; color:#e0e7ff; font-size:1rem;">
             Seluruh alur belanja, matriks harga grosir, multi-card hero slider, dan dashboard pengelolaan tersedia langsung di lingkungan demo online kami.
@@ -323,7 +323,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
         <div>
           <h3 class="lm-price-title" style="font-size:1.35rem; text-align:center;">
-            Paket Resmi Website Komersial LarisManis.online
+            Paket Resmi Website Komersial LarisDari.web.id
           </h3>
           <p class="lm-price-desc" style="text-align:center; margin-bottom:0;">
             Beli lisensi 1 website di awal, lalu cukup bayar biaya operasional setiap bulan untuk menjaga website tetap online optimal.
@@ -336,7 +336,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
                 <span class="lm-price-amount"><?php echo esc_html($price_lifetime); ?></span>
               </div>
               <p class="lm-price-period" style="margin:6px 0 0;">
-                Dibayar 1x di awal • Berlaku <strong>selama LarisManis.online beroperasi</strong>
+                Dibayar 1x di awal • Berlaku <strong>selama LarisDari.web.id beroperasi</strong>
               </p>
             </div>
 
@@ -403,7 +403,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
           <div class="lm-alert-success" role="status">
             <strong>✅ Form Pemesanan Berhasil Dikirim!</strong>
             <p style="margin:6px 0 0;">
-              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem CMS kami dan tim LarisManis.online akan segera menindaklanjuti pesanan Anda.
+              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem CMS kami dan tim LarisDari.web.id akan segera menindaklanjuti pesanan Anda.
             </p>
           </div>
         <?php elseif ($lead_error !== '') : ?>
@@ -497,7 +497,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <details class="lm-faq-item" open>
           <summary>Bagaimana cara kerja biaya lisensi Rp 3.000.000, operasional Rp 150.000/bulan, serta domain &amp; email custom?</summary>
           <p class="lm-faq-answer">
-            Kami hanya memakai 1 skema harga yang transparan: Anda membeli <strong>Lisensi 1 Website sebesar Rp 3.000.000</strong> (berlaku selama LarisManis.online beroperasi) untuk memiliki dan mengoperasikan 1 toko online penuh, ditambah <strong>Biaya Operasional Bulanan Rp 150.000/bulan</strong> agar server dan sistem berjalan optimal setiap bulannya. Untuk <strong>domain dan email custom</strong> disiapkan dan dibawa oleh masing-masing pengguna.
+            Kami hanya memakai 1 skema harga yang transparan: Anda membeli <strong>Lisensi 1 Website sebesar Rp 3.000.000</strong> (berlaku selama LarisDari.web.id beroperasi) untuk memiliki dan mengoperasikan 1 toko online penuh, ditambah <strong>Biaya Operasional Bulanan Rp 150.000/bulan</strong> agar server dan sistem berjalan optimal setiap bulannya. Untuk <strong>domain dan email custom</strong> disiapkan dan dibawa oleh masing-masing pengguna.
           </p>
         </details>
 
