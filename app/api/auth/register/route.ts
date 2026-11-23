@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
 import { registerUser } from '@/lib/auth';
 import { z } from 'zod';
-import { verifyTurnstile, isTurnstileRequired } from '@/lib/turnstile';
+import { verifyTurnstile, isTurnstileRequired, resolveTurnstileConfig } from '@/lib/turnstile';
 import { getIPAddress } from '@/lib/ip';
 
 const registerSchema = z.object({
@@ -13,6 +13,7 @@ const registerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   phone: z.string().optional(),
   turnstileToken: z.string().optional(),
+  'cf-turnstile-response': z.string().optional(),
   storeId: z.string().optional(),
 });
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     }
 
     const { email, password, firstName, lastName, phone, turnstileToken, storeId: bodyStoreId } = validation.data;
+    const submittedTurnstileToken = turnstileToken || validation.data['cf-turnstile-response'];
     const ip = getIPAddress(request);
     const host = request.headers.get('host');
     const domain = host?.split(':')[0];
@@ -47,22 +49,24 @@ export async function POST(request: Request) {
     }
 
     // Turnstile verification
+    const turnstileConfig = resolveTurnstileConfig(store.settings);
     const { required, error: configError } = isTurnstileRequired(
-      store.settings?.turnstileEnabled ?? false,
-      store.settings?.turnstileSecretKey
+      turnstileConfig.enabled,
+      turnstileConfig.secretKey
     );
 
     if (required) {
       if (configError) {
         return NextResponse.json({ error: configError }, { status: 500 });
       }
-      if (!turnstileToken) {
+      if (!submittedTurnstileToken) {
         return NextResponse.json({ error: 'Turnstile verification required' }, { status: 400 });
       }
       const verified = await verifyTurnstile(
-        store.settings?.turnstileSecretKey || '',
-        turnstileToken,
-        ip
+        turnstileConfig.secretKey || '',
+        submittedTurnstileToken,
+        ip,
+        { expectedAction: 'signup' }
       );
       if (!verified) {
         return NextResponse.json({ error: 'Turnstile verification failed' }, { status: 400 });

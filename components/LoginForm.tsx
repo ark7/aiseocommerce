@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import TurnstileWidget from '@/components/security/TurnstileWidget';
 
 interface LoginFormProps {
   storeId: string;
@@ -21,22 +22,16 @@ export function LoginForm({ storeId, storeDomain, fromPath, siteKey, isDemo = fa
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileResetCount, setTurnstileResetCount] = useState(0);
   const submitLockRef = useRef(false);
 
-  useEffect(() => {
-    if (!siteKey) return;
-    (window as any).onLoginTurnstileSuccess = (token: string) => {
-      setFormData(prev => ({ ...prev, turnstileToken: token }));
-    };
-    if (!document.getElementById('cf-turnstile-script')) {
-      const script = document.createElement('script');
-      script.id = 'cf-turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }, [siteKey]);
+  const handleTurnstileToken = useCallback((token: string) => {
+    setFormData((prev) => ({ ...prev, turnstileToken: token }));
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setError('Pemeriksaan keamanan Cloudflare gagal dimuat. Silakan coba lagi.');
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,6 +53,7 @@ export function LoginForm({ storeId, storeDomain, fromPath, siteKey, isDemo = fa
           email: formData.email,
           password: formData.password,
           turnstileToken: formData.turnstileToken,
+          'cf-turnstile-response': formData.turnstileToken,
           storeId,
         }),
       });
@@ -78,9 +74,17 @@ export function LoginForm({ storeId, storeDomain, fromPath, siteKey, isDemo = fa
         }
       } else {
         setError(data.error || 'Login gagal. Silahkan coba lagi.');
+        if (siteKey) {
+          setTurnstileResetCount((count) => count + 1);
+          setFormData((prev) => ({ ...prev, turnstileToken: '' }));
+        }
       }
     } catch (err) {
       setError('Terjadi kesalahan. Silahkan coba lagi.');
+      if (siteKey) {
+        setTurnstileResetCount((count) => count + 1);
+        setFormData((prev) => ({ ...prev, turnstileToken: '' }));
+      }
     } finally {
       setLoading(false);
       submitLockRef.current = false;
@@ -229,13 +233,13 @@ export function LoginForm({ storeId, storeDomain, fromPath, siteKey, isDemo = fa
       </div>
 
       {siteKey && (
-        <div className="turnstile-container my-3 flex justify-center">
-          <div
-            className="cf-turnstile"
-            data-sitekey={siteKey}
-            data-callback="onLoginTurnstileSuccess"
-          />
-        </div>
+        <TurnstileWidget
+          siteKey={siteKey}
+          action="login"
+          resetSignal={turnstileResetCount}
+          onToken={handleTurnstileToken}
+          onError={handleTurnstileError}
+        />
       )}
 
       <div className="flex items-center justify-between">

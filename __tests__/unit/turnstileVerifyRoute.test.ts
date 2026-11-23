@@ -103,4 +103,29 @@ describe('POST /api/security/turnstile-verify', () => {
     expect(cookie?.httpOnly).toBe(true);
     expect(verifyTurnstilePassToken(cookie?.value, '203.0.113.9')).toBe(true);
   });
+
+  it('supports cf-turnstile-response field and forwards expectedAction when action is passed', async () => {
+    (getActiveStore as jest.Mock).mockResolvedValue({
+      id: 'store-1',
+      domain: 'demo.larisdari.web.id',
+      settings: {
+        turnstileEnabled: true,
+        turnstileSiteKey: '0x4AAAAAAGOyEGvopPqTPLIf',
+        turnstileSecretKey: '0xSECRET',
+      },
+    });
+    (verifyTurnstile as jest.Mock).mockResolvedValue(true);
+
+    const res = await POST(
+      makeReq({
+        'cf-turnstile-response': 'cf-body-token',
+        storeDomain: 'demo.larisdari.web.id',
+        action: 'listing',
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(verifyTurnstile).toHaveBeenCalledWith('0xSECRET', 'cf-body-token', '203.0.113.9', {
+      expectedAction: 'listing',
+    });
+  });
 });

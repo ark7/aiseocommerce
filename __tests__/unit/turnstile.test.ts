@@ -91,11 +91,66 @@ describe('Turnstile Verification & Requirement', () => {
       const result = await verifyTurnstile('secret-key', 'any-token', '127.0.0.1');
       expect(result).toBe(false);
     });
+
+    it('rejects empty tokens or tokens longer than 2048 chars before calling Cloudflare', async () => {
+      global.fetch = jest.fn();
+
+      expect(await verifyTurnstile('secret-key', '', '127.0.0.1')).toBe(false);
+      expect(await verifyTurnstile('secret-key', 'a'.repeat(2049), '127.0.0.1')).toBe(false);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('enforces expectedAction and TURNSTILE_HOSTNAMES allowlist when configured', async () => {
+      const origHostnames = process.env.TURNSTILE_HOSTNAMES;
+      process.env.TURNSTILE_HOSTNAMES = 'demo.larisdari.web.id, shop.example.com';
+
+      try {
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            success: true,
+            action: 'login',
+            hostname: 'demo.larisdari.web.id',
+          }),
+        } as any);
+
+        expect(
+          await verifyTurnstile('secret-key', 'valid-token', '127.0.0.1', {
+            expectedAction: 'login',
+          })
+        ).toBe(true);
+
+        expect(
+          await verifyTurnstile('secret-key', 'valid-token', '127.0.0.1', {
+            expectedAction: 'signup',
+          })
+        ).toBe(false);
+
+        global.fetch = jest.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({
+            success: true,
+            action: 'login',
+            hostname: 'evil.example.net',
+          }),
+        } as any);
+
+        expect(
+          await verifyTurnstile('secret-key', 'valid-token', '127.0.0.1', {
+            expectedAction: 'login',
+          })
+        ).toBe(false);
+      } finally {
+        if (origHostnames === undefined) delete process.env.TURNSTILE_HOSTNAMES;
+        else process.env.TURNSTILE_HOSTNAMES = origHostnames;
+      }
+    });
   });
 
   describe('resolveTurnstileConfig', () => {
     const origSite = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
     const origSecret = process.env.TURNSTILE_SECRET_KEY;
+    const origSpinSecret = process.env.TURNSTILE_SECRET;
 
     afterEach(() => {
       if (origSite === undefined) delete process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
@@ -103,6 +158,9 @@ describe('Turnstile Verification & Requirement', () => {
 
       if (origSecret === undefined) delete process.env.TURNSTILE_SECRET_KEY;
       else process.env.TURNSTILE_SECRET_KEY = origSecret;
+
+      if (origSpinSecret === undefined) delete process.env.TURNSTILE_SECRET;
+      else process.env.TURNSTILE_SECRET = origSpinSecret;
     });
 
     it('returns disabled when store settings disable turnstile even if keys exist', () => {
@@ -115,15 +173,16 @@ describe('Turnstile Verification & Requirement', () => {
       expect(cfg.siteKey).toBeNull();
     });
 
-    it('falls back to environment variables when settings keys are null and enabled flag is omitted', () => {
+    it('falls back to environment variables (including TURNSTILE_SECRET alias) when settings keys are null', () => {
       process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = '0xENVSITE';
-      process.env.TURNSTILE_SECRET_KEY = '0xENVSECRET';
+      delete process.env.TURNSTILE_SECRET_KEY;
+      process.env.TURNSTILE_SECRET = '0xSPINSECRET';
 
       const cfg = resolveTurnstileConfig(undefined);
       expect(cfg).toEqual({
         enabled: true,
         siteKey: '0xENVSITE',
-        secretKey: '0xENVSECRET',
+        secretKey: '0xSPINSECRET',
       });
     });
 

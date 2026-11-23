@@ -11,6 +11,25 @@ export interface ResolvedTurnstileConfig {
   secretKey: string | null;
 }
 
+export interface VerifyTurnstileOptions {
+  expectedAction?: string;
+  expectedHostnames?: string[] | Set<string>;
+}
+
+/**
+ * Parses comma-separated allowed Turnstile hostnames from env or raw string.
+ */
+export function parseTurnstileHostnames(raw?: string | null): Set<string> {
+  const source = raw !== undefined ? raw : process.env.TURNSTILE_HOSTNAMES;
+  if (!source) return new Set();
+  return new Set(
+    source
+      .split(',')
+      .map((hostname) => hostname.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
 /**
  * Resolves Cloudflare Turnstile settings from StoreSettings with optional
  * environment variable fallback so keys can be managed in Admin Settings or env.
@@ -29,6 +48,7 @@ export function resolveTurnstileConfig(
   const secretKey =
     settings?.turnstileSecretKey?.trim() ||
     process.env.TURNSTILE_SECRET_KEY?.trim() ||
+    process.env.TURNSTILE_SECRET?.trim() ||
     null;
   const enabled =
     settings?.turnstileEnabled !== undefined && settings?.turnstileEnabled !== null
@@ -118,20 +138,36 @@ export function verifyTurnstilePassToken(
 export async function verifyTurnstile(
   secret: string,
   token: string,
-  ip: string
+  ip: string,
+  options?: VerifyTurnstileOptions
 ): Promise<boolean> {
+  if (
+    typeof secret !== 'string' ||
+    secret.trim() === '' ||
+    typeof token !== 'string' ||
+    token.trim() === '' ||
+    token.length > 2048
+  ) {
+    return false;
+  }
+
   try {
+    const requestInit: RequestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        secret,
+        response: token,
+        remoteip: ip,
+      }),
+    };
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      requestInit.signal = AbortSignal.timeout(10_000);
+    }
+
     const response = await fetch(
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          secret,
-          response: token,
-          remoteip: ip,
-        }),
-      }
+      requestInit
     );
 
     if (!response.ok) {
@@ -140,7 +176,37 @@ export async function verifyTurnstile(
     }
 
     const data = await response.json();
-    return data.success === true;
+    if (data?.success !== true) {
+      return false;
+    }
+
+    if (options?.expectedAction && data.action !== options.expectedAction) {
+      logger.warn('Turnstile action mismatch', {
+        expectedAction: options.expectedAction,
+        actualAction: data.action,
+      });
+      return false;
+    }
+
+    const allowedHostnames =
+      options?.expectedHostnames !== undefined
+        ? new Set(
+            Array.from(options.expectedHostnames)
+              .map((hostname) => hostname.trim().toLowerCase())
+              .filter(Boolean)
+          )
+        : parseTurnstileHostnames(process.env.TURNSTILE_HOSTNAMES);
+
+    if (allowedHostnames.size > 0) {
+      const actualHostname =
+        typeof data.hostname === 'string' ? data.hostname.trim().toLowerCase() : '';
+      if (!actualHostname || !allowedHostnames.has(actualHostname)) {
+        logger.warn('Turnstile hostname mismatch', { actualHostname });
+        return false;
+      }
+    }
+
+    return true;
   } catch (error) {
     logger.error('Turnstile verification error', {}, error instanceof Error ? error : String(error));
     return false;
@@ -207,7 +273,8 @@ export async function verifyRequestTurnstileOrPass(
     turnstileSiteKey?: string | null;
     turnstileSecretKey?: string | null;
   } | null,
-  bodyToken?: string | null
+  bodyToken?: string | null,
+  options?: VerifyTurnstileOptions
 ): Promise<{ allowed: boolean; status: number; error: string | null }> {
   const config = resolveTurnstileConfig(settings);
   if (!config.enabled) {
@@ -227,7 +294,9 @@ export async function verifyRequestTurnstileOrPass(
 
   const cleanToken = typeof bodyToken === 'string' ? bodyToken.trim() : '';
   if (cleanToken) {
-    const isValid = await verifyTurnstile(config.secretKey || '', cleanToken, ip);
+    const isValid = options
+      ? await verifyTurnstile(config.secretKey || '', cleanToken, ip, options)
+      : await verifyTurnstile(config.secretKey || '', cleanToken, ip);
     if (isValid) {
       return { allowed: true, status: 200, error: null };
     }

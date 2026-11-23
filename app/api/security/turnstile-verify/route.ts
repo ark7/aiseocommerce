@@ -13,10 +13,16 @@ import {
   verifyTurnstile,
 } from '@/lib/turnstile';
 
-const TurnstileVerifySchema = z.object({
-  token: z.string().min(1),
-  storeDomain: z.string().optional(),
-});
+const TurnstileVerifySchema = z
+  .object({
+    token: z.string().min(1).optional(),
+    'cf-turnstile-response': z.string().min(1).optional(),
+    storeDomain: z.string().optional(),
+    action: z.string().regex(/^[A-Za-z0-9_-]{1,32}$/).optional(),
+  })
+  .refine((data) => Boolean(data.token?.trim() || data['cf-turnstile-response']?.trim()), {
+    message: 'Token keamanan Cloudflare Turnstile wajib diisi',
+  });
 
 /**
  * Verifies a Cloudflare Turnstile token from public storefront pages (/products, /product/[slug])
@@ -63,7 +69,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: configError }, { status: 500 });
     }
 
-    const ok = await verifyTurnstile(config.secretKey || '', parsed.data.token, ip);
+    const submittedToken = (parsed.data.token || parsed.data['cf-turnstile-response'] || '').trim();
+    const ok = parsed.data.action
+      ? await verifyTurnstile(config.secretKey || '', submittedToken, ip, {
+          expectedAction: parsed.data.action,
+        })
+      : await verifyTurnstile(config.secretKey || '', submittedToken, ip);
     if (!ok) {
       return NextResponse.json(
         { error: 'Verifikasi keamanan Cloudflare Turnstile gagal. Silakan coba lagi.' },

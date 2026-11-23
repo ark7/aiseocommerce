@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import TurnstileWidget from '@/components/security/TurnstileWidget';
 
 interface RegisterFormProps {
   storeId: string;
@@ -22,22 +23,16 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [turnstileResetCount, setTurnstileResetCount] = useState(0);
   const submitLockRef = useRef(false);
 
-  useEffect(() => {
-    if (!siteKey) return;
-    (window as any).onRegisterTurnstileSuccess = (token: string) => {
-      setFormData(prev => ({ ...prev, turnstileToken: token }));
-    };
-    if (!document.getElementById('cf-turnstile-script')) {
-      const script = document.createElement('script');
-      script.id = 'cf-turnstile-script';
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }, [siteKey]);
+  const handleTurnstileToken = useCallback((token: string) => {
+    setFormData((prev) => ({ ...prev, turnstileToken: token }));
+  }, []);
+
+  const handleTurnstileError = useCallback(() => {
+    setError('Pemeriksaan keamanan Cloudflare gagal dimuat. Silakan coba lagi.');
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,6 +52,7 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          'cf-turnstile-response': formData.turnstileToken,
           storeId,
         }),
       });
@@ -75,9 +71,17 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
         }
       } else {
         setError(data.error || 'Registrasi gagal. Silahkan coba lagi.');
+        if (siteKey) {
+          setTurnstileResetCount((count) => count + 1);
+          setFormData((prev) => ({ ...prev, turnstileToken: '' }));
+        }
       }
     } catch (err) {
       setError('Terjadi kesalahan. Silahkan coba lagi.');
+      if (siteKey) {
+        setTurnstileResetCount((count) => count + 1);
+        setFormData((prev) => ({ ...prev, turnstileToken: '' }));
+      }
     } finally {
       setLoading(false);
       submitLockRef.current = false;
@@ -151,13 +155,13 @@ export function RegisterForm({ storeId, storeDomain, fromPath, siteKey }: Regist
       </div>
 
       {siteKey && (
-        <div className="turnstile-container my-3 flex justify-center">
-          <div
-            className="cf-turnstile"
-            data-sitekey={siteKey}
-            data-callback="onRegisterTurnstileSuccess"
-          />
-        </div>
+        <TurnstileWidget
+          siteKey={siteKey}
+          action="signup"
+          resetSignal={turnstileResetCount}
+          onToken={handleTurnstileToken}
+          onError={handleTurnstileError}
+        />
       )}
 
       <button
