@@ -461,4 +461,50 @@ describe('createOrder — kalkulasi ongkir manual', () => {
     expect(order.shippingZone).toBe('FREE');
     expect(order.totalAmount).toBe(350000);
   });
+
+  test('menerapkan PPN dan biaya tambahan kustom dari StoreSettings ke snapshot order', async () => {
+    const taxAndFeeSettings = {
+      sandboxPaymentEnabled: false,
+      shippingOriginCity: 'Jakarta',
+      shippingFlatRateInner: 10000,
+      shippingFlatRateOuter: 25000,
+      shippingFreeThreshold: null,
+      taxEnabled: true,
+      taxLabel: 'PPN 11%',
+      taxRate: 11,
+      taxApplyOnCheckout: true,
+      invoiceShowTax: true,
+      invoiceShowCustomFees: false,
+      customFeesConfig: [
+        { id: 'f1', name: 'Packing Kayu', type: 'FIXED', amount: 15000, enabled: true, showOnInvoice: true },
+        { id: 'f2', name: 'Biaya Nonaktif', type: 'FIXED', amount: 5000, enabled: false, showOnInvoice: true },
+      ],
+    };
+
+    const tx = makeTx([product({ sellingPrice: 100000 })], { storeSettings: taxAndFeeSettings });
+
+    const order = await createOrder(
+      STORE,
+      [{ productId: 'product-1', quantity: 2 }],
+      CUSTOMER,
+      undefined,
+      undefined,
+      undefined,
+      {
+        shippingZone: 'INNER',
+        shippingAddress: 'Jl. Melati No. 5',
+      }
+    );
+
+    // Subtotal = 200.000, PPN 11% = 22.000, Packing Kayu = 15.000, Ongkir = 10.000 => 247.000
+    expect(order.subtotal).toBe(200000);
+    expect(order.taxAmount).toBe(22000);
+    expect(order.taxLabel).toBe('PPN 11%');
+    expect(order.taxRate).toBe(11);
+    expect(order.customFeesAmount).toBe(15000);
+    expect(order.invoiceShowTax).toBe(true);
+    expect(order.invoiceShowCustomFees).toBe(false);
+    expect(order.shippingCost).toBe(10000);
+    expect(order.totalAmount).toBe(247000);
+  });
 });

@@ -9,17 +9,19 @@ describe('Admin Settings Layout & Navigation', () => {
     { id: 'ai', title: 'AI Assistant (BYOK)', icon: '✨' },
     { id: 'notifications', title: 'Notifikasi Otomatis', icon: '📲' },
     { id: 'email', title: 'Email & SMTP', icon: '✉️' },
+    { id: 'invoice', title: 'PPN, Biaya & Invoice', icon: '🧾' },
   ];
 
-  it('contains all 9 settings categories with icons and unique IDs', () => {
+  it('contains all 10 settings categories with icons and unique IDs', () => {
     const ids = EXPECTED_TABS.map((t) => t.id);
     const uniqueIds = Array.from(new Set(ids));
-    expect(uniqueIds.length).toBe(9);
+    expect(uniqueIds.length).toBe(10);
     expect(ids).toContain('general');
     expect(ids).toContain('shipping');
     expect(ids).toContain('ai');
     expect(ids).toContain('notifications');
     expect(ids).toContain('email');
+    expect(ids).toContain('invoice');
     expect(ids).toContain('legal');
   });
 
@@ -32,6 +34,7 @@ describe('Admin Settings Layout & Navigation', () => {
     expect(resolveTab('shipping')).toBe('shipping');
     expect(resolveTab('ai')).toBe('ai');
     expect(resolveTab('email')).toBe('email');
+    expect(resolveTab('invoice')).toBe('invoice');
     expect(resolveTab('notifications')).toBe('notifications');
     expect(resolveTab('theme')).toBe('theme');
     expect(resolveTab('unknown-tab')).toBe('general');

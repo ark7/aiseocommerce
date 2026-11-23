@@ -151,6 +151,49 @@ describe('/api/admin/settings/general', () => {
       const res = await PUT(req);
       expect(res.status).toBe(400);
     });
+
+    it('persists PPN, custom fees config, and invoice visibility options', async () => {
+      (requireUser as jest.Mock).mockResolvedValue({ id: 'u1', role: 'ADMIN', storeId: 'store-1' });
+      (prisma.store.update as jest.Mock).mockResolvedValue({});
+      (prisma.storeSettings.upsert as jest.Mock).mockResolvedValue({});
+
+      const customFeesConfig = [
+        { id: 'fee-1', name: 'Packing Kayu', type: 'FIXED', amount: 15000, enabled: true, showOnInvoice: true },
+        { id: 'fee-2', name: 'Asuransi', type: 'PERCENT', amount: 1.5, enabled: true, showOnInvoice: false },
+      ];
+
+      const req = new Request('http://localhost/api/admin/settings/general', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taxEnabled: true,
+          taxLabel: 'PPN 11%',
+          taxRate: 11,
+          taxApplyOnCheckout: true,
+          invoiceShowTax: true,
+          invoiceShowCustomFees: true,
+          customFeesConfig,
+          invoiceNotes: 'NPWP: 01.234.567.8-901.000',
+        }),
+      });
+
+      const res = await PUT(req);
+      expect(res.status).toBe(200);
+      expect(prisma.storeSettings.upsert).toHaveBeenCalledWith({
+        where: { storeId: 'store-1' },
+        update: expect.objectContaining({
+          taxEnabled: true,
+          taxLabel: 'PPN 11%',
+          taxRate: 11,
+          taxApplyOnCheckout: true,
+          invoiceShowTax: true,
+          invoiceShowCustomFees: true,
+          customFeesConfig,
+          invoiceNotes: 'NPWP: 01.234.567.8-901.000',
+        }),
+        create: expect.any(Object),
+      });
+    });
   });
 });
 

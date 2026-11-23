@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { getActiveStore } from '@/lib/store';
+import { parseCustomFeesConfig } from '@/lib/invoiceService';
 import CartPage from '@/components/CartPage';
 
 export default async function CartRoute() {
@@ -15,11 +16,20 @@ export default async function CartRoute() {
     originPostalCode: store.settings?.biteshipOriginPostalCode || null,
   };
 
+  const billingConfig = {
+    taxEnabled: Boolean(store.settings?.taxEnabled),
+    taxLabel: store.settings?.taxLabel || 'PPN',
+    taxRate: store.settings?.taxRate ?? 0,
+    taxApplyOnCheckout: store.settings?.taxApplyOnCheckout ?? true,
+    customFeesConfig: parseCustomFeesConfig(store.settings?.customFeesConfig),
+  };
+
   return (
     <CartPage
       storeId={store.id}
       storeDomain={store.domain}
       shippingConfig={shippingConfig}
+      billingConfig={billingConfig}
     />
   );
 }

@@ -14,6 +14,7 @@ import {
 import { dispatchLowStockWarningNotification } from '@/lib/orderNotificationService';
 import { calculateOrderShipping } from '@/lib/shipping';
 import type { ShippingZone } from '@/lib/shipping';
+import { calculateOrderPricing, parseCustomFeesConfig } from '@/lib/invoiceService';
 
 type Db = typeof prisma | Prisma.TransactionClient;
 
@@ -213,6 +214,13 @@ export async function createOrder(
           shippingFlatRateInner: true,
           shippingFlatRateOuter: true,
           shippingFreeThreshold: true,
+          taxEnabled: true,
+          taxLabel: true,
+          taxRate: true,
+          taxApplyOnCheckout: true,
+          invoiceShowTax: true,
+          invoiceShowCustomFees: true,
+          customFeesConfig: true,
         },
       });
     }
@@ -539,7 +547,21 @@ export async function createOrder(
       effectiveShippingZone = shippingResult.zone;
     }
 
-    const totalAmount = Math.max(0, subtotal - discount) + effectiveShippingCost;
+    const applyTaxOnCheckout =
+      Boolean(storeSettings?.taxEnabled) && storeSettings?.taxApplyOnCheckout !== false;
+    const configuredCustomFees = parseCustomFeesConfig(storeSettings?.customFeesConfig).filter(
+      (fee) => fee.enabled
+    );
+
+    const pricing = calculateOrderPricing({
+      subtotal,
+      discount,
+      shippingCost: effectiveShippingCost,
+      taxEnabled: applyTaxOnCheckout,
+      taxLabel: storeSettings?.taxLabel || 'PPN',
+      taxRate: typeof storeSettings?.taxRate === 'number' ? storeSettings.taxRate : 0,
+      customFees: configuredCustomFees,
+    });
 
     return tx.order.update({
       where: { id: order.id },
@@ -553,7 +575,14 @@ export async function createOrder(
         courierService: shippingOptions?.courierService || null,
         courierServiceName: shippingOptions?.courierServiceName || null,
         courierEtd: shippingOptions?.courierEtd || null,
-        totalAmount,
+        taxAmount: pricing.taxAmount,
+        taxLabel: pricing.taxLabel,
+        taxRate: pricing.taxRate,
+        customFeesAmount: pricing.customFeesAmount,
+        customFeesSnapshot: pricing.customFees as unknown as Prisma.InputJsonValue,
+        invoiceShowTax: storeSettings?.invoiceShowTax ?? true,
+        invoiceShowCustomFees: storeSettings?.invoiceShowCustomFees ?? true,
+        totalAmount: pricing.totalAmount,
       },
     });
   });

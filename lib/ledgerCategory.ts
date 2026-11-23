@@ -17,11 +17,13 @@ type Db = PrismaClient | Prisma.TransactionClient;
  *
  * Keyed by type, so adding a LedgerType is a compile error until it is handled.
  */
+export const TAX_PAYMENT_CATEGORY = 'Setoran PPN';
+
 export const DEFAULT_LEDGER_CATEGORIES: Record<LedgerType, string[]> = {
   INCOME: ['SALES', 'Pendapatan Lain'],
   REFUND: ['REFUND'],
   PETTY_CASH: ['PETTY_CASH'],
-  EXPENSE: ['Pembelian', 'Operasional', 'Gaji', 'Sewa', 'Iklan'],
+  EXPENSE: ['Pembelian', 'Operasional', 'Gaji', 'Sewa', 'Iklan', TAX_PAYMENT_CATEGORY],
   CAPITAL: ['Modal Awal', 'Modal Tambahan'],
   LOAN: ['Pinjaman', 'Angsuran'],
 };

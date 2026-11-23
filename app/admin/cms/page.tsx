@@ -8,8 +8,9 @@ import { LandingPageData } from '@/lib/landingPageTypes';
 import DateRangeFilter from '@/components/common/DateRangeFilter';
 import Pagination from '@/components/common/Pagination';
 import { createEmptyHeroSlide, type HeroSlideItem } from '@/lib/heroSlides';
+import TaxAndInvoiceSettingsPanel from '@/components/admin/TaxAndInvoiceSettingsPanel';
 
-type CmsTab = 'landing-pages' | 'hero' | 'terms' | 'privacy' | 'cookie' | 'about' | 'articles';
+type CmsTab = 'landing-pages' | 'hero' | 'terms' | 'privacy' | 'cookie' | 'about' | 'articles' | 'invoice';
 
 interface HeroData {
   heroBadge: string;
@@ -449,7 +450,7 @@ export default function AdminCmsPage() {
       )}
 
       {/* Quick Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <button
           type="button"
           onClick={() => { setActiveTab('landing-pages'); setIsCreatingLp(false); setEditingLp(null); }}
@@ -508,6 +509,18 @@ export default function AdminCmsPage() {
           <span className="text-xl">🍪</span>
           <h2 className="text-sm font-bold text-gray-900 mt-2">Izin Cookie</h2>
           <p className="text-xs text-gray-500 mt-0.5">{legalForm.cookieConsentEnabled ? '🟢 Banner Aktif' : '⚪ Nonaktif'}</p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('invoice'); setIsCreatingLp(false); setEditingLp(null); }}
+          className={`p-4 rounded-xl border text-left transition ${
+            activeTab === 'invoice' ? 'border-indigo-600 bg-indigo-50/50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'
+          }`}
+        >
+          <span className="text-xl">🧾</span>
+          <h2 className="text-sm font-bold text-gray-900 mt-2">PPN &amp; Invoice</h2>
+          <p className="text-xs text-indigo-600 font-semibold mt-0.5">Pajak, Biaya &amp; Faktur</p>
         </button>
       </div>
 
@@ -568,6 +581,14 @@ export default function AdminCmsPage() {
           }`}
         >
           📰 Panduan & Artikel Blog
+        </button>
+        <button
+          onClick={() => { setActiveTab('invoice'); setIsCreatingLp(false); setEditingLp(null); }}
+          className={`py-3 px-2 border-b-2 whitespace-nowrap transition ${
+            activeTab === 'invoice' ? 'border-indigo-600 text-indigo-600 font-bold' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          🧾 PPN, Biaya & Invoice
         </button>
       </div>
 
@@ -1313,6 +1334,14 @@ export default function AdminCmsPage() {
             </Link>
           </div>
         </div>
+      )}
+
+      {/* TAB 7: PPN, BIAYA TAMBAHAN & INVOICE */}
+      {activeTab === 'invoice' && (
+        <TaxAndInvoiceSettingsPanel
+          onNotice={(msg) => setNotice(msg)}
+          onError={(msg) => setError(msg)}
+        />
       )}
     </div>
   );

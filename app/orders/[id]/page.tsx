@@ -6,12 +6,15 @@ import Link from 'next/link';
 import StoreHeader from '@/components/StoreHeader';
 import StoreFooter from '@/components/StoreFooter';
 import { buildPurchaseCalls, fireOnce, getTrackingConfig } from '@/lib/tracking';
+import { parseOrderCustomFees } from '@/lib/invoicePricing';
+import OrderInvoiceModal, { type InvoiceModalStoreInfo } from '@/components/OrderInvoiceModal';
 
 interface OrderItem {
   id: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  variation?: string | null;
   product: {
     id: string;
     name: string;
@@ -41,12 +44,23 @@ interface OrderDetail {
   id: string;
   orderNumber: string;
   status: string;
+  customerName?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
   subtotal: number;
   totalAmount: number;
   shippingCost?: number;
   shippingZone?: string | null;
   shippingAddress: string | null;
   discount?: number;
+  taxAmount?: number;
+  taxLabel?: string | null;
+  taxRate?: number;
+  customFeesAmount?: number;
+  customFeesSnapshot?: unknown;
+  invoiceShowTax?: boolean;
+  invoiceShowCustomFees?: boolean;
+  invoiceRevision?: number;
   trackingUrl: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
@@ -85,6 +99,8 @@ export default function CustomerOrderDetailPage() {
   const orderId = (params?.id as string) || '';
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [storeInfo, setStoreInfo] = useState<InvoiceModalStoreInfo | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,6 +130,7 @@ export default function CustomerOrderDetailPage() {
 
       const data = await response.json();
       setOrder(data.order);
+      setStoreInfo(data.storeInfo || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal memuat pesanan');
     } finally {
@@ -311,14 +328,30 @@ export default function CustomerOrderDetailPage() {
 
         <div className="flex items-center justify-between mt-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{order.orderNumber}</h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold text-gray-900">{order.orderNumber}</h1>
+              {Boolean(order.invoiceRevision && order.invoiceRevision > 1) && (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  Revisi Invoice #{order.invoiceRevision}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">
               Dibuat {new Date(order.createdAt).toLocaleString('id-ID')}
             </p>
           </div>
-          <span className="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
-            {order.status}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setInvoiceModalOpen(true)}
+              className="px-3.5 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-semibold transition"
+            >
+              🧾 Lihat / Cetak Invoice
+            </button>
+            <span className="inline-flex px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+              {order.status}
+            </span>
+          </div>
         </div>
 
         {error && <div className="mb-4 bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>}
@@ -667,10 +700,33 @@ export default function CustomerOrderDetailPage() {
                   ? ' (Bebas Ongkir)'
                   : order.shippingZone === 'DIGITAL'
                   ? ' (Bebas Ongkir Digital)'
+                  : order.courierServiceName
+                  ? ` (${order.courierServiceName})`
                   : ''}
               </span>
               <span>{order.shippingCost ? formatIDR(order.shippingCost) : 'GRATIS'}</span>
             </div>
+            {order.invoiceShowTax !== false && Boolean(order.taxAmount && order.taxAmount > 0) && (
+              <div className="flex justify-between text-gray-600">
+                <span>
+                  {order.taxLabel || 'PPN'}
+                  {Number(order.taxRate || 0) > 0 ? ` (${Number(order.taxRate)}%)` : ''}
+                </span>
+                <span>{formatIDR(order.taxAmount!)}</span>
+              </div>
+            )}
+            {order.invoiceShowCustomFees !== false &&
+              parseOrderCustomFees(order.customFeesSnapshot)
+                .filter((fee) => fee.showOnInvoice !== false && fee.computedAmount > 0)
+                .map((fee) => (
+                  <div key={fee.id} className="flex justify-between text-gray-600">
+                    <span>
+                      {fee.name}
+                      {fee.type === 'PERCENT' ? ` (${fee.rateOrAmount}%)` : ''}
+                    </span>
+                    <span>{formatIDR(fee.computedAmount)}</span>
+                  </div>
+                ))}
             <div className="flex justify-between font-bold text-base text-gray-900 pt-2 border-t">
               <span>Total Pembayaran</span>
               <span className="text-indigo-600">{formatIDR(order.totalAmount)}</span>
@@ -678,6 +734,13 @@ export default function CustomerOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <OrderInvoiceModal
+        open={invoiceModalOpen}
+        onClose={() => setInvoiceModalOpen(false)}
+        order={order}
+        storeInfo={storeInfo}
+      />
 
       <StoreFooter />
     </div>
