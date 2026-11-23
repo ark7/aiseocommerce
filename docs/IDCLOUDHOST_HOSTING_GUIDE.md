@@ -94,6 +94,11 @@ DATABASE_URL="postgresql://<NEON_USER>:<NEON_PASSWORD>@<NEON_POOLER_HOST>/neondb
 # NextAuth Authentication Secret
 NEXTAUTH_URL="https://demo.larisdari.web.id"
 NEXTAUTH_SECRET="kunci-secret-acak-minimal-32-karakter-keamanan"
+
+# Cloudflare Turnstile (Anti-Bot Protection)
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="0x4AAAAAAGOyEGvopPqTPLIf"
+TURNSTILE_SECRET_KEY="<SECRET_KEY_DARI_CLOUDFLARE_DASHBOARD>"
+TURNSTILE_HOSTNAMES="demo.larisdari.web.id"
 ```
 
 ### Langkah 4: Jalankan Script Otomasi Deploy

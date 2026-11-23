@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ensureTurnstileScript } from '@/components/security/TurnstileWidget';
 
 export interface TurnstileStorefrontShieldProps {
   siteKey?: string | null;
@@ -12,28 +13,23 @@ export interface TurnstileStorefrontShieldProps {
   onVerifiedChange?: (verified: boolean) => void;
 }
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: HTMLElement,
-        options: {
-          sitekey: string;
-          theme?: 'light' | 'dark' | 'auto';
-          callback?: (token: string) => void;
-          'error-callback'?: () => void;
-          'expired-callback'?: () => void;
-        }
-      ) => string;
-      reset?: (widgetId?: string) => void;
-      remove?: (widgetId?: string) => void;
-    };
+const SESSION_STORAGE_KEY = 'cf_turnstile_verified';
+
+function resolveActionForContext(
+  context: TurnstileStorefrontShieldProps['context']
+): string {
+  switch (context) {
+    case 'product-detail':
+      return 'product_detail';
+    case 'auth':
+      return 'auth';
+    case 'public-global':
+      return 'storefront_verify';
+    case 'listing':
+    default:
+      return 'listing';
   }
 }
-
-const SESSION_STORAGE_KEY = 'cf_turnstile_verified';
-const SCRIPT_ID = 'cf-turnstile-script';
-const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 
 /**
  * Lightweight Cloudflare Turnstile guard for catalog listing (/products)
@@ -91,6 +87,7 @@ export default function TurnstileStorefrontShield({
     }
 
     let cancelled = false;
+    const action = resolveActionForContext(context);
 
     const verifyTokenWithServer = async (token: string) => {
       if (cancelled) return;
@@ -100,7 +97,12 @@ export default function TurnstileStorefrontShield({
         const res = await fetch('/api/security/turnstile-verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, storeDomain }),
+          body: JSON.stringify({
+            token,
+            'cf-turnstile-response': token,
+            storeDomain,
+            action,
+          }),
         });
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok && data?.verified) {
@@ -131,6 +133,7 @@ export default function TurnstileStorefrontShield({
       if (widgetIdRef.current) return;
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
+        action,
         theme: 'auto',
         callback: (token: string) => {
           void verifyTokenWithServer(token);
@@ -149,39 +152,11 @@ export default function TurnstileStorefrontShield({
       });
     };
 
-    if (window.turnstile?.render) {
-      renderWidget();
-    } else {
-      let script = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
-      const handleLoad = () => renderWidget();
-      if (!script) {
-        script = document.createElement('script');
-        script.id = SCRIPT_ID;
-        script.src = SCRIPT_SRC;
-        script.async = true;
-        script.defer = true;
-        script.addEventListener('load', handleLoad);
-        document.head.appendChild(script);
-      } else {
-        script.addEventListener('load', handleLoad);
-      }
-
-      return () => {
-        cancelled = true;
-        script?.removeEventListener('load', handleLoad);
-        if (widgetIdRef.current && window.turnstile?.remove) {
-          try {
-            window.turnstile.remove(widgetIdRef.current);
-          } catch {
-            // ignore
-          }
-          widgetIdRef.current = null;
-        }
-      };
-    }
+    const detachScript = ensureTurnstileScript(renderWidget);
 
     return () => {
       cancelled = true;
+      detachScript();
       if (widgetIdRef.current && window.turnstile?.remove) {
         try {
           window.turnstile.remove(widgetIdRef.current);
@@ -191,7 +166,7 @@ export default function TurnstileStorefrontShield({
         widgetIdRef.current = null;
       }
     };
-  }, [siteKey, initiallyVerified, storeDomain]);
+  }, [siteKey, initiallyVerified, storeDomain, context]);
 
   if (!siteKey) return null;
 

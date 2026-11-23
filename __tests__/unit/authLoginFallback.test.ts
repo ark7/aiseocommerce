@@ -27,6 +27,11 @@ jest.mock('@/lib/auth', () => ({
 jest.mock('@/lib/turnstile', () => ({
   isTurnstileRequired: jest.fn().mockReturnValue({ required: false }),
   verifyTurnstile: jest.fn().mockResolvedValue(true),
+  resolveTurnstileConfig: jest.fn().mockReturnValue({
+    enabled: false,
+    siteKey: null,
+    secretKey: null,
+  }),
 }));
 
 jest.mock('@/lib/ip', () => ({
