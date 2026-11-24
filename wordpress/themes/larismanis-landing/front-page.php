@@ -107,7 +107,6 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <span class="lm-eco-badge">🛍️ Shopee</span>
         <span class="lm-eco-badge">🟢 Tokopedia</span>
         <span class="lm-eco-badge">🎵 TikTok Shop</span>
-        <span class="lm-eco-badge">🔵 Blibli &amp; Lazada</span>
         <span class="lm-eco-badge">🚚 Biteship (JNE • J&amp;T • SiCepat • AnterAja)</span>
         <span class="lm-eco-badge">💳 Midtrans &amp; Flip</span>
         <span class="lm-eco-badge">📲 Notifikasi Telegram &amp; WhatsApp</span>
@@ -230,7 +229,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <article class="lm-feature-card">
           <div class="lm-feature-icon" aria-hidden="true">🛍️</div>
           <h3>Katalog Omnichannel &amp; Multi-Varian</h3>
-          <p>Kelola produk fisik, digital, maupun layanan Pre-Order. Setiap halaman produk dapat menampilkan tombol checkout langsung sekaligus tautan Shopee, Tokopedia, TikTok Shop, Blibli, dan Lazada.</p>
+          <p>Kelola produk fisik, digital, maupun layanan Pre-Order. Setiap halaman produk dapat menampilkan tombol checkout langsung sekaligus tautan resmi ke Shopee, Tokopedia, dan TikTok Shop.</p>
         </article>
 
         <article class="lm-feature-card">
@@ -360,7 +359,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
             </p>
             <ul class="lm-feature-checklist-2col">
               <li><span aria-hidden="true">✅</span> <span>1 Website toko komersial mandiri lengkap &amp; terisolasi</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Integrasi link Shopee, Tokopedia, TikTok Shop, Blibli, Lazada</span></li>
+              <li><span aria-hidden="true">✅</span> <span>Integrasi link Shopee, Tokopedia, dan TikTok Shop</span></li>
               <li><span aria-hidden="true">✅</span> <span>Katalog multi-varian, kategori, &amp; mode Pre-Order</span></li>
               <li><span aria-hidden="true">✅</span> <span>Matriks Harga Grosir Bertingkat (Batch Pricing)</span></li>
               <li><span aria-hidden="true">✅</span> <span>AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</span></li>
@@ -504,7 +503,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <details class="lm-faq-item">
           <summary>Apakah pembeli di website tetap bisa diarahkan belanja ke Shopee, Tokopedia, atau TikTok Shop kami?</summary>
           <p class="lm-faq-answer">
-            Bisa. Di setiap produk, Anda dapat mengisi URL Shopee, Tokopedia, TikTok Shop, Blibli, dan satu marketplace kustom (misalnya Lazada). Dengan begitu pembeli bebas memilih checkout langsung di website atau lewat marketplace kepercayaan mereka.
+            Bisa. Di setiap produk, Anda dapat mengisi URL Shopee, Tokopedia, dan TikTok Shop. Dengan begitu pembeli bebas memilih checkout langsung di website atau lewat marketplace kepercayaan mereka.
           </p>
         </details>
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
@@ -14,15 +14,9 @@ const LegalSettingsUpdateSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const store = await prisma.store.findUnique({
       where: { id: user.storeId },
@@ -53,15 +47,9 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   try {
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const parsed = LegalSettingsUpdateSchema.safeParse(body);

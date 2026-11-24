@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { auditPaymentVerified } from '@/services/auditService';
 import { recordOrderIncome } from '@/services/transactionService';
 import { getIPAddress } from '@/lib/ip';
@@ -8,14 +8,10 @@ import { dispatchPaymentVerifiedNotification } from '@/lib/orderNotificationServ
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
     const ip = getIPAddress(request);
-    
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    const auth = await requirePermission(request, 'orders');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const body = await request.json();
     const { paymentId, action } = body;
@@ -92,12 +88,9 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user) return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    const auth = await requirePermission(request, 'orders');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'PENDING';

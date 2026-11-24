@@ -59,6 +59,30 @@ describe('GET /api/products/[id]', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, product: PRODUCT });
-    expect(requireStoreRole).toHaveBeenCalledWith(request, PRODUCT.storeId, ['ADMIN']);
+    expect(requireStoreRole).toHaveBeenCalledWith(request, PRODUCT.storeId, ['ADMIN', 'STAFF']);
+  });
+
+  it('allows STAFF with products permission on the owning store and rejects STAFF without products permission', async () => {
+    (prisma.product.findUnique as jest.Mock).mockResolvedValue(PRODUCT);
+
+    (requireStoreRole as jest.Mock).mockResolvedValue({
+      id: 'staff-1',
+      storeId: PRODUCT.storeId,
+      email: 'staff@b.c',
+      role: 'STAFF',
+      permissions: ['products'],
+    });
+    const allowedRes = await GET(...Object.values(getRequest()) as [Request, { params: { id: string } }]);
+    expect(allowedRes.status).toBe(200);
+
+    (requireStoreRole as jest.Mock).mockResolvedValue({
+      id: 'staff-2',
+      storeId: PRODUCT.storeId,
+      email: 'finance@b.c',
+      role: 'STAFF',
+      permissions: ['finance'],
+    });
+    const deniedRes = await GET(...Object.values(getRequest()) as [Request, { params: { id: string } }]);
+    expect(deniedRes.status).toBe(403);
   });
 });

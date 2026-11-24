@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { requireSuperAdminOwner } from '@/lib/superAdminAuth';
 import { getStoreErrors, markErrorResolved, ErrorSeverity, ErrorSource } from '@/services/telemetryService';
 import { prisma } from '@/lib/prisma';
@@ -7,15 +7,10 @@ import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
-const STAFF_ROLES = ['ADMIN', 'STAFF', 'OWNER'];
-
 async function resolveUserOrSuperAdmin(request: Request) {
-  const token = request.headers.get('authorization')?.replace('Bearer ', '');
-  if (!token) return null;
-
-  const user = await verifyToken(token);
-  if (user && STAFF_ROLES.includes(user.role)) {
-    return { isSuperAdmin: false, user };
+  const auth = await requirePermission(request, 'settings', { allowExtraRoles: ['OWNER'] });
+  if (auth.authorized) {
+    return { isSuperAdmin: false, user: auth.user };
   }
 
   const superAdmin = requireSuperAdminOwner(request);

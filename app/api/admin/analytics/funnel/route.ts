@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { OrderStatus, ProductEventType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 import { REVENUE_STATUSES } from '@/lib/orderStatus';
 
 const DEFAULT_DAYS = 7;
 const MAX_DAYS = 90;
-
-const STAFF_ROLES = ['ADMIN', 'STAFF'];
 
 /** Where each funnel step lands in a report row. */
 const STEP_FIELD: Record<ProductEventType, 'views' | 'addToCarts' | 'checkoutStarts'> = {
@@ -37,13 +35,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: Request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const user = await verifyToken(token);
-    if (!user || !STAFF_ROLES.includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'analytics');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { searchParams } = new URL(request.url);
     // A window in days rather than a period switch: four period cases here would

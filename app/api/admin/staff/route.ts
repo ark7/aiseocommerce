@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser, hashPassword } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
 import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
-import { hasPermission, normalizePermissions, ALL_MENU_PERMISSIONS } from '@/lib/rbac';
+import { normalizePermissions, ALL_MENU_PERMISSIONS } from '@/lib/rbac';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 
 const createStaffSchema = z.object({
@@ -17,18 +18,11 @@ const createStaffSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Only ADMIN or users with 'staff' permission can view staff list
-    if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
-      return NextResponse.json(
-        { error: 'Akses Ditolak', message: 'Hanya Administrator yang dapat mengakses manajemen staf.' },
-        { status: 403 }
-      );
-    }
+    const auth = await requirePermission(request, 'staff', {
+      forbiddenMessage: 'Hanya Administrator yang dapat mengakses manajemen staf.',
+    });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const staffMembers = await prisma.user.findMany({
       where: {
@@ -74,18 +68,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Only ADMIN can create staff accounts
-    if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
-      return NextResponse.json(
-        { error: 'Akses Ditolak', message: 'Hanya Administrator yang dapat membuat akun staf.' },
-        { status: 403 }
-      );
-    }
+    const auth = await requirePermission(request, 'staff', {
+      forbiddenMessage: 'Hanya Administrator yang dapat membuat akun staf.',
+    });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();

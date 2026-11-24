@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { getFinanceSummary } from '@/services/transactionService';
 import { isConfiguredCategory, TAX_PAYMENT_CATEGORY } from '@/lib/ledgerCategory';
 import { REVENUE_STATUSES } from '@/lib/orderStatus';
@@ -8,14 +8,9 @@ import { LedgerType, type OrderStatus } from '@prisma/client';
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
@@ -125,12 +120,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const body = await request.json();
     const { type, amount, description, category } = body;

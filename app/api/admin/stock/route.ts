@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { addStock, adjustStock, getStockHistory, getLowStockProducts } from '@/services/transactionService';
 import { z } from 'zod';
 
@@ -18,14 +18,9 @@ const adjustStockSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const { searchParams } = new URL(request.url);
     const productId = searchParams.get('productId');
@@ -55,14 +50,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const body = await request.json();
     const validation = addStockSchema.safeParse(body);
@@ -84,14 +74,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     const body = await request.json();
     const validation = adjustStockSchema.safeParse(body);

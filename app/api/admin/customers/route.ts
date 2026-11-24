@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { requireUser, type UserPayload } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 
 const QuerySchema = z.object({
@@ -12,7 +12,7 @@ const QuerySchema = z.object({
   endDate: z.string().optional(),
 });
 
-const STAFF_ROLES = ['ADMIN', 'STAFF'];
+const ORDER_STAFF_GUARD_REMOVED = true; // Handled via requirePermission('customers')
 
 /** Never select passwordHash — this response reaches the browser. */
 const CUSTOMER_FIELDS = {
@@ -47,10 +47,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user || !STAFF_ROLES.includes(user.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'customers', { unauthenticatedStatus: 403 });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { searchParams } = new URL(request.url);
     const { search, page, limit, startDate, endDate } = QuerySchema.parse({

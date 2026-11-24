@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { revalidateLandingPage } from '@/lib/revalidate';
@@ -23,10 +23,9 @@ const LandingPageSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'cms', { unauthenticatedStatus: 403 });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
@@ -97,10 +96,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'STAFF')) {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'cms', { unauthenticatedStatus: 403 });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const parsed = LandingPageSchema.safeParse(body);

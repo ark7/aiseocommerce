@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { checkDomainDnsRecords } from '@/lib/emailService';
 import { z } from 'zod';
 
@@ -9,14 +9,8 @@ const CheckDnsSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
 
     const body = await request.json();
     const parsed = CheckDnsSchema.safeParse(body);

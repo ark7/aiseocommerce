@@ -1,6 +1,3 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireUser, UserPayload } from './auth';
-
 export type PermissionKey =
   | 'dashboard'
   | 'products'
@@ -270,43 +267,5 @@ export function canAccessPath(
   }
 
   return hasPermission(user, required);
-}
-
-/**
- * Server-side guard for API routes.
- * Usage:
- * const auth = await requirePermission(request, 'products');
- * if (!auth.authorized) return auth.response;
- * const { user } = auth;
- */
-export async function requirePermission(
-  request: NextRequest | Request,
-  requiredKey: PermissionKey
-): Promise<
-  | { authorized: true; user: UserPayload }
-  | { authorized: false; response: NextResponse }
-> {
-  const user = await requireUser(request);
-  if (!user) {
-    return {
-      authorized: false,
-      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
-    };
-  }
-
-  if (!hasPermission(user, requiredKey)) {
-    return {
-      authorized: false,
-      response: NextResponse.json(
-        {
-          error: 'Akses Ditolak',
-          message: `Anda tidak memiliki izin akses untuk modul '${requiredKey}'.`,
-        },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { authorized: true, user };
 }
 

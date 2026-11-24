@@ -56,14 +56,24 @@ beforeEach(() => {
 });
 
 describe('GET /api/admin/vouchers', () => {
-  test('mengizinkan role STAFF mengambil daftar voucher', async () => {
-    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF' });
+  test('mengizinkan role STAFF dengan izin promo mengambil daftar voucher', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF', permissions: ['promo'] });
     const response = await getVouchers(
       new Request('http://localhost/api/admin/vouchers', {
         headers: { authorization: 'Bearer token' },
       })
     );
     expect(response.status).toBe(200);
+  });
+
+  test('menolak role STAFF tanpa izin promo', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF', permissions: ['orders'] });
+    const response = await getVouchers(
+      new Request('http://localhost/api/admin/vouchers', {
+        headers: { authorization: 'Bearer token' },
+      })
+    );
+    expect(response.status).toBe(403);
   });
 
   test('menolak role CUSTOMER', async () => {
@@ -181,8 +191,8 @@ describe('POST /api/admin/vouchers', () => {
     expect((await createVoucher(jsonRequest(VALID_BODY))).status).toBe(403);
   });
 
-  test('mengizinkan role STAFF membuat voucher', async () => {
-    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF' });
+  test('mengizinkan role STAFF dengan izin promo membuat voucher', async () => {
+    (requireUser as jest.Mock).mockResolvedValue({ ...ADMIN, role: 'STAFF', permissions: ['promo'] });
 
     const response = await createVoucher(jsonRequest(VALID_BODY));
     expect(response.status).toBe(200);

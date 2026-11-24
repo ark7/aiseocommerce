@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
@@ -413,12 +414,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await ensureUploadDir();
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();
@@ -592,12 +590,9 @@ export async function PATCH(request: Request) {
   let storeId: string | undefined;
   try {
     await ensureUploadDir();
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();
@@ -804,12 +799,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || user.role !== 'ADMIN') return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    const auth = await requirePermission(request, 'products');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();

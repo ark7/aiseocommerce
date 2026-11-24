@@ -29,6 +29,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
+    const clearClientAuth = () => {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+    };
+
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
@@ -42,7 +48,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         });
         
         if (!response.ok) {
-          localStorage.removeItem('token');
+          clearClientAuth();
           router.push('/login');
           return;
         }
@@ -51,6 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (data.user && (data.user.role === 'ADMIN' || data.user.role === 'STAFF')) {
           setUser(data.user);
         } else {
+          clearClientAuth();
           router.push('/login');
         }
       } catch (error) {
@@ -63,8 +70,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     checkAuth();
   }, [router]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch {
+      // Clear local session state even if network logout fails
+    }
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 

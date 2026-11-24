@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { processOrderPayment, releaseStock } from '@/services/transactionService'
-import { requireStoreRole } from '@/lib/auth'
+import { requirePermission } from '@/lib/rbacServer'
 import { auditPaymentVerified } from '@/services/auditService'
 
 // Define schema for payment confirmation
@@ -116,8 +116,13 @@ export async function PUT(request: Request) {
     }
 
     // The caller's identity comes from the bearer token, never from the body.
-    const user = await requireStoreRole(request, order.storeId, ['ADMIN', 'STAFF'])
-    if (!user) {
+    const auth = await requirePermission(request, 'orders', {
+      unauthenticatedStatus: 403,
+      storeId: order.storeId,
+    })
+    if (!auth.authorized) return auth.response
+    const { user } = auth
+    if (user.storeId !== order.storeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

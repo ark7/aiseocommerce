@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { requireStoreRole } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { sendOrderInvoiceEmail } from '@/lib/invoiceService';
 import { logger } from '@/lib/logger';
 
@@ -30,8 +30,12 @@ export async function POST(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: 'Pesanan tidak ditemukan' }, { status: 404 });
     }
 
-    const user = await requireStoreRole(request, order.storeId, ['ADMIN', 'STAFF']);
-    if (!user) {
+    const auth = await requirePermission(request, 'orders', {
+      unauthenticatedStatus: 403,
+      storeId: order.storeId,
+    });
+    if (!auth.authorized) return auth.response;
+    if (auth.user.storeId !== order.storeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

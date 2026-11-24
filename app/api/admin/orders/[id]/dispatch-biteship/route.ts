@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { createBiteshipShipmentOrder } from '@/lib/biteship';
 import { dispatchOrderShippedNotification } from '@/lib/orderNotificationService';
 import { logger } from '@/lib/logger';
@@ -29,17 +29,12 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!['ADMIN', 'STAFF', 'SUPER_ADMIN'].includes(user.role)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Hanya admin dan staf yang dapat memproses pengiriman.' },
-        { status: 403 }
-      );
-    }
+    const auth = await requirePermission(request, 'orders', {
+      allowExtraRoles: ['SUPER_ADMIN'],
+      forbiddenMessage: 'Forbidden: Hanya admin dan staf yang dapat memproses pengiriman.',
+    });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const orderId = params?.id;
     if (!orderId) {
