@@ -215,6 +215,22 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
           findUnique: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({ id: 'prod-1' }),
         },
+        article: {
+          upsert: jest.fn().mockResolvedValue({
+            id: 'art-1',
+            slug: 'panduan-belanja-resmi-berkah-hijab',
+          }),
+        },
+        articleProduct: {
+          upsert: jest.fn().mockResolvedValue({ articleId: 'art-1', productId: 'prod-1' }),
+        },
+        voucher: {
+          upsert: jest.fn().mockResolvedValue({
+            id: 'vouch-1',
+            code: 'WELCOME10',
+            isActive: false,
+          }),
+        },
       };
 
       const result = await provisionTenantStore(
@@ -248,9 +264,24 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
 
       expect(result.store.domain).toBe('berkahhijab.com');
       expect(result.adminUser.email).toBe('owner@berkahhijab.com');
-      expect(result.seededCounts.ledgerCategories).toBe(7);
+      expect(result.seededCounts.ledgerCategories).toBe(8);
       expect(result.seededCounts.categories).toBeGreaterThan(0);
       expect(result.seededCounts.products).toBeGreaterThan(0);
+      expect(result.seededCounts.articles).toBe(1);
+      expect(result.seededCounts.vouchers).toBe(1);
+
+      // Verify store is explicitly marked non-demo and voucher template starts inactive
+      expect(mockPrisma.store.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ isDemo: false }),
+          update: expect.objectContaining({ isDemo: false }),
+        })
+      );
+      expect(mockPrisma.voucher.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ code: 'WELCOME10', isActive: false }),
+        })
+      );
 
       // Verify legal pages were generated with the client's store name
       const settingsCall = mockPrisma.storeSettings.upsert.mock.calls[0][0];
@@ -258,9 +289,13 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
       expect(settingsCall.create.privacyContent).toContain('cs@berkahhijab.com');
       expect(settingsCall.create.defaultPageSize).toBe(10);
 
-      // Verify generated .env disables Super-Admin Control Plane on the client's deployment
+      // Verify generated .env disables Demo Mode & Super-Admin Control Plane on the client's deployment
+      expect(result.deployment.envContent).toContain('ENABLE_DEMO_MODE="false"');
       expect(result.deployment.envContent).toContain('ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"');
       expect(result.deployment.envContent).toContain('DEFAULT_STORE_DOMAIN="berkahhijab.com"');
+      expect(result.deployment.envContent).toContain('GUEST_SESSION_SECRET="');
+      expect(result.deployment.envContent).toContain('NEXTAUTH_SECRET="');
+      expect(result.deployment.envContent).toContain('TURNSTILE_HOSTNAMES="berkahhijab.com"');
       expect(result.deployment.jwtSecret).toHaveLength(64);
       expect(result.deployment.cronSecret).toHaveLength(48);
     });

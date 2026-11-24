@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
+import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 import { resolveTurnstileConfig } from '@/lib/turnstile';
 import { RegisterForm } from '@/components/RegisterForm';
 import Link from 'next/link';
@@ -11,7 +12,7 @@ export default async function RegisterPage({
 }) {
   const params = await searchParams;
   const fromPath = params.from as string | undefined;
-  const storeParam = params.store as string | undefined;
+  const storeParam = isControlPlaneEnabled() ? (params.store as string | undefined) : undefined;
 
   let store: any = null;
   try {
@@ -21,9 +22,9 @@ export default async function RegisterPage({
   }
 
   const effectiveStore = store || {
-    id: 'demo-store-001',
-    name: 'LarisDari Demo Store',
-    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
+    id: '',
+    name: 'Toko Online',
+    domain: process.env.DEFAULT_STORE_DOMAIN || '',
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };
 

@@ -14,6 +14,31 @@ export const DEMO_FILE_UPLOAD_LOCKED_MESSAGE =
   'Fitur upload berkas dinonaktifkan pada Akun Demo untuk menjaga kapasitas penyimpanan server. Pada website toko Anda, seluruh fitur upload gambar & bukti transfer beroperasi normal 100%.';
 
 /**
+ * Kill-switch environment: di website klien hasil duplikasi, ENABLE_DEMO_MODE="false"
+ * menonaktifkan seluruh mode demo & kartu Quick Login secara mutlak.
+ */
+export function isDemoModeEnabled(): boolean {
+  return process.env.ENABLE_DEMO_MODE?.trim().toLowerCase() !== 'false';
+}
+
+/**
+ * Menentukan apakah kartu Quick Login Demo boleh ditampilkan di halaman login.
+ * Wajib false ketika ENABLE_DEMO_MODE="false" atau ketika store berasal dari fallback/tenant klien.
+ */
+export function shouldShowDemoQuickLogin(
+  store?: { id?: string | null; domain?: string | null; isDemo?: boolean | null } | null
+): boolean {
+  if (!isDemoModeEnabled()) return false;
+  if (!store) return false;
+  const normalizedDomain = store.domain?.toLowerCase().trim() || '';
+  return Boolean(
+    store.isDemo === true ||
+      store.id === DEMO_STORE_ID ||
+      (normalizedDomain && DEMO_DOMAINS.includes(normalizedDomain))
+  );
+}
+
+/**
  * Memeriksa apakah suatu alamat email tergolong akun demo bersama bawaan seeder.
  */
 export function isDemoEmail(email?: string | null): boolean {

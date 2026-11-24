@@ -66,10 +66,10 @@ async function main() {
     subscriptionPlan: 'BUSINESS',
   });
 
-  console.log(`✅ Toko berhasil dibuat! ID: ${result.store.id}`);
+  console.log(`✅ Toko berhasil dibuat! ID: ${result.store.id} (isDemo=false, Quick Login Demo nonaktif)`);
   console.log(`👤 Akun Admin Klien: ${result.adminUser.email}`);
   console.log(
-    `📦 Data Diinisialisasi: ${result.seededCounts.ledgerCategories} kategori keuangan, ${result.seededCounts.categories} kategori produk, ${result.seededCounts.products} produk awal.\n`
+    `📦 Data Diinisialisasi: ${result.seededCounts.ledgerCategories} kategori kas, ${result.seededCounts.categories} kategori produk, ${result.seededCounts.products} produk, ${result.seededCounts.articles} artikel SEO, ${result.seededCounts.vouchers} voucher promo.\n`
   );
   console.log(`================ KARTU SERAH TERIMA KLIEN ================`);
   console.log(result.deployment.handoverMessage);

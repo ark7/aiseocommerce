@@ -66,9 +66,10 @@ export const getActiveStore = safeCache(async (domainHint?: string) => {
     // 3. Check active / preview store cookie
     try {
       const cookieStore = cookies();
-      const cookieDomain =
-        cookieStore.get('active_store_domain')?.value ||
-        cookieStore.get('preview_store_domain')?.value;
+      const previewDomain = isControlPlaneEnabled()
+        ? cookieStore.get('preview_store_domain')?.value
+        : undefined;
+      const cookieDomain = cookieStore.get('active_store_domain')?.value || previewDomain;
       if (cookieDomain) {
         const store = await prisma.store.findUnique({
           where: { domain: cookieDomain },
