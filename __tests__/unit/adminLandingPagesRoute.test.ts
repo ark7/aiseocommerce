@@ -35,7 +35,8 @@ jest.mock('@/lib/logger', () => ({
 }));
 
 const ADMIN_USER = { id: 'admin-1', storeId: 'store-1', role: 'ADMIN' };
-const STAFF_USER = { id: 'staff-1', storeId: 'store-1', role: 'STAFF' };
+const STAFF_USER = { id: 'staff-1', storeId: 'store-1', role: 'STAFF', permissions: ['cms'] };
+const STAFF_NO_CMS_USER = { id: 'staff-2', storeId: 'store-1', role: 'STAFF', permissions: ['orders'] };
 const CUSTOMER_USER = { id: 'cust-1', storeId: 'store-1', role: 'CUSTOMER' };
 
 describe('Admin Landing Pages API', () => {
@@ -52,6 +53,10 @@ describe('Admin Landing Pages API', () => {
       (requireUser as jest.Mock).mockResolvedValue(CUSTOMER_USER);
       const res2 = await GET(new Request('http://localhost/api/admin/landing-pages'));
       expect(res2.status).toBe(403);
+
+      (requireUser as jest.Mock).mockResolvedValue(STAFF_NO_CMS_USER);
+      const res3 = await GET(new Request('http://localhost/api/admin/landing-pages'));
+      expect(res3.status).toBe(403);
     });
 
     it('returns landing pages list for ADMIN or STAFF', async () => {

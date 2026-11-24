@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import {
   listAvailableAiModels,
   AiProvider,
@@ -11,14 +11,9 @@ import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json().catch(() => ({}));
     let apiKey = (body.apiKey as string) || '';
@@ -72,14 +67,9 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const settings = await prisma.storeSettings.findUnique({
       where: { storeId: user.storeId },

@@ -380,6 +380,7 @@ export async function middleware(request: NextRequest) {
                             !path.startsWith('/api') &&
                             !path.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|css|js)$/);
 
+  let pendingGuestToken: string | null = null;
   if (!currentRole && isDocumentRequest) {
     const host = request.headers.get('host') || '';
     let domain = host.split(':')[0];
@@ -394,22 +395,24 @@ export async function middleware(request: NextRequest) {
     }
 
     if (domain) {
-      const guestToken = await generateGuestToken(domain);
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set('x-user-id', 'guest-' + Math.random().toString(36).substring(7));
-      requestHeaders.set('x-user-role', 'GUEST');
-
+      pendingGuestToken = await generateGuestToken(domain);
+      currentRole = 'GUEST';
+      userId = 'guest-' + Math.random().toString(36).substring(7);
       logger.info(`Issued guest session`, { ...logContext, domain });
-      const res = NextResponse.next({ request: { headers: requestHeaders } });
-      res.cookies.set('token', guestToken, {
+    }
+  }
+
+  const attachGuestCookie = (res: NextResponse): NextResponse => {
+    if (pendingGuestToken) {
+      res.cookies.set('token', pendingGuestToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7,
       });
-      return addCorsHeaders(res);
     }
-  }
+    return res;
+  };
 
   // 3. Enforce Tiers
   const required = requiredTierFor(path);
@@ -420,7 +423,7 @@ export async function middleware(request: NextRequest) {
     }
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', path);
-    return NextResponse.redirect(loginUrl);
+    return addCorsHeaders(attachGuestCookie(NextResponse.redirect(loginUrl)));
   }
 
   // 4. Legacy Protected Paths (Staff/Admin check)
@@ -432,14 +435,14 @@ export async function middleware(request: NextRequest) {
       }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('from', path);
-      return NextResponse.redirect(loginUrl);
+      return addCorsHeaders(attachGuestCookie(NextResponse.redirect(loginUrl)));
     }
-    if ((path.startsWith('/admin') || path.startsWith('/api/admin')) && currentRole !== 'ADMIN') {
+    if ((path.startsWith('/admin') || path.startsWith('/api/admin')) && !['ADMIN', 'STAFF'].includes(currentRole)) {
       logger.warn('Forbidden: Insufficient permissions', { ...logContext, userId: userId || undefined, role: currentRole });
       if (path.startsWith('/api/')) {
         return addCorsHeaders(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
       }
-      return NextResponse.redirect(new URL('/unauthorized', request.url));
+      return addCorsHeaders(attachGuestCookie(NextResponse.redirect(new URL('/unauthorized', request.url))));
     }
   }
 
@@ -453,7 +456,7 @@ export async function middleware(request: NextRequest) {
 
   const duration = Date.now() - startTime;
   logger.info(`Request completed`, { ...logContext, duration });
-  return addCorsHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
+  return addCorsHeaders(attachGuestCookie(NextResponse.next({ request: { headers: requestHeaders } })));
 }
 
 export const config = {

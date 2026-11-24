@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 import { UNIQUE_VIOLATION, VoucherInputSchema } from '../schema';
 
 /** Change a voucher. The admin form always sends the whole row, so no partial patch. */
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requirePermission(request, 'promo');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const input = VoucherInputSchema.parse(await request.json());
 
@@ -64,9 +64,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
  */
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requirePermission(request, 'promo');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const voucher = await prisma.voucher.findUnique({
       where: { id: params.id },

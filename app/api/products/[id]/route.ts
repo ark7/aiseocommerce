@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireStoreRole } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 
 interface RouteContext {
@@ -37,8 +37,12 @@ export async function GET(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    const user = await requireStoreRole(request, product.storeId, ['ADMIN']);
-    if (!user) {
+    const auth = await requirePermission(request, 'products', {
+      unauthenticatedStatus: 403,
+      storeId: product.storeId,
+    });
+    if (!auth.authorized) return auth.response;
+    if (auth.user.storeId !== product.storeId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 

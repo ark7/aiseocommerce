@@ -1,25 +1,18 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { getStoreUsageMetrics } from '@/services/telemetryService';
 import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
-const STAFF_ROLES = ['ADMIN', 'STAFF', 'OWNER'];
 const DEFAULT_DAYS = 7;
 const MAX_DAYS = 90;
 
 export async function GET(request: Request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const user = await verifyToken(token);
-    if (!user || !STAFF_ROLES.includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'analytics', { allowExtraRoles: ['OWNER'] });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (!user.storeId) {
       return NextResponse.json({ error: 'User does not belong to any store' }, { status: 400 });

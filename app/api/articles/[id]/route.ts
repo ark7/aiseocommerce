@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
@@ -20,14 +20,9 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'articles');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const article = await prisma.article.findFirst({
       where: { id, storeId: user.storeId },
@@ -64,14 +59,9 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'articles');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const parsed = ArticleUpdateSchema.safeParse(body);
@@ -115,14 +105,9 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'articles');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const article = await prisma.article.findFirst({
       where: { id, storeId: user.storeId },

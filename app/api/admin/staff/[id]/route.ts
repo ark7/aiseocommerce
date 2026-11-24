@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser, hashPassword } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
 import { isDemoStore, createDemoReadOnlyResponse } from '@/lib/demoGuard';
-import { hasPermission, normalizePermissions } from '@/lib/rbac';
+import { normalizePermissions } from '@/lib/rbac';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 
 const updateStaffSchema = z.object({
@@ -24,18 +25,9 @@ export async function GET(
   { params }: RouteParams
 ) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
-      return NextResponse.json({ error: 'Akses Ditolak' }, { status: 403 });
-    }
-
-    if (await isDemoStore(user.storeId)) {
-      return createDemoReadOnlyResponse();
-    }
+    const auth = await requirePermission(request, 'staff');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { id } = await params;
 
@@ -83,14 +75,9 @@ export async function PUT(
   { params }: RouteParams
 ) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN' && !hasPermission(user, 'staff')) {
-      return NextResponse.json({ error: 'Akses Ditolak' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'staff');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();
@@ -184,17 +171,11 @@ export async function DELETE(
   { params }: RouteParams
 ) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json(
-        { error: 'Akses Ditolak', message: 'Hanya Administrator yang dapat menghapus staf.' },
-        { status: 403 }
-      );
-    }
+    const auth = await requirePermission(request, 'staff', {
+      forbiddenMessage: 'Hanya Administrator atau staf berwenang yang dapat menghapus staf.',
+    });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (await isDemoStore(user.storeId)) {
       return createDemoReadOnlyResponse();

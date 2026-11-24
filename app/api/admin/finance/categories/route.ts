@@ -2,12 +2,10 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { LedgerType, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 import { getIPAddress } from '@/lib/ip';
 import { logAuditAction } from '@/services/auditService';
-
-const STAFF_ROLES = ['ADMIN', 'STAFF'];
 
 const QuerySchema = z.object({
   type: z.nativeEnum(LedgerType).optional(),
@@ -41,13 +39,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    // Staff record transactions, so they need the picklist even though they
-    // cannot change it.
-    if (!STAFF_ROLES.includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { searchParams } = new URL(request.url);
     const { type, includeInactive } = QuerySchema.parse({
@@ -82,11 +76,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { type, name } = CreateSchema.parse(await request.json());
 
@@ -132,11 +124,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { id, name, isActive } = UpdateSchema.parse(await request.json());
 
@@ -193,11 +183,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'finance');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { id } = DeleteSchema.parse(await request.json());
 

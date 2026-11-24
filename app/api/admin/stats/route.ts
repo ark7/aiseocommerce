@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 
 // Reads the Authorization header, so it can never be served statically. Without
@@ -9,14 +9,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    
-    const user = await verifyToken(token);
-    if (!user || !['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Admin/Staff access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'dashboard');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
     
     // Every number on the dashboard describes the real business, so sandbox
     // products and orders are excluded at the query rather than filtered after.

@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { requireAnyPermission } from '@/lib/rbacServer';
 import { chatWithAi, AiChatMessage, AiChatContext } from '@/lib/aiService';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const auth = await requireAnyPermission(
+      request,
+      ['products', 'articles', 'cms', 'analytics', 'orders', 'dashboard'],
+      { forbiddenError: 'Forbidden' }
+    );
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (!user.storeId) {
       return NextResponse.json(

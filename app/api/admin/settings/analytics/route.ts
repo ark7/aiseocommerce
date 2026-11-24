@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 import { AnalyticsConfigSchema, parseAnalyticsConfig } from '@/lib/analytics';
 import { revalidateStoreSettings } from '@/lib/revalidate';
@@ -9,9 +9,9 @@ import { revalidateStoreSettings } from '@/lib/revalidate';
 /** Read the store's analytics ids so the admin form can prefill. */
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const settings = await prisma.storeSettings.findUnique({ where: { storeId: user.storeId } });
 
@@ -32,9 +32,9 @@ export async function GET(request: Request) {
 /** Replace the store's analytics ids. Only schema-validated ids are persisted. */
 export async function PUT(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const auth = await requirePermission(request, 'settings');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const analytics = AnalyticsConfigSchema.parse(await request.json());
 

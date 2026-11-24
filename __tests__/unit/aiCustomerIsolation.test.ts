@@ -53,6 +53,7 @@ describe('AI BYOK Security & Customer Isolation (100% Back-Office Only)', () => 
     id: 'user-staff-789',
     email: 'staff@toko.com',
     role: 'STAFF',
+    permissions: ['products'],
     storeId: mockStoreId,
   };
 

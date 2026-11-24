@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import {
   generateProductSalesImage,
   SalesImageStyle,
@@ -9,20 +9,12 @@ import { logger } from '@/lib/logger';
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Harap login terlebih dahulu.' },
-        { status: 401 }
-      );
-    }
-
-    if (!['ADMIN', 'STAFF'].includes(user.role)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Hanya admin dan staf toko yang dapat membuat gambar jualan.' },
-        { status: 403 }
-      );
-    }
+    const auth = await requirePermission(request, 'products', {
+      forbiddenError: 'Forbidden: Hanya admin dan staf berwenang yang dapat membuat gambar jualan.',
+      forbiddenMessage: 'Forbidden: Hanya admin dan staf berwenang yang dapat membuat gambar jualan.',
+    });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     if (!user.storeId) {
       return NextResponse.json(

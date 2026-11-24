@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { logger } from '@/lib/logger';
 
-const STAFF_ROLES = ['ADMIN', 'STAFF'];
 const ORDER_HISTORY_LIMIT = 100;
 
 interface RouteContext {
@@ -13,10 +12,9 @@ interface RouteContext {
 /** One customer plus their order history. Staff-only, scoped to the store. */
 export async function GET(request: Request, { params }: RouteContext) {
   try {
-    const user = await requireUser(request);
-    if (!user || !STAFF_ROLES.includes(user.role)) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'customers', { unauthenticatedStatus: 403 });
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     // A customer of another store must look identical to one that never existed,
     // so the store filter is part of the lookup rather than a later check.

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 
@@ -14,14 +14,9 @@ export async function POST(
 ) {
   try {
     const { id: articleId } = await params;
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'articles');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const parsed = ProductAssociationSchema.safeParse(body);
@@ -76,14 +71,9 @@ export async function DELETE(
 ) {
   try {
     const { id: articleId } = await params;
-    const user = await requireUser(request);
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'articles');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const parsed = ProductAssociationSchema.safeParse(body);

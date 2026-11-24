@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireUser } from '@/lib/auth';
+import { requirePermission } from '@/lib/rbacServer';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { getIPAddress } from '@/lib/ip';
@@ -36,11 +36,9 @@ function uniqueViolationMessage(error: unknown): string | null {
 
 export async function GET(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'promo');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
@@ -158,11 +156,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser(request);
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    if (user.role !== 'ADMIN' && user.role !== 'STAFF') {
-      return NextResponse.json({ error: 'Staff or Admin access required' }, { status: 403 });
-    }
+    const auth = await requirePermission(request, 'promo');
+    if (!auth.authorized) return auth.response;
+    const { user } = auth;
 
     const body = await request.json();
     const validation = voucherSchema.safeParse(body);
