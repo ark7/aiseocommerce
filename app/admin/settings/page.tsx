@@ -2457,7 +2457,7 @@ function AdminSettingsContent() {
                 </li>
                 <li>
                   Isi nama widget (misal: <em>Proteksi Toko Online</em>) dan tambahkan domain toko Anda di{' '}
-                  <strong>Add Hostnames</strong> (misal: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">demo.larisdari.web.id</code> atau domain kustom toko Anda).
+                  <strong>Add Hostnames</strong> (misal: <code className="bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">tokoanda.com</code> atau domain kustom toko Anda).
                 </li>
                 <li>
                   Pilih Widget Mode <strong>Managed (Recommended)</strong> agar pengunjung manusia terverifikasi otomatis tanpa puzzle mengganggu, lalu klik <strong>Create</strong>.

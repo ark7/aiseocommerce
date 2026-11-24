@@ -19,7 +19,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
-      - DEFAULT_STORE_DOMAIN=demo.larisdari.web.id
+      - DEFAULT_STORE_DOMAIN=${DEFAULT_STORE_DOMAIN:-demo.larisdari.web.id}
     deploy:
       resources:
         limits:

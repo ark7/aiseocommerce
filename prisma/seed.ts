@@ -470,7 +470,26 @@ function generateSlug(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
+const DEMO_SEED_ALLOWED_DOMAINS = new Set([
+  'demo.larisdari.web.id',
+  'demo.larismanis.online',
+  'demo-store.local',
+]);
+
 async function main() {
+  const allowDemoSeed = process.env.ALLOW_DEMO_SEED === 'true';
+  const demoFlagOff = process.env.ENABLE_DEMO_MODE?.trim().toLowerCase() === 'false';
+  const normalizedDomain = STORE_DOMAIN.trim().toLowerCase();
+
+  if (!allowDemoSeed && (demoFlagOff || !DEMO_SEED_ALLOWED_DOMAINS.has(normalizedDomain))) {
+    console.error(
+      `❌ DIBLOKIR: prisma/seed.ts hanya diperuntukkan bagi database demo (demo-store-001).\n` +
+        `   Terdeteksi ENABLE_DEMO_MODE="${process.env.ENABLE_DEMO_MODE || ''}" atau DEFAULT_STORE_DOMAIN="${STORE_DOMAIN}".\n` +
+        `   Untuk menginisialisasi website pelanggan baru tanpa akun @demo-store.local, gunakan: npm run tenant:bootstrap`
+    );
+    process.exit(1);
+  }
+
   console.log('🌱 Memulai proses reset dan seeding data demo toko...\n');
 
   // 1. Clean existing demo store data

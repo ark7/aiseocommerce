@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { getActiveStore } from '@/lib/store';
-import { DEMO_DOMAINS } from '@/lib/demoGuard';
+import { shouldShowDemoQuickLogin } from '@/lib/demoGuard';
+import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 import { resolveTurnstileConfig } from '@/lib/turnstile';
 import { LoginForm } from '@/components/LoginForm';
 import { redirectPathFromUrl } from '@/lib/redirect';
@@ -13,7 +14,7 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const fromPath = params.from as string | undefined;
-  const storeParam = params.store as string | undefined;
+  const storeParam = isControlPlaneEnabled() ? (params.store as string | undefined) : undefined;
 
   let store: any = null;
   try {
@@ -23,17 +24,14 @@ export default async function LoginPage({
   }
 
   const effectiveStore = store || {
-    id: 'demo-store-001',
-    name: 'LarisDari Demo Store',
-    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
-    isDemo: true,
+    id: '',
+    name: 'Toko Online',
+    domain: process.env.DEFAULT_STORE_DOMAIN || '',
+    isDemo: false,
     settings: { turnstileEnabled: false, turnstileSiteKey: '' },
   };
 
-  const isDemo = Boolean(
-    effectiveStore?.isDemo === true ||
-    DEMO_DOMAINS.includes((effectiveStore?.domain || '').toLowerCase().trim())
-  );
+  const isDemo = shouldShowDemoQuickLogin(store);
   const turnstileConfig = resolveTurnstileConfig(effectiveStore.settings);
 
   return (

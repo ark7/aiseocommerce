@@ -99,6 +99,8 @@ export const TenantDuplicationInputSchema = z.object({
   // --- GRUP 4: Preset Konten Awal & Seeding Otomatis ---
   seedPreset: SeedPresetEnum.default('CLEAN'),
   seedLedgerCategories: z.boolean().default(true),
+  seedStarterArticle: z.boolean().default(true),
+  seedStarterVoucher: z.boolean().default(true),
   generateLegalPages: z.boolean().default(true),
   cookieConsentEnabled: z.boolean().default(true),
 
@@ -151,6 +153,7 @@ export const DEFAULT_LEDGER_CATEGORIES: Array<{ type: LedgerType; name: string }
   { type: 'EXPENSE', name: 'Biaya Iklan & Pemasaran' },
   { type: 'EXPENSE', name: 'Gaji & Operasional Toko' },
   { type: 'EXPENSE', name: 'Biaya Kemasan & Logistik' },
+  { type: 'EXPENSE', name: 'Setoran PPN' },
 ];
 
 interface StarterItem {
@@ -388,13 +391,21 @@ export function generateTenantEnvConfig(params: {
   databaseUrl: string;
   jwtSecret?: string;
   cronSecret?: string;
+  guestSessionSecret?: string;
+  nextAuthSecret?: string;
+  turnstileSiteKey?: string | null;
+  turnstileSecretKey?: string | null;
 }): {
   jwtSecret: string;
   cronSecret: string;
+  guestSessionSecret: string;
+  nextAuthSecret: string;
   envContent: string;
 } {
   const jwtSecret = params.jwtSecret || generateRandomHex(32);
   const cronSecret = params.cronSecret || generateRandomHex(24);
+  const guestSessionSecret = params.guestSessionSecret || generateRandomHex(32);
+  const nextAuthSecret = params.nextAuthSecret || generateRandomHex(32);
   const appUrl = params.domain.startsWith('localhost')
     ? `http://${params.domain}`
     : `https://${params.domain}`;
@@ -404,13 +415,29 @@ export function generateTenantEnvConfig(params: {
     `# KONFIGURASI ENVIRONMENT WEBSITE PELANGGAN: ${params.domain}`,
     `# Dibuat otomatis oleh Super-Admin Control Plane`,
     `# ============================================================================`,
+    `NODE_ENV="production"`,
+    `PORT="3000"`,
     `DATABASE_URL="${params.databaseUrl}"`,
     `DEFAULT_STORE_DOMAIN="${params.domain}"`,
     `NEXT_PUBLIC_APP_URL="${appUrl}"`,
+    `NEXT_PUBLIC_API_URL="${appUrl}/api"`,
+    `NEXTAUTH_URL="${appUrl}"`,
     `JWT_SECRET="${jwtSecret}"`,
+    `NEXTAUTH_SECRET="${nextAuthSecret}"`,
+    `GUEST_SESSION_SECRET="${guestSessionSecret}"`,
     `CRON_SECRET="${cronSecret}"`,
+    `# Pastikan Quick Login Demo & mode read-only demo mati permanen pada website klien:`,
+    `ENABLE_DEMO_MODE="false"`,
     `# Nonaktifkan portal Super-Admin di website pelanggan demi keamanan:`,
     `ENABLE_SUPER_ADMIN_CONTROL_PLANE="false"`,
+    `# Proteksi Anti-Bot Cloudflare Turnstile untuk domain toko klien:`,
+    `TURNSTILE_HOSTNAMES="${params.domain}"`,
+    params.turnstileSiteKey?.trim()
+      ? `NEXT_PUBLIC_TURNSTILE_SITE_KEY="${params.turnstileSiteKey.trim()}"`
+      : `# NEXT_PUBLIC_TURNSTILE_SITE_KEY=""`,
+    params.turnstileSecretKey?.trim()
+      ? `TURNSTILE_SECRET_KEY="${params.turnstileSecretKey.trim()}"`
+      : `# TURNSTILE_SECRET_KEY=""`,
     ``,
     `# ============================================================================`,
     `# TELEMETRY & ANALYTICS MASTER (SENTRY & POSTHOG)`,
@@ -434,7 +461,7 @@ export function generateTenantEnvConfig(params: {
     ``,
   ].join('\n');
 
-  return { jwtSecret, cronSecret, envContent };
+  return { jwtSecret, cronSecret, guestSessionSecret, nextAuthSecret, envContent };
 }
 
 /**
@@ -537,6 +564,8 @@ export interface ProvisionTenantResult {
     ledgerCategories: number;
     categories: number;
     products: number;
+    articles: number;
+    vouchers: number;
   };
   deployment: {
     databaseMode: string;
@@ -597,7 +626,7 @@ export async function provisionTenantStore(
       }
     }
 
-    // 1. Upsert Store by domain
+    // 1. Upsert Store by domain (always mark as client production store, never demo)
     const store = await targetPrisma.store.upsert({
       where: { domain: input.domain },
       update: {
@@ -606,6 +635,7 @@ export async function provisionTenantStore(
         address: input.storeAddress || null,
         phone: input.storePhone,
         email: input.storeEmail,
+        isDemo: false,
       },
       create: {
         name: input.storeName,
@@ -614,6 +644,7 @@ export async function provisionTenantStore(
         address: input.storeAddress || null,
         phone: input.storePhone,
         email: input.storeEmail,
+        isDemo: false,
       },
     });
 
@@ -764,6 +795,7 @@ export async function provisionTenantStore(
     // 5. Optional Starter Catalog Preset
     let categoriesCount = 0;
     let productsCount = 0;
+    let firstProductId: string | null = null;
 
     if (input.seedPreset !== 'CLEAN') {
       const catalogGroups = STARTER_CATALOGS[input.seedPreset] || [];
@@ -801,8 +833,10 @@ export async function provisionTenantStore(
             },
           });
 
-          if (!existingProd) {
-            await targetPrisma.product.create({
+          if (existingProd) {
+            if (!firstProductId) firstProductId = existingProd.id;
+          } else {
+            const createdProd = await targetPrisma.product.create({
               data: {
                 storeId: store.id,
                 categoryId: category.id,
@@ -834,10 +868,96 @@ export async function provisionTenantStore(
                 },
               },
             });
+            if (!firstProductId && createdProd?.id) {
+              firstProductId = createdProd.id;
+            }
             productsCount++;
           }
         }
       }
+    }
+
+    // 6. Seed 1 Starter SEO Article (ready to customize by client)
+    let articlesCount = 0;
+    if (input.seedStarterArticle && typeof (targetPrisma as any).article?.upsert === 'function') {
+      const starterArticleSlug = `panduan-belanja-resmi-${input.tenantSlug}`;
+      const starterArticle = await targetPrisma.article.upsert({
+        where: {
+          storeId_slug: {
+            storeId: store.id,
+            slug: starterArticleSlug,
+          },
+        },
+        update: {},
+        create: {
+          storeId: store.id,
+          title: `Panduan Belanja & Keunggulan Produk di ${input.storeName}`,
+          slug: starterArticleSlug,
+          content: [
+            `<h2>Selamat Datang di Toko Resmi ${input.storeName}</h2>`,
+            `<p>Melalui situs resmi <strong>${input.domain}</strong>, Anda dapat memesan produk original langsung dari <strong>${input.storeName}</strong> dengan proses checkout yang aman, transparan, dan terintegrasi pengiriman cepat.</p>`,
+            `<h3>Keunggulan Berbelanja Langsung di Website Resmi</h3>`,
+            `<ul>`,
+            `  <li>Produk terjamin keasliannya langsung dari tim ${input.storeName}.</li>`,
+            `  <li>Perhitungan ongkos kirim otomatis &amp; pilihan pembayaran lengkap.</li>`,
+            `  <li>Dukungan layanan pelanggan resmi melalui ${input.storeEmail} atau WhatsApp ${input.storePhone}.</li>`,
+            `</ul>`,
+            `<p><em>Catatan Admin: Anda dapat mengedit atau menambah artikel SEO baru kapan saja melalui Panel Admin &rarr; Artikel.</em></p>`,
+          ].join('\n'),
+          seoTitle: `Panduan Belanja Resmi ${input.storeName} | ${input.domain}`,
+          seoDescription: `Panduan lengkap belanja aman, promo terbaru, dan katalog resmi dari ${input.storeName} (${input.domain}).`,
+          isFeatured: true,
+        },
+      });
+      articlesCount = 1;
+
+      if (
+        firstProductId &&
+        starterArticle?.id &&
+        typeof (targetPrisma as any).articleProduct?.upsert === 'function'
+      ) {
+        await targetPrisma.articleProduct.upsert({
+          where: {
+            articleId_productId: {
+              articleId: starterArticle.id,
+              productId: firstProductId,
+            },
+          },
+          update: {},
+          create: {
+            articleId: starterArticle.id,
+            productId: firstProductId,
+          },
+        });
+      }
+    }
+
+    // 7. Seed 1 Inactive Template Promo Voucher (safe default until activated by client)
+    let vouchersCount = 0;
+    if (input.seedStarterVoucher && typeof (targetPrisma as any).voucher?.upsert === 'function') {
+      await targetPrisma.voucher.upsert({
+        where: {
+          storeId_code: {
+            storeId: store.id,
+            code: 'WELCOME10',
+          },
+        },
+        update: {},
+        create: {
+          storeId: store.id,
+          code: 'WELCOME10',
+          name: `Promo Sambutan ${input.storeName} (Template)`,
+          description:
+            'Template voucher diskon 10% (maks. Rp 25.000, min. belanja Rp 100.000). Aktifkan melalui menu Promo & Voucher saat toko siap diluncurkan.',
+          type: 'PERCENT',
+          value: 10,
+          maxDiscount: 25000,
+          minPurchase: 100000,
+          quota: 50,
+          isActive: false,
+        },
+      });
+      vouchersCount = 1;
     }
 
     const { jwtSecret, cronSecret, envContent } = generateTenantEnvConfig({
@@ -848,6 +968,8 @@ export async function provisionTenantStore(
           : '<ISI_DATABASE_URL_PELANGGAN_DI_SINI>',
       jwtSecret: input.jwtSecret?.trim() || undefined,
       cronSecret: input.cronSecret?.trim() || undefined,
+      turnstileSiteKey: input.turnstileSiteKey,
+      turnstileSecretKey: input.turnstileSecretKey,
     });
 
     const siteUrl = input.domain.startsWith('localhost')
@@ -863,12 +985,20 @@ export async function provisionTenantStore(
       `📧 *Email Admin:* ${input.adminEmail}`,
       `🔑 *Password Awal:* ${input.adminPassword}`,
       ``,
+      `📦 *Template Siap Pakai yang Sudah Disiapkan:*`,
+      `• Akun login produksi bersih (Quick Login demo dinonaktifkan 100%).`,
+      `• ${ledgerCategoriesCount} kategori pembukuan kas & pajak PPN.`,
+      articlesCount > 0 ? `• 1 template Artikel SEO (${siteUrl}/articles/panduan-belanja-resmi-${input.tenantSlug}).` : null,
+      vouchersCount > 0 ? `• 1 template Voucher Promo WELCOME10 (status masih nonaktif — aktifkan di menu Promo saat siap).` : null,
+      ``,
       `📌 *Langkah Awal yang Disarankan:*`,
       `1. Login melalui tautan di atas menuju Dashboard Admin (${siteUrl}/admin).`,
       `2. Buka menu *Pengaturan Toko* untuk menyesuaikan logo, rekening bank / Midtrans, dan pixel iklan.`,
       `3. Buka menu *Produk* & *Kategori* untuk mulai menambahkan katalog produk Anda.`,
       `4. Demi keamanan, segera perbarui password Anda setelah login pertama.`,
-    ].join('\n');
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n');
 
     return {
       store: {
@@ -888,6 +1018,8 @@ export async function provisionTenantStore(
         ledgerCategories: ledgerCategoriesCount,
         categories: categoriesCount,
         products: productsCount,
+        articles: articlesCount,
+        vouchers: vouchersCount,
       },
       deployment: {
         databaseMode: input.dbMode,

@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { getActiveStore } from '@/lib/store';
+import { isControlPlaneEnabled } from '@/lib/superAdminGuard';
 import { ForgotPasswordForm } from '@/components/ForgotPasswordForm';
 import {
   resolveTurnstileConfig,
@@ -14,7 +15,7 @@ export default async function ForgotPasswordPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const params = await searchParams;
-  const storeParam = params.store as string | undefined;
+  const storeParam = isControlPlaneEnabled() ? (params.store as string | undefined) : undefined;
 
   let store: any = null;
   try {
@@ -24,9 +25,9 @@ export default async function ForgotPasswordPage({
   }
 
   const effectiveStore = store || {
-    id: 'demo-store-001',
-    name: 'LarisDari.web.id Store',
-    domain: process.env.DEFAULT_STORE_DOMAIN || 'demo.larisdari.web.id',
+    id: '',
+    name: 'Toko Online',
+    domain: process.env.DEFAULT_STORE_DOMAIN || '',
   };
 
   const turnstileConfig = resolveTurnstileConfig(store?.settings);
