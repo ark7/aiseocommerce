@@ -97,7 +97,7 @@ describe('Multi-Tenant Store Resolution & Isolation', () => {
       });
     });
 
-    it('prioritizes real non-demo store over dummy demo-store.local, demo.larismanis.online, and demo.larisdari.web.id in fallback', async () => {
+    it('prioritizes real non-demo store over dummy demo-store.local and demo.larisdari.web.id in fallback', async () => {
       (headers as jest.Mock).mockReturnValue(new Map());
       (cookies as jest.Mock).mockReturnValue({ get: jest.fn().mockReturnValue(undefined) });
       (prisma.store.findUnique as jest.Mock).mockResolvedValue(null);
@@ -111,13 +111,13 @@ describe('Multi-Tenant Store Resolution & Isolation', () => {
       const store = await getActiveStore();
       expect(store).toEqual(TOKODEMOKU);
       expect(prisma.store.findFirst).toHaveBeenCalledWith({
-        where: { domain: { notIn: ['demo.larisdari.web.id', 'demo.larismanis.online', 'demo-store.local'] } },
+        where: { domain: { notIn: ['demo.larisdari.web.id', 'demo-store.local'] } },
         orderBy: { createdAt: 'desc' },
         include: { settings: true },
       });
     });
 
-    it('resolves demo store cleanly across demo.larisdari.web.id, demo.larismanis.online, and demo-store.local aliases', async () => {
+    it('resolves demo store cleanly across demo.larisdari.web.id and demo-store.local aliases', async () => {
       (headers as jest.Mock).mockReturnValue(new Map([['host', 'demo.larisdari.web.id']]));
       (cookies as jest.Mock).mockReturnValue({ get: jest.fn().mockReturnValue(undefined) });
       (prisma.store.findUnique as jest.Mock).mockResolvedValue(null);
@@ -126,9 +126,9 @@ describe('Multi-Tenant Store Resolution & Isolation', () => {
       const storeNew = await getActiveStore();
       expect(storeNew).toEqual(DEMO_STORE);
 
-      (headers as jest.Mock).mockReturnValue(new Map([['host', 'demo.larismanis.online']]));
-      const storeLegacy = await getActiveStore();
-      expect(storeLegacy).toEqual(DEMO_STORE);
+      (headers as jest.Mock).mockReturnValue(new Map([['host', 'demo-store.local']]));
+      const storeLocalAlias = await getActiveStore();
+      expect(storeLocalAlias).toEqual(DEMO_STORE);
     });
   });
 

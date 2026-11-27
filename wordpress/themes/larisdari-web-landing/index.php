@@ -4,7 +4,7 @@
  * Ensures homepage always renders our custom landing page if reading settings point to latest posts,
  * and renders clean article cards for blog/archive queries.
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {

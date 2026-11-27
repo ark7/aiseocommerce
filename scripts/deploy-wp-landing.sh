@@ -2,15 +2,15 @@
 set -euo pipefail
 
 # ==============================================================================
-# Deploy & Activate WordPress Marketing Landing Theme (larismanis-landing)
+# Deploy & Activate WordPress Marketing Landing Theme (larisdari-web-landing)
 # Targets container `marketing-wordpress` without touching `aiseocommerce-web`.
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-THEME_SRC="${REPO_ROOT}/wordpress/themes/larismanis-landing"
+THEME_SRC="${REPO_ROOT}/wordpress/themes/larisdari-web-landing"
 CONTAINER_NAME="marketing-wordpress"
-TARGET_THEME="larismanis-landing"
+TARGET_THEME="larisdari-web-landing"
 
 if [ ! -d "${THEME_SRC}" ]; then
   echo "[ERROR] Theme directory not found: ${THEME_SRC}" >&2
@@ -48,9 +48,9 @@ if (!file_exists($wp_config)) {
 }
 
 $db_host   = getenv('WORDPRESS_DB_HOST') ?: 'marketing-db:3306';
-$db_user   = getenv('WORDPRESS_DB_USER') ?: 'larismanis_user';
+$db_user   = getenv('WORDPRESS_DB_USER') ?: 'larisdari_web_user';
 $db_pass   = getenv('WORDPRESS_DB_PASSWORD') ?: '';
-$db_name   = getenv('WORDPRESS_DB_NAME') ?: 'larismanis_wp';
+$db_name   = getenv('WORDPRESS_DB_NAME') ?: 'larisdari_web_wp';
 $tbl_pref  = getenv('WORDPRESS_TABLE_PREFIX') ?: 'lm_';
 
 $host_parts = explode(':', $db_host, 2);
@@ -76,7 +76,7 @@ if (!$already_installed) {
     $random_password = wp_generate_password(20, true, true);
     wp_install(
         'LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda',
-        'admin_larismanis',
+        'admin_larisdari_web',
         'halo@larisdari.web.id',
         true,
         '',
@@ -88,31 +88,31 @@ if (!$already_installed) {
     echo "[INFO] WordPress auto-installed with siteurl https://larisdari.web.id.\n";
 }
 
-$theme = wp_get_theme('larismanis-landing');
+$theme = wp_get_theme('larisdari-web-landing');
 if (!$theme->exists()) {
-    fwrite(STDERR, "[ERROR] Theme 'larismanis-landing' not detected by WordPress.\n");
+    fwrite(STDERR, "[ERROR] Theme 'larisdari-web-landing' not detected by WordPress.\n");
     exit(1);
 }
 
-switch_theme('larismanis-landing');
-remove_theme_mod('larismanis_wa_number');
+switch_theme('larisdari-web-landing');
+remove_theme_mod('larisdari_web_wa_number');
 
-// Always sync siteurl, home, blogname, and legacy theme_mods on live deploys
+// Always sync siteurl, home, blogname, and theme_mods on live deploys
 update_option('siteurl', 'https://larisdari.web.id');
 update_option('home', 'https://larisdari.web.id');
 $current_blogname = (string) get_option('blogname', '');
-if (trim($current_blogname) === '' || stripos($current_blogname, 'larismanis') !== false) {
+if (trim($current_blogname) === '' || stripos($current_blogname, 'larisdari') === false) {
     update_option('blogname', 'LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda');
 }
 
-$legacy_mod_updates = array(
-    'larismanis_demo_url'       => 'https://demo.larisdari.web.id',
-    'larismanis_demo_admin_url' => 'https://demo.larisdari.web.id/login',
-    'larismanis_contact_email'  => 'halo@larisdari.web.id',
+$default_mod_updates = array(
+    'larisdari_web_demo_url'       => 'https://demo.larisdari.web.id',
+    'larisdari_web_demo_admin_url' => 'https://demo.larisdari.web.id/login',
+    'larisdari_web_contact_email'  => 'halo@larisdari.web.id',
 );
-foreach ($legacy_mod_updates as $mod_key => $mod_target) {
+foreach ($default_mod_updates as $mod_key => $mod_target) {
     $existing_mod = get_theme_mod($mod_key);
-    if (is_string($existing_mod) && stripos($existing_mod, 'larismanis.online') !== false) {
+    if (is_string($existing_mod) && stripos($existing_mod, 'larisdari.web.id') === false && trim($existing_mod) !== '') {
         set_theme_mod($mod_key, $mod_target);
     }
 }
@@ -129,13 +129,19 @@ echo "[3/3] Verifying local WordPress response on http://127.0.0.1:8080/..."
 if command -v curl >/dev/null 2>&1; then
   TMP_HTML="$(mktemp)"
   curl -fsS -H "Host: larisdari.web.id" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ -o "${TMP_HTML}"
-  grep -q "larismanis-landing" "${TMP_HTML}"
+  grep -q "larisdari-web-landing" "${TMP_HTML}"
+  if grep -q "Login CMS Admin" "${TMP_HTML}"; then
+    rm -f "${TMP_HTML}"
+    echo "[ERROR] Exposed Login CMS Admin link still present in rendered HTML." >&2
+    exit 1
+  fi
   rm -f "${TMP_HTML}"
 else
   ${DOCKER_CMD} exec "${CONTAINER_NAME}" php -r '
     $ctx = stream_context_create(["http" => ["header" => "Host: larisdari.web.id\r\nX-Forwarded-Proto: https\r\n"]]);
     $html = file_get_contents("http://127.0.0.1/", false, $ctx);
-    if (strpos($html, "larismanis-landing") === false) exit(1);
+    if (strpos($html, "larisdari-web-landing") === false) exit(1);
+    if (strpos($html, "Login CMS Admin") !== false) exit(1);
   '
 fi
 echo "✓ WordPress Landing Page deployed and active successfully."

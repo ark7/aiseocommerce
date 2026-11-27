@@ -2,7 +2,7 @@
 /**
  * Main Landing Page Template for larisdari.web.id
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {
@@ -11,14 +11,14 @@ if (!defined('ABSPATH')) {
 
 get_header();
 
-$badge_text     = larismanis_get_option('larismanis_badge_text', 'Platform Webcommerce Omnichannel #1 untuk Brand & UMKM Indonesia');
-$hero_title     = larismanis_get_option('larismanis_hero_title', 'Website komersial pemersatu jalur penjualan online Anda');
-$hero_subtitle  = larismanis_get_option('larismanis_hero_subtitle', 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.');
-$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
-$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larisdari.web.id/login');
+$badge_text     = larisdari_web_get_option('larisdari_web_badge_text', 'Platform Webcommerce Omnichannel #1 untuk Brand & UMKM Indonesia');
+$hero_title     = larisdari_web_get_option('larisdari_web_hero_title', 'Website komersial pemersatu jalur penjualan online Anda');
+$hero_subtitle  = larisdari_web_get_option('larisdari_web_hero_subtitle', 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.');
+$demo_url       = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+$demo_admin_url = larisdari_web_get_option('larisdari_web_demo_admin_url', 'https://demo.larisdari.web.id/login');
 
-$price_monthly  = larismanis_get_option('larismanis_price_monthly', 'Rp 150.000');
-$price_lifetime = larismanis_get_option('larismanis_price_lifetime', 'Rp 3.000.000');
+$price_monthly  = larisdari_web_get_option('larisdari_web_price_monthly', 'Rp 150.000');
+$price_lifetime = larisdari_web_get_option('larisdari_web_price_lifetime', 'Rp 3.000.000');
 
 $lead_submitted = isset($_GET['lead_submitted']) && $_GET['lead_submitted'] === '1';
 $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_GET['lead_error'])) : '';
@@ -415,8 +415,8 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <?php endif; ?>
 
         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="lm-order-form">
-          <input type="hidden" name="action" value="larismanis_submit_lead">
-          <?php wp_nonce_field('larismanis_submit_lead_action', 'larismanis_submit_lead_nonce'); ?>
+          <input type="hidden" name="action" value="larisdari_web_submit_lead">
+          <?php wp_nonce_field('larisdari_web_submit_lead_action', 'larisdari_web_submit_lead_nonce'); ?>
           <input type="hidden" name="utm_source" id="lm-utm-source" value="">
           <input type="hidden" name="utm_medium" id="lm-utm-medium" value="">
           <input type="hidden" name="utm_campaign" id="lm-utm-campaign" value="">

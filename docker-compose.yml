@@ -52,10 +52,10 @@ services:
       '--max-connections=50'
     ]
     environment:
-      MYSQL_ROOT_PASSWORD: ${WP_DB_ROOT_PASSWORD:-larismanis_db_root_2026}
-      MYSQL_DATABASE: larismanis_wp
-      MYSQL_USER: larismanis_user
-      MYSQL_PASSWORD: ${WP_DB_PASSWORD:-larismanis_pass_2026}
+      MYSQL_ROOT_PASSWORD: ${WP_DB_ROOT_PASSWORD:-larisdari_web_db_root_2026}
+      MYSQL_DATABASE: ${WP_DB_NAME:-larisdari_web_wp}
+      MYSQL_USER: ${WP_DB_USER:-larisdari_web_user}
+      MYSQL_PASSWORD: ${WP_DB_PASSWORD:-larisdari_web_pass_2026}
     volumes:
       - wp_db_data:/var/lib/mysql
     deploy:
@@ -83,13 +83,13 @@ services:
       - "127.0.0.1:8080:80"
     environment:
       WORDPRESS_DB_HOST: marketing-db:3306
-      WORDPRESS_DB_USER: larismanis_user
-      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD:-larismanis_pass_2026}
-      WORDPRESS_DB_NAME: larismanis_wp
+      WORDPRESS_DB_USER: ${WP_DB_USER:-larisdari_web_user}
+      WORDPRESS_DB_PASSWORD: ${WP_DB_PASSWORD:-larisdari_web_pass_2026}
+      WORDPRESS_DB_NAME: ${WP_DB_NAME:-larisdari_web_wp}
       WORDPRESS_TABLE_PREFIX: lm_
     volumes:
       - wp_content_data:/var/www/html/wp-content
-      - ./wordpress/themes/larismanis-landing:/var/www/html/wp-content/themes/larismanis-landing
+      - ./wordpress/themes/larisdari-web-landing:/var/www/html/wp-content/themes/larisdari-web-landing
     deploy:
       resources:
         limits:

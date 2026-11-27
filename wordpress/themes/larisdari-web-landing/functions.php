@@ -2,32 +2,32 @@
 /**
  * LarisDari.web.id Official Landing Theme Functions
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_THEME_VERSION', '1.3.0');
+define('LARISDARI_WEB_THEME_VERSION', '1.4.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 
 /**
  * Prevent stale browser or CDN HTML caching on the public landing page.
  */
-function larismanis_send_nocache_headers() {
+function larisdari_web_send_nocache_headers() {
     if (!is_admin()) {
         nocache_headers();
         header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     }
 }
-add_action('send_headers', 'larismanis_send_nocache_headers');
+add_action('send_headers', 'larisdari_web_send_nocache_headers');
 
 /**
  * Helper to fetch theme options configured via WP Customizer with safe defaults.
  */
-function larismanis_get_option($key, $default = '') {
+function larisdari_web_get_option($key, $default = '') {
     $val = get_theme_mod($key, $default);
     if (is_string($val) && trim($val) === '') {
         return $default;
@@ -38,44 +38,44 @@ function larismanis_get_option($key, $default = '') {
 /**
  * Theme setup supports.
  */
-function larismanis_theme_setup() {
+function larisdari_web_theme_setup() {
     add_theme_support('title-tag');
     add_theme_support('post-thumbnails');
     add_theme_support('html5', array('search-form', 'comment-form', 'comment-list', 'gallery', 'caption', 'style', 'script'));
 
     register_nav_menus(array(
-        'primary' => __('Menu Utama Header', 'larismanis-landing'),
+        'primary' => __('Menu Utama Header', 'larisdari-web-landing'),
     ));
 }
-add_action('after_setup_theme', 'larismanis_theme_setup');
+add_action('after_setup_theme', 'larisdari_web_theme_setup');
 
 /**
  * Enqueue styles and lightweight interactive JS.
  */
-function larismanis_enqueue_assets() {
+function larisdari_web_enqueue_assets() {
     wp_enqueue_style(
-        'larismanis-google-fonts',
+        'larisdari-web-google-fonts',
         'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
         array(),
         null
     );
 
     wp_enqueue_style(
-        'larismanis-landing-style',
+        'larisdari-web-landing-style',
         get_stylesheet_uri(),
-        array('larismanis-google-fonts'),
-        LARISMANIS_THEME_VERSION
+        array('larisdari-web-google-fonts'),
+        LARISDARI_WEB_THEME_VERSION
     );
 
     wp_enqueue_script(
-        'larismanis-landing-js',
+        'larisdari-web-landing-js',
         get_template_directory_uri() . '/assets/js/landing.js',
         array(),
-        LARISMANIS_THEME_VERSION,
+        LARISDARI_WEB_THEME_VERSION,
         true
     );
 }
-add_action('wp_enqueue_scripts', 'larismanis_enqueue_assets');
+add_action('wp_enqueue_scripts', 'larisdari_web_enqueue_assets');
 
 /**
  * Remove bloat scripts for faster Core Web Vitals & LCP.
@@ -87,14 +87,14 @@ remove_action('wp_head', 'wp_generator');
 /**
  * Output SEO OpenGraph Meta & SoftwareApplication JSON-LD Schema.
  */
-function larismanis_output_seo_head() {
+function larisdari_web_output_seo_head() {
     $title = wp_get_document_title();
-    $desc  = larismanis_get_option(
-        'larismanis_hero_subtitle',
+    $desc  = larisdari_web_get_option(
+        'larisdari_web_hero_subtitle',
         'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu website komersial.'
     );
     $url   = home_url('/');
-    $demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
+    $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
 
     echo '<meta name="description" content="' . esc_attr($desc) . '">' . "\n";
     echo '<meta property="og:type" content="website">' . "\n";
@@ -121,55 +121,55 @@ function larismanis_output_seo_head() {
     );
     echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
 }
-add_action('wp_head', 'larismanis_output_seo_head', 5);
+add_action('wp_head', 'larisdari_web_output_seo_head', 5);
 
 /**
  * WordPress Customizer settings so Admin can tweak texts & pricing without editing code.
  */
-function larismanis_customize_register($wp_customize) {
-    $wp_customize->add_section('larismanis_landing_section', array(
-        'title'       => __('Pengaturan Landing Page LarisDari', 'larismanis-landing'),
+function larisdari_web_customize_register($wp_customize) {
+    $wp_customize->add_section('larisdari_web_landing_section', array(
+        'title'       => __('Pengaturan Landing Page LarisDari', 'larisdari-web-landing'),
         'priority'    => 25,
-        'description' => __('Sesuaikan teks headline, URL demo toko, email kontak, dan rincian harga lisensi tanpa perlu menyentuh kode.', 'larismanis-landing'),
+        'description' => __('Sesuaikan teks headline, URL demo toko, email kontak, dan rincian harga lisensi tanpa perlu menyentuh kode.', 'larisdari-web-landing'),
     ));
 
     $fields = array(
-        'larismanis_badge_text' => array(
+        'larisdari_web_badge_text' => array(
             'label'   => 'Badge Hero Promo',
             'default' => 'Platform Webcommerce Omnichannel #1 untuk Brand & UMKM Indonesia',
             'type'    => 'text',
         ),
-        'larismanis_hero_title' => array(
+        'larisdari_web_hero_title' => array(
             'label'   => 'Headline Utama Hero (H1)',
             'default' => 'Website komersial pemersatu jalur penjualan online Anda',
             'type'    => 'text',
         ),
-        'larismanis_hero_subtitle' => array(
+        'larisdari_web_hero_subtitle' => array(
             'label'   => 'Sub-headline Hero',
             'default' => 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.',
             'type'    => 'textarea',
         ),
-        'larismanis_demo_url' => array(
+        'larisdari_web_demo_url' => array(
             'label'   => 'URL Live Storefront Demo',
             'default' => 'https://demo.larisdari.web.id',
             'type'    => 'url',
         ),
-        'larismanis_demo_admin_url' => array(
+        'larisdari_web_demo_admin_url' => array(
             'label'   => 'URL Login Admin Demo',
             'default' => 'https://demo.larisdari.web.id/login',
             'type'    => 'url',
         ),
-        'larismanis_contact_email' => array(
+        'larisdari_web_contact_email' => array(
             'label'   => 'Email Kontak Resmi',
             'default' => 'halo@larisdari.web.id',
             'type'    => 'email',
         ),
-        'larismanis_price_monthly' => array(
+        'larisdari_web_price_monthly' => array(
             'label'   => 'Biaya Operasional Bulanan Website',
             'default' => 'Rp 150.000',
             'type'    => 'text',
         ),
-        'larismanis_price_lifetime' => array(
+        'larisdari_web_price_lifetime' => array(
             'label'   => 'Biaya Lisensi 1 Website (Selama LarisDari.web.id Beroperasi)',
             'default' => 'Rp 3.000.000',
             'type'    => 'text',
@@ -184,9 +184,9 @@ function larismanis_customize_register($wp_customize) {
         ));
         $wp_customize->add_control($key, array(
             'label'   => $cfg['label'],
-            'section' => 'larismanis_landing_section',
+            'section' => 'larisdari_web_landing_section',
             'type'    => $cfg['type'],
         ));
     }
 }
-add_action('customize_register', 'larismanis_customize_register');
+add_action('customize_register', 'larisdari_web_customize_register');

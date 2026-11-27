@@ -2,14 +2,14 @@
 /**
  * Theme Header Template
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-$demo_url = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
+$demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
