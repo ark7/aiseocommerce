@@ -28,7 +28,7 @@ $contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@
       </div>
 
       <div>
-        <h4>Platform &amp; Demo</h4>
+        <h2 class="lm-footer-heading">Platform &amp; Demo</h2>
         <ul>
           <li><a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener">Live Storefront Demo</a></li>
           <li><a href="<?php echo esc_url(rtrim($demo_url, '/') . '/products'); ?>" target="_blank" rel="noopener">Katalog &amp; Harga Grosir</a></li>
@@ -38,7 +38,7 @@ $contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@
       </div>
 
       <div>
-        <h4>Navigasi &amp; Pendaftaran</h4>
+        <h2 class="lm-footer-heading">Navigasi &amp; Pendaftaran</h2>
         <ul>
           <li><a href="#fitur">Fitur Unggulan</a></li>
           <li><a href="#harga">Skema Harga</a></li>

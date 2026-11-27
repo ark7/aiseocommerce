@@ -22,6 +22,7 @@ $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.lar
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
+<a class="lm-skip-link" href="#primary">Langsung ke konten utama</a>
 
 <header class="lm-header" role="banner">
   <div class="lm-container lm-nav-wrap">

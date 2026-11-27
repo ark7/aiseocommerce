@@ -5,7 +5,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
   const repoRoot = process.cwd();
   const themeDir = path.join(repoRoot, 'wordpress', 'themes', 'larisdari-web-landing');
 
-  it('contains all required WordPress theme files, CMS module, and deployment script', () => {
+  it('contains all required WordPress theme files, brand assets, CMS module, and deployment script', () => {
     const requiredFiles = [
       'style.css',
       'functions.php',
@@ -15,6 +15,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       'footer.php',
       path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
+      path.join('assets', 'images', 'favicon.svg'),
+      path.join('assets', 'images', 'favicon-180.png'),
+      path.join('assets', 'images', 'og-larisdari-web.png'),
     ];
 
     for (const file of requiredFiles) {
@@ -27,7 +30,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(deployScript).toContain('larisdari-web-landing');
   });
 
-  it('defines valid WordPress theme metadata and responsive layout + order form styles in style.css', () => {
+  it('defines valid WordPress theme metadata, focus-visible accessibility, tap targets, and contrast in style.css', () => {
     const styleCss = fs.readFileSync(path.join(themeDir, 'style.css'), 'utf8');
     expect(styleCss).toContain('Theme Name: LarisDari.web.id Official Landing');
     expect(styleCss).toContain('Text Domain: larisdari-web-landing');
@@ -39,9 +42,13 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(styleCss).toContain('.lm-check-title');
     expect(styleCss).toContain('.lm-check-desc');
     expect(styleCss).toContain('@media (min-width: 960px)');
+    expect(styleCss).toContain('.lm-skip-link');
+    expect(styleCss).toContain(':focus-visible');
+    expect(styleCss).toContain('prefers-reduced-motion');
+    expect(styleCss).toContain('width: 48px;');
   });
 
-  it('registers WP Customizer, JSON-LD SEO, CMS Leads (Klik to Chat WA), and Indonesian Pixel/Analytics in functions & cms-admin', () => {
+  it('registers WP Customizer, rich SEO metadata, WP security hardening, CMS Leads, and Analytics in functions & cms-admin', () => {
     const functionsPhp = fs.readFileSync(path.join(themeDir, 'functions.php'), 'utf8');
     const cmsAdminPhp = fs.readFileSync(path.join(themeDir, 'inc', 'cms-admin.php'), 'utf8');
 
@@ -50,6 +57,14 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(functionsPhp).toContain('larisdari_web_demo_url');
     expect(functionsPhp).toContain('application/ld+json');
     expect(functionsPhp).toContain('SoftwareApplication');
+    expect(functionsPhp).toContain('FAQPage');
+    expect(functionsPhp).toContain('rel="canonical"');
+    expect(functionsPhp).toContain('property="og:image"');
+    expect(functionsPhp).toContain('wp_sitemaps_add_provider');
+    expect(functionsPhp).toContain('rest_endpoints');
+    expect(functionsPhp).toContain('rsd_link');
+    expect(functionsPhp).toContain('wp-block-library');
+    expect(functionsPhp).toContain("'strategy' => 'defer'");
 
     // Public functions must NOT expose hardcoded WhatsApp numbers
     expect(functionsPhp).not.toContain('6281288997711');
@@ -71,14 +86,18 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(cmsAdminPhp).toContain('analytics.tiktok.com');
   });
 
-  it('routes public CTAs to the on-page #pesan order form without public wa.me links or exposed WP admin URLs', () => {
+  it('routes public CTAs to #pesan without wa.me/admin exposure and satisfies heading order & form a11y', () => {
     const headerPhp = fs.readFileSync(path.join(themeDir, 'header.php'), 'utf8');
     const frontPagePhp = fs.readFileSync(path.join(themeDir, 'front-page.php'), 'utf8');
     const footerPhp = fs.readFileSync(path.join(themeDir, 'footer.php'), 'utf8');
     const indexPhp = fs.readFileSync(path.join(themeDir, 'index.php'), 'utf8');
 
     expect(headerPhp).toContain('#pesan');
+    expect(headerPhp).toContain('lm-skip-link');
     expect(footerPhp).toContain('#pesan');
+    expect(footerPhp).not.toContain('<h4');
+    expect(footerPhp).toContain('lm-footer-heading');
+
     for (const content of [headerPhp, frontPagePhp, footerPhp, indexPhp]) {
       expect(content).not.toContain('wa.me');
       expect(content).not.toMatch(/0812|628[0-9]{4,}/);
@@ -107,6 +126,11 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(frontPagePhp).toContain('larisdari_web_submit_lead');
     expect(frontPagePhp).toContain('name="whatsapp"');
     expect(frontPagePhp).toContain('name="brand_name"');
+    expect(frontPagePhp).toContain('autocomplete="name"');
+    expect(frontPagePhp).toContain('autocomplete="tel"');
+    expect(frontPagePhp).toContain('autocomplete="email"');
+    expect(frontPagePhp).toContain('#047857');
+    expect(frontPagePhp).not.toContain('*first impression*');
     expect(frontPagePhp).toContain('lm-compare-heading');
     expect(frontPagePhp).toContain('lm-check-body');
     expect(frontPagePhp).toContain('lm-check-title');
