@@ -4,7 +4,7 @@ Theme URI: https://larisdari.web.id
 Author: LarisDari.web.id Team
 Author URI: https://larisdari.web.id
 Description: Tema landing page pemasaran resmi untuk LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda. Ringan, cepat, responsif, dan ramah SEO.
-Version: 1.5.0
+Version: 1.6.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -154,6 +154,13 @@ img {
   font-weight: 900;
   font-size: 1.05rem;
   box-shadow: 0 6px 14px rgba(79, 70, 229, 0.25);
+}
+
+.lm-brand-logo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: block;
 }
 
 .lm-brand-domain {

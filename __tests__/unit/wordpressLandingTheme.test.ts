@@ -15,6 +15,8 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       'footer.php',
       path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
+      path.join('assets', 'images', 'logo.svg'),
+      path.join('assets', 'images', 'logo-dark.svg'),
       path.join('assets', 'images', 'favicon.svg'),
       path.join('assets', 'images', 'favicon-180.png'),
       path.join('assets', 'images', 'og-larisdari-web.png'),
@@ -94,7 +96,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
 
     expect(headerPhp).toContain('#pesan');
     expect(headerPhp).toContain('lm-skip-link');
+    expect(headerPhp).toContain('assets/images/logo.svg');
     expect(footerPhp).toContain('#pesan');
+    expect(footerPhp).toContain('assets/images/logo-dark.svg');
     expect(footerPhp).not.toContain('<h4');
     expect(footerPhp).toContain('lm-footer-heading');
 
@@ -148,6 +152,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       'index.php',
       path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
+      path.join('assets', 'images', 'logo.svg'),
+      path.join('assets', 'images', 'logo-dark.svg'),
+      path.join('assets', 'images', 'favicon.svg'),
     ];
 
     for (const file of themeFiles) {
