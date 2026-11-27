@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISDARI_WEB_THEME_VERSION', '1.4.0');
+define('LARISDARI_WEB_THEME_VERSION', '1.5.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 
@@ -50,7 +50,18 @@ function larisdari_web_theme_setup() {
 add_action('after_setup_theme', 'larisdari_web_theme_setup');
 
 /**
- * Enqueue styles and lightweight interactive JS.
+ * Optimize homepage <title> length (57 chars) for Google SERP display without truncation.
+ */
+function larisdari_web_document_title($title) {
+    if (is_front_page() || is_home()) {
+        return 'LarisDari.web.id — Website Komersial Omnichannel & AI SEO';
+    }
+    return $title;
+}
+add_filter('pre_get_document_title', 'larisdari_web_document_title');
+
+/**
+ * Enqueue styles and deferred interactive JS.
  */
 function larisdari_web_enqueue_assets() {
     wp_enqueue_style(
@@ -72,54 +83,209 @@ function larisdari_web_enqueue_assets() {
         get_template_directory_uri() . '/assets/js/landing.js',
         array(),
         LARISDARI_WEB_THEME_VERSION,
-        true
+        array('in_footer' => true, 'strategy' => 'defer')
     );
 }
 add_action('wp_enqueue_scripts', 'larisdari_web_enqueue_assets');
 
 /**
- * Remove bloat scripts for faster Core Web Vitals & LCP.
+ * Strip unused Gutenberg block CSS (~14 KB inline styles) on public landing pages.
+ */
+function larisdari_web_dequeue_unused_styles() {
+    if (is_admin()) {
+        return;
+    }
+    wp_dequeue_style('wp-block-library');
+    wp_dequeue_style('wp-block-library-theme');
+    wp_dequeue_style('wc-blocks-style');
+    wp_dequeue_style('global-styles');
+    wp_dequeue_style('classic-theme-styles');
+}
+add_action('wp_enqueue_scripts', 'larisdari_web_dequeue_unused_styles', 100);
+
+/**
+ * Load Google Fonts asynchronously without render-blocking first paint.
+ */
+function larisdari_web_async_google_fonts($html, $handle, $href, $media) {
+    if ($handle !== 'larisdari-web-google-fonts') {
+        return $html;
+    }
+    $escaped_href = esc_url($href);
+    return "<link rel=\"stylesheet\" id=\"larisdari-web-google-fonts-css\" href=\"{$escaped_href}\" media=\"print\" onload=\"this.media='all'\">\n"
+        . "<noscript><link rel=\"stylesheet\" href=\"{$escaped_href}\" media=\"{$media}\"></noscript>\n";
+}
+add_filter('style_loader_tag', 'larisdari_web_async_google_fonts', 10, 4);
+
+/**
+ * Remove bloat scripts, RSD/XML-RPC hints, shortlinks, and REST discovery tags.
  */
 remove_action('wp_head', 'print_emoji_detection_script', 7);
 remove_action('wp_print_styles', 'print_emoji_styles');
 remove_action('wp_head', 'wp_generator');
+remove_action('wp_head', 'rsd_link');
+remove_action('wp_head', 'wlwmanifest_link');
+remove_action('wp_head', 'wp_shortlink_wp_head');
+remove_action('wp_head', 'rest_output_link_wp_head');
+remove_action('wp_head', 'wp_oembed_add_discovery_links');
+remove_action('template_redirect', 'rest_output_link_header', 11);
+add_filter('xmlrpc_enabled', '__return_false');
 
 /**
- * Output SEO OpenGraph Meta & SoftwareApplication JSON-LD Schema.
+ * Close public WordPress username enumeration across Sitemap, REST API, and author archives.
+ */
+function larisdari_web_disable_users_sitemap($provider, $name) {
+    if ($name === 'users') {
+        return false;
+    }
+    return $provider;
+}
+add_filter('wp_sitemaps_add_provider', 'larisdari_web_disable_users_sitemap', 10, 2);
+
+function larisdari_web_hide_public_users_rest($endpoints) {
+    if (!is_user_logged_in()) {
+        unset($endpoints['/wp/v2/users']);
+        unset($endpoints['/wp/v2/users/(?P<id>[\\d]+)']);
+    }
+    return $endpoints;
+}
+add_filter('rest_endpoints', 'larisdari_web_hide_public_users_rest');
+
+function larisdari_web_redirect_author_archives() {
+    if (is_author() && !is_admin()) {
+        wp_safe_redirect(home_url('/'), 301);
+        exit;
+    }
+}
+add_action('template_redirect', 'larisdari_web_redirect_author_archives');
+
+/**
+ * Output SEO Canonical, Favicon, OpenGraph/Twitter Images, and Schema.org JSON-LD @graph.
  */
 function larisdari_web_output_seo_head() {
     $title = wp_get_document_title();
     $desc  = larisdari_web_get_option(
         'larisdari_web_hero_subtitle',
-        'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu website komersial.'
+        'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, ongkir Biteship, payment gateway, harga grosir bertingkat, dan AI SEO dalam satu website Anda.'
     );
-    $url   = home_url('/');
-    $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+    $url       = is_singular() ? get_permalink() : home_url('/');
+    $demo_url  = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+    $theme_uri = get_template_directory_uri();
+    $fav_svg   = $theme_uri . '/assets/images/favicon.svg';
+    $fav_png   = $theme_uri . '/assets/images/favicon-180.png';
+    $og_image  = $theme_uri . '/assets/images/og-larisdari-web.png';
+
+    echo '<link rel="canonical" href="' . esc_url($url) . '">' . "\n";
+    echo '<link rel="icon" href="' . esc_url($fav_svg) . '" type="image/svg+xml">' . "\n";
+    echo '<link rel="apple-touch-icon" sizes="180x180" href="' . esc_url($fav_png) . '">' . "\n";
 
     echo '<meta name="description" content="' . esc_attr($desc) . '">' . "\n";
+    echo '<meta property="og:locale" content="id_ID">' . "\n";
     echo '<meta property="og:type" content="website">' . "\n";
     echo '<meta property="og:title" content="' . esc_attr($title) . '">' . "\n";
     echo '<meta property="og:description" content="' . esc_attr($desc) . '">' . "\n";
     echo '<meta property="og:url" content="' . esc_url($url) . '">' . "\n";
     echo '<meta property="og:site_name" content="LarisDari.web.id">' . "\n";
-    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+    echo '<meta property="og:image" content="' . esc_url($og_image) . '">' . "\n";
+    echo '<meta property="og:image:width" content="1200">' . "\n";
+    echo '<meta property="og:image:height" content="630">' . "\n";
+    echo '<meta property="og:image:alt" content="LarisDari.web.id — Website Komersial Pemersatu Jalur Penjualan Online">' . "\n";
 
-    $schema = array(
+    echo '<meta name="twitter:card" content="summary_large_image">' . "\n";
+    echo '<meta name="twitter:title" content="' . esc_attr($title) . '">' . "\n";
+    echo '<meta name="twitter:description" content="' . esc_attr($desc) . '">' . "\n";
+    echo '<meta name="twitter:image" content="' . esc_url($og_image) . '">' . "\n";
+
+    $graph = array(
         '@context' => 'https://schema.org',
-        '@type' => 'SoftwareApplication',
-        'name' => 'LarisDari.web.id',
-        'applicationCategory' => 'BusinessApplication',
-        'operatingSystem' => 'Web',
-        'url' => $url,
-        'description' => $desc,
-        'offers' => array(
-            '@type' => 'Offer',
-            'price' => '150000',
-            'priceCurrency' => 'IDR',
-            'url' => $demo_url,
+        '@graph' => array(
+            array(
+                '@type' => 'Organization',
+                '@id'   => home_url('/#organization'),
+                'name'  => 'LarisDari.web.id',
+                'url'   => home_url('/'),
+                'logo'  => $fav_png,
+            ),
+            array(
+                '@type'       => 'WebSite',
+                '@id'         => home_url('/#website'),
+                'name'        => 'LarisDari.web.id',
+                'url'         => home_url('/'),
+                'inLanguage'  => 'id-ID',
+                'publisher'   => array('@id' => home_url('/#organization')),
+            ),
+            array(
+                '@type'               => 'SoftwareApplication',
+                'name'                => 'LarisDari.web.id',
+                'applicationCategory' => 'BusinessApplication',
+                'operatingSystem'     => 'Web',
+                'url'                 => $url,
+                'image'               => $og_image,
+                'description'         => $desc,
+                'offers'              => array(
+                    array(
+                        '@type'         => 'Offer',
+                        'name'          => 'Lisensi 1 Website (Berlaku selama LarisDari.web.id beroperasi)',
+                        'price'         => '3000000',
+                        'priceCurrency' => 'IDR',
+                        'url'           => home_url('/#pesan'),
+                    ),
+                    array(
+                        '@type'         => 'Offer',
+                        'name'          => 'Biaya Operasional Bulanan Website',
+                        'price'         => '150000',
+                        'priceCurrency' => 'IDR',
+                        'url'           => $demo_url,
+                    ),
+                ),
+            ),
+            array(
+                '@type' => 'FAQPage',
+                'mainEntity' => array(
+                    array(
+                        '@type' => 'Question',
+                        'name'  => 'Bagaimana cara kerja biaya lisensi Rp 3.000.000, operasional Rp 150.000/bulan, serta domain & email custom?',
+                        'acceptedAnswer' => array(
+                            '@type' => 'Answer',
+                            'text'  => 'Kami hanya memakai 1 skema harga yang transparan: Anda membeli Lisensi 1 Website sebesar Rp 3.000.000 (berlaku selama LarisDari.web.id beroperasi) untuk memiliki dan mengoperasikan 1 toko online penuh, ditambah Biaya Operasional Bulanan Rp 150.000/bulan agar server dan sistem berjalan optimal setiap bulannya. Untuk domain dan email custom disiapkan dan dibawa oleh masing-masing pengguna.',
+                        ),
+                    ),
+                    array(
+                        '@type' => 'Question',
+                        'name'  => 'Apakah pembeli di website tetap bisa diarahkan belanja ke Shopee, Tokopedia, atau TikTok Shop kami?',
+                        'acceptedAnswer' => array(
+                            '@type' => 'Answer',
+                            'text'  => 'Bisa. Di setiap produk, Anda dapat mengisi URL Shopee, Tokopedia, dan TikTok Shop. Dengan begitu pembeli bebas memilih checkout langsung di website atau lewat marketplace kepercayaan mereka.',
+                        ),
+                    ),
+                    array(
+                        '@type' => 'Question',
+                        'name'  => 'Bagaimana cara kerja fitur AI SEO dan AI Studio Foto Produk?',
+                        'acceptedAnswer' => array(
+                            '@type' => 'Answer',
+                            'text'  => 'Anda cukup memasukkan API Key Gemini atau OpenAI pribadi (sistem BYOK/Bring Your Own Key) di halaman Pengaturan Toko, sehingga biaya pemakaian AI sepenuhnya transparan dan efisien tanpa biaya tambahan per-artikel dari kami.',
+                        ),
+                    ),
+                    array(
+                        '@type' => 'Question',
+                        'name'  => 'Apakah Cloudflare Turnstile di website toko akan mengganggu peringkat SEO Google?',
+                        'acceptedAnswer' => array(
+                            '@type' => 'Answer',
+                            'text'  => 'Tidak. Implementasi Cloudflare Turnstile di toko kami dirancang ramah SEO: pemuatannya ditunda setelah tampilan utama (first impression) selesai dimuat dan otomatis dilewati bagi crawler mesin pencari seperti Googlebot sehingga skor Core Web Vitals dan indeksasi tetap optimal.',
+                        ),
+                    ),
+                    array(
+                        '@type' => 'Question',
+                        'name'  => 'Bisakah saya mencoba seluruh fitur admin dan checkout sebelum memesan?',
+                        'acceptedAnswer' => array(
+                            '@type' => 'Answer',
+                            'text'  => 'Sangat bisa! Silakan kunjungi ' . $demo_url . ' dan masuk melalui halaman login demo menggunakan tombol 1-klik untuk peran Admin, Staf, atau Pelanggan.',
+                        ),
+                    ),
+                ),
+            ),
         ),
     );
-    echo '<script type="application/ld+json">' . wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
+    echo '<script type="application/ld+json">' . wp_json_encode($graph, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
 }
 add_action('wp_head', 'larisdari_web_output_seo_head', 5);
 
@@ -146,7 +312,7 @@ function larisdari_web_customize_register($wp_customize) {
         ),
         'larisdari_web_hero_subtitle' => array(
             'label'   => 'Sub-headline Hero',
-            'default' => 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.',
+            'default' => 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, ongkir Biteship, payment gateway, harga grosir bertingkat, dan AI SEO dalam satu website Anda.',
             'type'    => 'textarea',
         ),
         'larisdari_web_demo_url' => array(

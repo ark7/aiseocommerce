@@ -13,7 +13,7 @@ get_header();
 
 $badge_text     = larisdari_web_get_option('larisdari_web_badge_text', 'Platform Webcommerce Omnichannel #1 untuk Brand & UMKM Indonesia');
 $hero_title     = larisdari_web_get_option('larisdari_web_hero_title', 'Website komersial pemersatu jalur penjualan online Anda');
-$hero_subtitle  = larisdari_web_get_option('larisdari_web_hero_subtitle', 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, kurir otomatis Biteship, payment gateway, harga grosir bertingkat, dan asisten AI SEO dalam satu toko online milik Anda sendiri.');
+$hero_subtitle  = larisdari_web_get_option('larisdari_web_hero_subtitle', 'Satukan katalog mandiri, Shopee, Tokopedia, TikTok Shop, ongkir Biteship, payment gateway, harga grosir bertingkat, dan AI SEO dalam satu website Anda.');
 $demo_url       = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
 $demo_admin_url = larisdari_web_get_option('larisdari_web_demo_admin_url', 'https://demo.larisdari.web.id/login');
 
@@ -53,9 +53,9 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         </div>
 
         <div class="lm-usp-row">
-          <span class="lm-usp-item"><span class="lm-usp-check">✓</span> Domain &amp; Database Mandiri</span>
-          <span class="lm-usp-item"><span class="lm-usp-check">✓</span> Terintegrasi Marketplace &amp; Biteship</span>
-          <span class="lm-usp-item"><span class="lm-usp-check">✓</span> AI SEO &amp; Foto Studio Produk</span>
+          <span class="lm-usp-item"><span class="lm-usp-check" aria-hidden="true">✓</span> Domain &amp; Database Mandiri</span>
+          <span class="lm-usp-item"><span class="lm-usp-check" aria-hidden="true">✓</span> Terintegrasi Marketplace &amp; Biteship</span>
+          <span class="lm-usp-item"><span class="lm-usp-check" aria-hidden="true">✓</span> AI SEO &amp; Foto Studio Produk</span>
         </div>
       </div>
 
@@ -66,7 +66,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
             <span></span><span></span><span></span>
           </div>
           <div class="lm-mockup-url">https://demo.larisdari.web.id</div>
-          <span style="font-size:0.75rem; font-weight:700; color:#10b981;">● Online</span>
+          <span style="font-size:0.75rem; font-weight:700; color:#047857;"><span aria-hidden="true">●</span> Online</span>
         </div>
 
         <div class="lm-mockup-stats">
@@ -86,12 +86,12 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
           Jalur Penjualan &amp; Operasional Tersatukan:
         </div>
         <div class="lm-channel-list">
-          <div class="lm-channel-pill">🛒 Web Checkout &amp; Kasir</div>
-          <div class="lm-channel-pill">🛍️ Shopee • Tokopedia • TikTok</div>
-          <div class="lm-channel-pill">🚚 Ongkir Otomatis Biteship</div>
-          <div class="lm-channel-pill">💳 Midtrans • Flip • Transfer</div>
-          <div class="lm-channel-pill">✨ AI SEO &amp; Image Studio</div>
-          <div class="lm-channel-pill">🛡️ Cloudflare Turnstile SEO-Safe</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">🛒</span> Web Checkout &amp; Kasir</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">🛍️</span> Shopee • Tokopedia • TikTok</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">🚚</span> Ongkir Otomatis Biteship</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">💳</span> Midtrans • Flip • Transfer</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">✨</span> AI SEO &amp; Image Studio</div>
+          <div class="lm-channel-pill"><span aria-hidden="true">🛡️</span> Cloudflare Turnstile SEO-Safe</div>
         </div>
       </div>
     </div>
@@ -100,17 +100,17 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
   <!-- 2. OMNICHANNEL ECOSYSTEM STRIP -->
   <section id="omnichannel" class="lm-section" style="padding:44px 0;">
     <div class="lm-container">
-      <p style="text-align:center; font-size:0.85rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#64748b; margin:0 0 20px;">
+      <p style="text-align:center; font-size:0.85rem; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#475569; margin:0 0 20px;">
         Terhubung dalam Satu Pusat Kendali Penjualan Digital Anda
       </p>
       <div class="lm-eco-strip">
-        <span class="lm-eco-badge">🛍️ Shopee</span>
-        <span class="lm-eco-badge">🟢 Tokopedia</span>
-        <span class="lm-eco-badge">🎵 TikTok Shop</span>
-        <span class="lm-eco-badge">🚚 Biteship (JNE • J&amp;T • SiCepat • AnterAja)</span>
-        <span class="lm-eco-badge">💳 Midtrans &amp; Flip</span>
-        <span class="lm-eco-badge">📲 Notifikasi Telegram &amp; WhatsApp</span>
-        <span class="lm-eco-badge">🤖 Gemini &amp; OpenAI BYOK</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">🛍️</span> Shopee</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">🟢</span> Tokopedia</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">🎵</span> TikTok Shop</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">🚚</span> Biteship (JNE • J&amp;T • SiCepat • AnterAja)</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">💳</span> Midtrans &amp; Flip</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">📲</span> Notifikasi Telegram &amp; WhatsApp</span>
+        <span class="lm-eco-badge"><span aria-hidden="true">🤖</span> Gemini &amp; OpenAI BYOK</span>
       </div>
     </div>
   </section>
@@ -383,7 +383,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
       </div>
 
       <div class="lm-pricing-note">
-        <strong>📌 Ketentuan Domain &amp; Email Custom:</strong> Domain brand sendiri (misal <code>namatoko.com</code> atau <code>.id</code>) serta akun <strong>Email Custom / SMTP</strong> dibawa dan disiapkan oleh masing-masing pengguna agar aset digital bisnis 100% atas nama Anda. Tim kami membantu menyambungkan DNS &amp; SMTP agar website Anda langsung siap operasional.
+        <strong><span aria-hidden="true">📌</span> Ketentuan Domain &amp; Email Custom:</strong> Domain brand sendiri (misal <code>namatoko.com</code> atau <code>.id</code>) serta akun <strong>Email Custom / SMTP</strong> dibawa dan disiapkan oleh masing-masing pengguna agar aset digital bisnis 100% atas nama Anda. Tim kami membantu menyambungkan DNS &amp; SMTP agar website Anda langsung siap operasional.
       </div>
     </div>
   </section>
@@ -428,28 +428,28 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
           <div class="lm-form-grid">
             <div class="lm-field">
-              <label for="lm_full_name">Nama Lengkap <span style="color:#dc2626;">*</span></label>
-              <input type="text" id="lm_full_name" name="full_name" required class="lm-input" placeholder="Contoh: Budi Santoso">
+              <label for="lm_full_name">Nama Lengkap <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <input type="text" id="lm_full_name" name="full_name" required autocomplete="name" class="lm-input" placeholder="Contoh: Budi Santoso">
             </div>
 
             <div class="lm-field">
-              <label for="lm_whatsapp">Nomor WhatsApp Aktif <span style="color:#dc2626;">*</span></label>
-              <input type="tel" id="lm_whatsapp" name="whatsapp" required class="lm-input" placeholder="Masukkan nomor WhatsApp aktif Anda">
+              <label for="lm_whatsapp">Nomor WhatsApp Aktif <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <input type="tel" id="lm_whatsapp" name="whatsapp" required autocomplete="tel" class="lm-input" placeholder="Masukkan nomor WhatsApp aktif Anda">
             </div>
 
             <div class="lm-field">
-              <label for="lm_brand_name">Nama Brand / Toko <span style="color:#dc2626;">*</span></label>
-              <input type="text" id="lm_brand_name" name="brand_name" required class="lm-input" placeholder="Contoh: Batik Nusantara Jaya">
+              <label for="lm_brand_name">Nama Brand / Toko <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <input type="text" id="lm_brand_name" name="brand_name" required autocomplete="organization" class="lm-input" placeholder="Contoh: Batik Nusantara Jaya">
             </div>
 
             <div class="lm-field">
               <label for="lm_email">Alamat Email</label>
-              <input type="email" id="lm_email" name="email" class="lm-input" placeholder="Contoh: halo@namatoko.com">
+              <input type="email" id="lm_email" name="email" autocomplete="email" class="lm-input" placeholder="Contoh: halo@namatoko.com">
             </div>
 
             <div class="lm-field">
               <label for="lm_custom_domain">Rencana Nama Domain (Opsional)</label>
-              <input type="text" id="lm_custom_domain" name="custom_domain" class="lm-input" placeholder="Contoh: namatoko.com (dibawa oleh user)">
+              <input type="text" id="lm_custom_domain" name="custom_domain" autocomplete="url" class="lm-input" placeholder="Contoh: namatoko.com (dibawa oleh user)">
             </div>
 
             <div class="lm-field">
@@ -472,8 +472,8 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
           </div>
 
           <div style="margin-top:22px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px;">
-            <p style="margin:0; font-size:0.84rem; color:#64748b;">
-              🔒 Data Anda aman dan hanya digunakan untuk menindaklanjuti pemesanan website Anda.
+            <p style="margin:0; font-size:0.84rem; color:#475569;">
+              <span aria-hidden="true">🔒</span> Data Anda aman dan hanya digunakan untuk menindaklanjuti pemesanan website Anda.
             </p>
             <button type="submit" class="lm-btn lm-btn-primary lm-btn-lg">
               Kirim Form Pemesanan Lisensi &rarr;
@@ -517,7 +517,7 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
         <details class="lm-faq-item">
           <summary>Apakah Cloudflare Turnstile di website toko akan mengganggu peringkat SEO Google?</summary>
           <p class="lm-faq-answer">
-            Tidak. Implementasi Cloudflare Turnstile di toko kami dirancang ramah SEO: pemuatannya ditunda setelah tampilan utama (*first impression*) selesai dimuat dan otomatis dilewati bagi crawler mesin pencari seperti Googlebot sehingga skor Core Web Vitals dan indeksasi tetap optimal.
+            Tidak. Implementasi Cloudflare Turnstile di toko kami dirancang ramah SEO: pemuatannya ditunda setelah tampilan utama (<em>first impression</em>) selesai dimuat dan otomatis dilewati bagi crawler mesin pencari seperti Googlebot sehingga skor Core Web Vitals dan indeksasi tetap optimal.
           </p>
         </details>
 
