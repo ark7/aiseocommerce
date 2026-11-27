@@ -27,7 +27,7 @@ $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.lar
 <header class="lm-header" role="banner">
   <div class="lm-container lm-nav-wrap">
     <a href="<?php echo esc_url(home_url('/')); ?>" class="lm-brand">
-      <span class="lm-brand-icon" aria-hidden="true">L</span>
+      <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo.svg'); ?>" alt="" width="40" height="40" class="lm-brand-logo" aria-hidden="true" decoding="async">
       <span>LarisDari<span class="lm-brand-domain">.web.id</span></span>
     </a>
 

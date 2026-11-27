@@ -1,10 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#7c3aed"/>
+    <linearGradient id="favBg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="52%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#6d28d9"/>
     </linearGradient>
+    <mask id="favCutout">
+      <rect width="128" height="128" fill="#ffffff"/>
+      <path d="M 35 61 L 49 38 M 93 61 L 79 38" stroke="#000000" stroke-width="15" stroke-linecap="round"/>
+      <rect x="20" y="54" width="88" height="19" rx="9" fill="#000000"/>
+      <path d="M 27 67 L 101 67 L 94 94 Q 92 103 83 103 L 45 103 Q 36 103 34 94 Z" fill="#000000"/>
+    </mask>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
-  <text x="32" y="45" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="900" font-size="38" fill="#ffffff">L</text>
+  <rect width="64" height="64" rx="16" fill="url(#favBg)"/>
+  <g transform="translate(6, 6) scale(0.40625)">
+    <g mask="url(#favCutout)" fill="none" stroke="#e0e7ff" stroke-linecap="round">
+      <circle cx="64" cy="64" r="51" stroke-width="6.5"/>
+      <path d="M 64 13 Q 21 64 64 115" stroke-width="5"/>
+      <path d="M 64 13 Q 107 64 64 115" stroke-width="5"/>
+      <line x1="64" y1="13" x2="64" y2="115" stroke-width="5"/>
+      <line x1="13" y1="64" x2="115" y2="64" stroke-width="5"/>
+      <path d="M 19 40 Q 64 60 109 40" stroke-width="5"/>
+      <path d="M 19 88 Q 64 68 109 88" stroke-width="5"/>
+      <circle cx="44" cy="48" r="5.5" fill="#e0e7ff" stroke="none"/>
+      <circle cx="84" cy="48" r="5.5" fill="#e0e7ff" stroke="none"/>
+      <circle cx="44" cy="80" r="5.5" fill="#e0e7ff" stroke="none"/>
+      <circle cx="84" cy="80" r="5.5" fill="#e0e7ff" stroke="none"/>
+    </g>
+    <g>
+      <line x1="39" y1="59" x2="50.5" y2="40" stroke="#fbbf24" stroke-width="7.5" stroke-linecap="round"/>
+      <line x1="89" y1="59" x2="77.5" y2="40" stroke="#f59e0b" stroke-width="7.5" stroke-linecap="round"/>
+      <path d="M 32 69 L 96 69 L 90.5 92.5 Q 89 99 82 99 L 46 99 Q 39 99 37.5 92.5 Z" fill="#fbbf24"/>
+      <path d="M 67 69 L 96 69 L 90.5 92.5 Q 89 99 82 99 L 55 99 Q 63 87 67 69 Z" fill="#d97706" opacity="0.45"/>
+      <rect x="24" y="57.5" width="80" height="12.5" rx="6.25" fill="#fde68a"/>
+    </g>
+  </g>
 </svg>

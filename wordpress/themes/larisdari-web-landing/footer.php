@@ -19,7 +19,7 @@ $contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@
     <div class="lm-footer-grid">
       <div>
         <a href="<?php echo esc_url(home_url('/')); ?>" class="lm-brand" style="color:#ffffff; margin-bottom:14px;">
-          <span class="lm-brand-icon" aria-hidden="true">L</span>
+          <img src="<?php echo esc_url(get_template_directory_uri() . '/assets/images/logo-dark.svg'); ?>" alt="" width="40" height="40" class="lm-brand-logo" aria-hidden="true" decoding="async" loading="lazy">
           <span>LarisDari<span style="color:#818cf8;">.web.id</span></span>
         </a>
         <p style="margin:0; font-size:0.92rem; max-width:420px; color:#94a3b8;">

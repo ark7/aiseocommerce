@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISDARI_WEB_THEME_VERSION', '1.5.0');
+define('LARISDARI_WEB_THEME_VERSION', '1.6.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 
@@ -170,9 +170,10 @@ function larisdari_web_output_seo_head() {
     $url       = is_singular() ? get_permalink() : home_url('/');
     $demo_url  = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
     $theme_uri = get_template_directory_uri();
-    $fav_svg   = $theme_uri . '/assets/images/favicon.svg';
-    $fav_png   = $theme_uri . '/assets/images/favicon-180.png';
-    $og_image  = $theme_uri . '/assets/images/og-larisdari-web.png';
+    $ver       = '?ver=' . rawurlencode(LARISDARI_WEB_THEME_VERSION);
+    $fav_svg   = $theme_uri . '/assets/images/favicon.svg' . $ver;
+    $fav_png   = $theme_uri . '/assets/images/favicon-180.png' . $ver;
+    $og_image  = $theme_uri . '/assets/images/og-larisdari-web.png' . $ver;
 
     echo '<link rel="canonical" href="' . esc_url($url) . '">' . "\n";
     echo '<link rel="icon" href="' . esc_url($fav_svg) . '" type="image/svg+xml">' . "\n";
