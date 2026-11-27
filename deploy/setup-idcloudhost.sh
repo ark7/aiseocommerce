@@ -64,18 +64,18 @@ echo -e "${YELLOW}[4/6] Mengonfigurasi Nginx Reverse Proxy Dual Virtual Host...$
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-if [ ! -f /etc/nginx/ssl/larismanis.crt ] || [ ! -f /etc/nginx/ssl/larismanis.key ]; then
+if [ ! -f /etc/nginx/ssl/larisdari-web.crt ] || [ ! -f /etc/nginx/ssl/larisdari-web.key ]; then
   mkdir -p /etc/nginx/ssl
   openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/larismanis.key \
-    -out /etc/nginx/ssl/larismanis.crt \
+    -keyout /etc/nginx/ssl/larisdari-web.key \
+    -out /etc/nginx/ssl/larisdari-web.crt \
     -subj "/CN=larisdari.web.id/O=LarisDari/C=ID" \
-    -addext "subjectAltName=DNS:larisdari.web.id,DNS:*.larisdari.web.id,DNS:larismanis.online,DNS:*.larismanis.online" 2>/dev/null
+    -addext "subjectAltName=DNS:larisdari.web.id,DNS:*.larisdari.web.id" 2>/dev/null
 fi
 
 if [ -f "${APP_DIR}/nginx/idcloudhost-nginx.conf" ]; then
-  cp "${APP_DIR}/nginx/idcloudhost-nginx.conf" /etc/nginx/sites-available/larismanis.conf
-  ln -sf /etc/nginx/sites-available/larismanis.conf /etc/nginx/sites-enabled/larismanis.conf
+  cp "${APP_DIR}/nginx/idcloudhost-nginx.conf" /etc/nginx/sites-available/larisdari-web.conf
+  ln -sf /etc/nginx/sites-available/larisdari-web.conf /etc/nginx/sites-enabled/larisdari-web.conf
   rm -f /etc/nginx/sites-enabled/default
   nginx -t
   systemctl restart nginx

@@ -472,7 +472,6 @@ function generateSlug(name: string): string {
 
 const DEMO_SEED_ALLOWED_DOMAINS = new Set([
   'demo.larisdari.web.id',
-  'demo.larismanis.online',
   'demo-store.local',
 ]);
 
@@ -495,7 +494,7 @@ async function main() {
   // 1. Clean existing demo store data
   console.log('🧹 Membersihkan data demo lama...');
   const demoStore = await prisma.store.findFirst({ 
-    where: { OR: [{ domain: STORE_DOMAIN }, { domain: 'demo-store.local' }, { domain: 'demo.larisdari.web.id' }, { domain: 'demo.larismanis.online' }] } 
+    where: { OR: [{ domain: STORE_DOMAIN }, { domain: 'demo-store.local' }, { domain: 'demo.larisdari.web.id' }] } 
   });
   
   if (demoStore) {

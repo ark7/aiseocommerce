@@ -126,7 +126,7 @@ Setelah script selesai berjalan:
 2. Halaman wizard instalasi WordPress akan muncul:
    - **Pilih Bahasa:** Bahasa Indonesia / English.
    - **Judul Situs:** `LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda`
-   - **Nama Pengguna Admin:** `admin_larismanis` (atau sesuai pilihan Anda)
+   - **Nama Pengguna Admin:** `admin_larisdari_web` (atau sesuai pilihan Anda)
    - **Kata Sandi:** Masukkan kata sandi yang kuat.
    - **Email:** Email kontak Anda.
 3. Klik **Install WordPress**.

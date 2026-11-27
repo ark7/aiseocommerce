@@ -2,16 +2,16 @@
 /**
  * Theme Footer Template
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-$demo_url       = larismanis_get_option('larismanis_demo_url', 'https://demo.larisdari.web.id');
-$demo_admin_url = larismanis_get_option('larismanis_demo_admin_url', 'https://demo.larisdari.web.id/login');
-$contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larisdari.web.id');
+$demo_url       = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+$demo_admin_url = larisdari_web_get_option('larisdari_web_demo_admin_url', 'https://demo.larisdari.web.id/login');
+$contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@larisdari.web.id');
 ?>
 
 <footer class="lm-footer" role="contentinfo">
@@ -45,7 +45,6 @@ $contact_email  = larismanis_get_option('larismanis_contact_email', 'halo@larisd
           <li><a href="#pesan">Form Pemesanan Lisensi</a></li>
           <li><a href="#faq">FAQ</a></li>
           <li><a href="mailto:<?php echo esc_attr($contact_email); ?>"><?php echo esc_html($contact_email); ?></a></li>
-          <li><a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-leads')); ?>">Login CMS Admin</a></li>
         </ul>
       </div>
     </div>

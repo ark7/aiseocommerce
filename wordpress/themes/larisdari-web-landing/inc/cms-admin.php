@@ -5,23 +5,23 @@
  * - WP Admin Menu: Data Pemesanan + Klik to Chat WA + Export CSV
  * - WP Admin Menu: Pixel & Analytics Indonesia (GTM, Google Ads, GA4, Meta Pixel, TikTok Pixel)
  *
- * @package larismanis-landing
+ * @package larisdari-web-landing
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISMANIS_ANALYTICS_OPTION', 'larismanis_analytics_options');
+define('LARISDARI_WEB_ANALYTICS_OPTION', 'larisdari_web_analytics_options');
 
 /**
  * Registers internal Custom Post Type `lm_lead` to store landing page orders cleanly.
  */
-function larismanis_register_lead_cpt() {
+function larisdari_web_register_lead_cpt() {
     register_post_type('lm_lead', array(
         'labels' => array(
-            'name'          => __('Data Pemesanan', 'larismanis-landing'),
-            'singular_name' => __('Pesanan Masuk', 'larismanis-landing'),
+            'name'          => __('Data Pemesanan', 'larisdari-web-landing'),
+            'singular_name' => __('Pesanan Masuk', 'larisdari-web-landing'),
         ),
         'public'              => false,
         'show_ui'             => false,
@@ -32,12 +32,12 @@ function larismanis_register_lead_cpt() {
         'supports'            => array('title'),
     ));
 }
-add_action('init', 'larismanis_register_lead_cpt');
+add_action('init', 'larisdari_web_register_lead_cpt');
 
 /**
  * Returns status label metadata map.
  */
-function larismanis_get_lead_statuses() {
+function larisdari_web_get_lead_statuses() {
     return array(
         'BARU'      => array('label' => 'Baru Masuk', 'bg' => '#eef2ff', 'color' => '#4338ca'),
         'DIHUBUNGI' => array('label' => 'Sudah Dihubungi', 'bg' => '#e0f2fe', 'color' => '#0369a1'),
@@ -51,7 +51,7 @@ function larismanis_get_lead_statuses() {
  * Normalizes a lead's phone number into an Indonesian Click-to-Chat WhatsApp URL (`wa.me/62...`)
  * pre-filled with a polite follow-up greeting mentioning their name & brand.
  */
-function larismanis_format_wa_click_url($phone, $name = '', $brand = '', $domain = '') {
+function larisdari_web_format_wa_click_url($phone, $name = '', $brand = '', $domain = '') {
     $digits = preg_replace('/[^0-9]/', '', (string) $phone);
     if ($digits === '') {
         return '';
@@ -74,7 +74,7 @@ function larismanis_format_wa_click_url($phone, $name = '', $brand = '', $domain
 /**
  * Prevents CSV spreadsheet formula injection when exporting user-submitted values.
  */
-function larismanis_csv_safe_cell($value) {
+function larisdari_web_csv_safe_cell($value) {
     $str = (string) $value;
     if ($str !== '' && in_array($str[0], array('=', '+', '-', '@', "\t", "\r"), true)) {
         return "'" . $str;
@@ -85,10 +85,10 @@ function larismanis_csv_safe_cell($value) {
 /**
  * Handles public submission of the #pesan Order/Consultation form.
  */
-function larismanis_handle_submit_lead() {
+function larisdari_web_handle_submit_lead() {
     if (
-        !isset($_POST['larismanis_submit_lead_nonce']) ||
-        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['larismanis_submit_lead_nonce'])), 'larismanis_submit_lead_action')
+        !isset($_POST['larisdari_web_submit_lead_nonce']) ||
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['larisdari_web_submit_lead_nonce'])), 'larisdari_web_submit_lead_action')
     ) {
         wp_safe_redirect(add_query_arg('lead_error', 'nonce', home_url('/')) . '#pesan');
         exit;
@@ -143,27 +143,27 @@ function larismanis_handle_submit_lead() {
     wp_safe_redirect(add_query_arg('lead_submitted', '1', home_url('/')) . '#pesan');
     exit;
 }
-add_action('admin_post_nopriv_larismanis_submit_lead', 'larismanis_handle_submit_lead');
-add_action('admin_post_larismanis_submit_lead', 'larismanis_handle_submit_lead');
+add_action('admin_post_nopriv_larisdari_web_submit_lead', 'larisdari_web_handle_submit_lead');
+add_action('admin_post_larisdari_web_submit_lead', 'larisdari_web_handle_submit_lead');
 
 /**
  * Handles status update for a lead from the CMS admin table.
  */
-function larismanis_handle_update_lead_status() {
+function larisdari_web_handle_update_lead_status() {
     if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('Akses ditolak.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Akses ditolak.', 'larisdari-web-landing'), 403);
     }
 
     $lead_id = isset($_POST['lead_id']) ? absint($_POST['lead_id']) : 0;
     if (
         !$lead_id ||
         !isset($_POST['_wpnonce']) ||
-        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'larismanis_lead_action_' . $lead_id)
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'larisdari_web_lead_action_' . $lead_id)
     ) {
-        wp_die(esc_html__('Token keamanan tidak valid.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Token keamanan tidak valid.', 'larisdari-web-landing'), 403);
     }
 
-    $statuses   = larismanis_get_lead_statuses();
+    $statuses   = larisdari_web_get_lead_statuses();
     $new_status = isset($_POST['status']) ? sanitize_text_field(wp_unslash($_POST['status'])) : 'BARU';
     if (!isset($statuses[$new_status])) {
         $new_status = 'BARU';
@@ -173,50 +173,50 @@ function larismanis_handle_update_lead_status() {
         update_post_meta($lead_id, '_lm_status', $new_status);
     }
 
-    wp_safe_redirect(add_query_arg(array('page' => 'larismanis-leads', 'updated' => '1'), admin_url('admin.php')));
+    wp_safe_redirect(add_query_arg(array('page' => 'larisdari-web-leads', 'updated' => '1'), admin_url('admin.php')));
     exit;
 }
-add_action('admin_post_larismanis_update_lead_status', 'larismanis_handle_update_lead_status');
+add_action('admin_post_larisdari_web_update_lead_status', 'larisdari_web_handle_update_lead_status');
 
 /**
  * Handles deleting a lead from the CMS admin table.
  */
-function larismanis_handle_delete_lead() {
+function larisdari_web_handle_delete_lead() {
     if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('Akses ditolak.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Akses ditolak.', 'larisdari-web-landing'), 403);
     }
 
     $lead_id = isset($_GET['lead_id']) ? absint($_GET['lead_id']) : 0;
     if (
         !$lead_id ||
         !isset($_GET['_wpnonce']) ||
-        !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'larismanis_delete_lead_' . $lead_id)
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'larisdari_web_delete_lead_' . $lead_id)
     ) {
-        wp_die(esc_html__('Token keamanan tidak valid.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Token keamanan tidak valid.', 'larisdari-web-landing'), 403);
     }
 
     if (get_post_type($lead_id) === 'lm_lead') {
         wp_delete_post($lead_id, true);
     }
 
-    wp_safe_redirect(add_query_arg(array('page' => 'larismanis-leads', 'deleted' => '1'), admin_url('admin.php')));
+    wp_safe_redirect(add_query_arg(array('page' => 'larisdari-web-leads', 'deleted' => '1'), admin_url('admin.php')));
     exit;
 }
-add_action('admin_post_larismanis_delete_lead', 'larismanis_handle_delete_lead');
+add_action('admin_post_larisdari_web_delete_lead', 'larisdari_web_handle_delete_lead');
 
 /**
  * Exports all stored leads to CSV for spreadsheet follow-up.
  */
-function larismanis_handle_export_leads_csv() {
+function larisdari_web_handle_export_leads_csv() {
     if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('Akses ditolak.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Akses ditolak.', 'larisdari-web-landing'), 403);
     }
 
     if (
         !isset($_GET['_wpnonce']) ||
-        !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'larismanis_export_leads_csv')
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'larisdari_web_export_leads_csv')
     ) {
-        wp_die(esc_html__('Token keamanan tidak valid.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Token keamanan tidak valid.', 'larisdari-web-landing'), 403);
     }
 
     $leads = get_posts(array(
@@ -240,31 +240,31 @@ function larismanis_handle_export_leads_csv() {
         $domain = get_post_meta($lead->ID, '_lm_custom_domain', true);
 
         fputcsv($out, array(
-            larismanis_csv_safe_cell(get_the_date('Y-m-d H:i', $lead)),
-            larismanis_csv_safe_cell($name),
-            larismanis_csv_safe_cell($brand),
-            larismanis_csv_safe_cell($wa),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_email', true)),
-            larismanis_csv_safe_cell($domain),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_business_category', true)),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_notes', true)),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_source', true)),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_medium', true)),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_campaign', true)),
-            larismanis_csv_safe_cell(get_post_meta($lead->ID, '_lm_status', true) ?: 'BARU'),
-            larismanis_csv_safe_cell(larismanis_format_wa_click_url($wa, $name, $brand, $domain)),
+            larisdari_web_csv_safe_cell(get_the_date('Y-m-d H:i', $lead)),
+            larisdari_web_csv_safe_cell($name),
+            larisdari_web_csv_safe_cell($brand),
+            larisdari_web_csv_safe_cell($wa),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_email', true)),
+            larisdari_web_csv_safe_cell($domain),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_business_category', true)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_notes', true)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_source', true)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_medium', true)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_campaign', true)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_status', true) ?: 'BARU'),
+            larisdari_web_csv_safe_cell(larisdari_web_format_wa_click_url($wa, $name, $brand, $domain)),
         ));
     }
 
     fclose($out);
     exit;
 }
-add_action('admin_post_larismanis_export_leads_csv', 'larismanis_handle_export_leads_csv');
+add_action('admin_post_larisdari_web_export_leads_csv', 'larisdari_web_handle_export_leads_csv');
 
 /**
  * Registers the top-level "LarisDari CMS" admin menu with Leads & Pixel/Analytics submenus.
  */
-function larismanis_register_admin_menus() {
+function larisdari_web_register_admin_menus() {
     $new_leads = get_posts(array(
         'post_type'      => 'lm_lead',
         'post_status'    => 'publish',
@@ -281,44 +281,44 @@ function larismanis_register_admin_menus() {
     $badge     = $new_count > 0 ? ' <span class="awaiting-mod count-' . $new_count . '"><span class="pending-count">' . $new_count . '</span></span>' : '';
 
     add_menu_page(
-        __('LarisDari CMS', 'larismanis-landing'),
-        'LarisDari CMS' . $badge,
+        __('Laris Dari Web CMS', 'larisdari-web-landing'),
+        'Laris Dari Web CMS' . $badge,
         'manage_options',
-        'larismanis-leads',
-        'larismanis_render_leads_page',
+        'larisdari-web-leads',
+        'larisdari_web_render_leads_page',
         'dashicons-store',
         3
     );
 
     add_submenu_page(
-        'larismanis-leads',
-        __('Data Pemesanan & Leads', 'larismanis-landing'),
+        'larisdari-web-leads',
+        __('Data Pemesanan & Leads', 'larisdari-web-landing'),
         '📋 Data Pemesanan' . $badge,
         'manage_options',
-        'larismanis-leads',
-        'larismanis_render_leads_page'
+        'larisdari-web-leads',
+        'larisdari_web_render_leads_page'
     );
 
     add_submenu_page(
-        'larismanis-leads',
-        __('Pixel & Analytics Indonesia', 'larismanis-landing'),
+        'larisdari-web-leads',
+        __('Pixel & Analytics Indonesia', 'larisdari-web-landing'),
         '📊 Pixel & Analytics',
         'manage_options',
-        'larismanis-analytics',
-        'larismanis_render_analytics_page'
+        'larisdari-web-analytics',
+        'larisdari_web_render_analytics_page'
     );
 }
-add_action('admin_menu', 'larismanis_register_admin_menus');
+add_action('admin_menu', 'larisdari_web_register_admin_menus');
 
 /**
  * Renders the "Data Pemesanan & Leads" page inside WP Admin with 1-click Chat WA buttons.
  */
-function larismanis_render_leads_page() {
+function larisdari_web_render_leads_page() {
     if (!current_user_can('manage_options')) {
         return;
     }
 
-    $statuses      = larismanis_get_lead_statuses();
+    $statuses      = larisdari_web_get_lead_statuses();
     $filter_status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : 'ALL';
     $search_query  = isset($_GET['s']) ? trim(sanitize_text_field(wp_unslash($_GET['s']))) : '';
 
@@ -366,7 +366,7 @@ function larismanis_render_leads_page() {
         $filtered_leads[] = $lead;
     }
 
-    $export_url = wp_nonce_url(admin_url('admin-post.php?action=larismanis_export_leads_csv'), 'larismanis_export_leads_csv');
+    $export_url = wp_nonce_url(admin_url('admin-post.php?action=larisdari_web_export_leads_csv'), 'larisdari_web_export_leads_csv');
     ?>
     <div class="wrap">
       <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px;">
@@ -376,7 +376,7 @@ function larismanis_render_leads_page() {
         </div>
         <div style="display:flex; gap:8px;">
           <a href="<?php echo esc_url($export_url); ?>" class="button button-secondary">📥 Export CSV</a>
-          <a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-analytics')); ?>" class="button button-primary">📊 Atur Pixel &amp; Analytics</a>
+          <a href="<?php echo esc_url(admin_url('admin.php?page=larisdari-web-analytics')); ?>" class="button button-primary">📊 Atur Pixel &amp; Analytics</a>
         </div>
       </div>
 
@@ -411,7 +411,7 @@ function larismanis_render_leads_page() {
       <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;">
         <ul class="subsubsub" style="margin:0;">
           <li>
-            <a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-leads&status=ALL')); ?>" class="<?php echo $filter_status === 'ALL' ? 'current' : ''; ?>">
+            <a href="<?php echo esc_url(admin_url('admin.php?page=larisdari-web-leads&status=ALL')); ?>" class="<?php echo $filter_status === 'ALL' ? 'current' : ''; ?>">
               Semua <span class="count">(<?php echo esc_html((string) $counts['ALL']); ?>)</span>
             </a> |
           </li>
@@ -422,7 +422,7 @@ function larismanis_render_leads_page() {
               $sep = ($idx < count($status_keys) - 1) ? ' |' : '';
               ?>
               <li>
-                <a href="<?php echo esc_url(admin_url('admin.php?page=larismanis-leads&status=' . $st_key)); ?>" class="<?php echo $filter_status === $st_key ? 'current' : ''; ?>">
+                <a href="<?php echo esc_url(admin_url('admin.php?page=larisdari-web-leads&status=' . $st_key)); ?>" class="<?php echo $filter_status === $st_key ? 'current' : ''; ?>">
                   <?php echo esc_html($st_info['label']); ?> <span class="count">(<?php echo esc_html((string) $counts[$st_key]); ?>)</span>
                 </a><?php echo esc_html($sep); ?>
               </li>
@@ -430,7 +430,7 @@ function larismanis_render_leads_page() {
         </ul>
 
         <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>" style="display:flex; gap:6px;">
-          <input type="hidden" name="page" value="larismanis-leads">
+          <input type="hidden" name="page" value="larisdari-web-leads">
           <input type="hidden" name="status" value="<?php echo esc_attr($filter_status); ?>">
           <input type="search" name="s" value="<?php echo esc_attr($search_query); ?>" placeholder="Cari nama, brand, atau nomor WA..." class="regular-text" style="width:240px;">
           <button type="submit" class="button">Cari</button>
@@ -470,8 +470,8 @@ function larismanis_render_leads_page() {
                 $utm_camp    = get_post_meta($lead->ID, '_lm_utm_campaign', true);
                 $status      = get_post_meta($lead->ID, '_lm_status', true) ?: 'BARU';
                 $status_meta = isset($statuses[$status]) ? $statuses[$status] : $statuses['BARU'];
-                $wa_url      = larismanis_format_wa_click_url($whatsapp, $full_name, $brand_name, $domain);
-                $del_url     = wp_nonce_url(admin_url('admin-post.php?action=larismanis_delete_lead&lead_id=' . $lead->ID), 'larismanis_delete_lead_' . $lead->ID);
+                $wa_url      = larisdari_web_format_wa_click_url($whatsapp, $full_name, $brand_name, $domain);
+                $del_url     = wp_nonce_url(admin_url('admin-post.php?action=larisdari_web_delete_lead&lead_id=' . $lead->ID), 'larisdari_web_delete_lead_' . $lead->ID);
                 ?>
                 <tr>
                   <td>
@@ -509,9 +509,9 @@ function larismanis_render_leads_page() {
                       <?php echo esc_html($status_meta['label']); ?>
                     </span>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex; gap:4px;">
-                      <input type="hidden" name="action" value="larismanis_update_lead_status">
+                      <input type="hidden" name="action" value="larisdari_web_update_lead_status">
                       <input type="hidden" name="lead_id" value="<?php echo esc_attr((string) $lead->ID); ?>">
-                      <?php wp_nonce_field('larismanis_lead_action_' . $lead->ID); ?>
+                      <?php wp_nonce_field('larisdari_web_lead_action_' . $lead->ID); ?>
                       <select name="status" style="font-size:12px; max-width:110px;">
                         <?php foreach ($statuses as $k => $info) : ?>
                           <option value="<?php echo esc_attr($k); ?>" <?php selected($status, $k); ?>>
@@ -556,16 +556,16 @@ function larismanis_render_leads_page() {
 /**
  * Handles saving Pixel & Analytics settings from WP Admin.
  */
-function larismanis_handle_save_analytics() {
+function larisdari_web_handle_save_analytics() {
     if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('Akses ditolak.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Akses ditolak.', 'larisdari-web-landing'), 403);
     }
 
     if (
-        !isset($_POST['larismanis_analytics_nonce']) ||
-        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['larismanis_analytics_nonce'])), 'larismanis_save_analytics_action')
+        !isset($_POST['larisdari_web_analytics_nonce']) ||
+        !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['larisdari_web_analytics_nonce'])), 'larisdari_web_save_analytics_action')
     ) {
-        wp_die(esc_html__('Token keamanan tidak valid.', 'larismanis-landing'), 403);
+        wp_die(esc_html__('Token keamanan tidak valid.', 'larisdari-web-landing'), 403);
     }
 
     $options = array(
@@ -580,22 +580,22 @@ function larismanis_handle_save_analytics() {
         'custom_head_script'      => isset($_POST['custom_head_script']) ? trim((string) wp_unslash($_POST['custom_head_script'])) : '',
     );
 
-    update_option(LARISMANIS_ANALYTICS_OPTION, $options);
+    update_option(LARISDARI_WEB_ANALYTICS_OPTION, $options);
 
-    wp_safe_redirect(add_query_arg(array('page' => 'larismanis-analytics', 'saved' => '1'), admin_url('admin.php')));
+    wp_safe_redirect(add_query_arg(array('page' => 'larisdari-web-analytics', 'saved' => '1'), admin_url('admin.php')));
     exit;
 }
-add_action('admin_post_larismanis_save_analytics', 'larismanis_handle_save_analytics');
+add_action('admin_post_larisdari_web_save_analytics', 'larisdari_web_handle_save_analytics');
 
 /**
  * Renders the "Pixel & Analytics Indonesia" settings page inside WP Admin.
  */
-function larismanis_render_analytics_page() {
+function larisdari_web_render_analytics_page() {
     if (!current_user_can('manage_options')) {
         return;
     }
 
-    $opt = get_option(LARISMANIS_ANALYTICS_OPTION, array());
+    $opt = get_option(LARISDARI_WEB_ANALYTICS_OPTION, array());
     if (!is_array($opt)) {
         $opt = array();
     }
@@ -621,8 +621,8 @@ function larismanis_render_analytics_page() {
       <?php endif; ?>
 
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:24px; margin-top:16px;">
-        <input type="hidden" name="action" value="larismanis_save_analytics">
-        <?php wp_nonce_field('larismanis_save_analytics_action', 'larismanis_analytics_nonce'); ?>
+        <input type="hidden" name="action" value="larisdari_web_save_analytics">
+        <?php wp_nonce_field('larisdari_web_save_analytics_action', 'larisdari_web_analytics_nonce'); ?>
 
         <h2 style="margin-top:0; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">1. Google Tag Manager &amp; Google Ecosystem</h2>
         <table class="form-table" role="presentation">
@@ -633,7 +633,7 @@ function larismanis_render_analytics_page() {
             </th>
             <td>
               <input name="gtm_id" id="gtm_id" type="text" value="<?php echo esc_attr($val('gtm_id')); ?>" class="regular-text" placeholder="GTM-XXXXXXX">
-              <p class="description">Otomatis menyuntikkan script GTM di <code>&lt;head&gt;</code> &amp; <code>&lt;body&gt;</code>, serta mengirim <code>dataLayer.push({ event: 'larismanis_lead_submitted' })</code> saat form disubmit.</p>
+              <p class="description">Otomatis menyuntikkan script GTM di <code>&lt;head&gt;</code> &amp; <code>&lt;body&gt;</code>, serta mengirim <code>dataLayer.push({ event: 'larisdari_web_lead_submitted' })</code> saat form disubmit.</p>
             </td>
           </tr>
           <tr>
@@ -725,12 +725,12 @@ function larismanis_render_analytics_page() {
 /**
  * Outputs configured GTM, GA4, Google Ads, Meta Pixel, TikTok Pixel, and conversion events in <head>.
  */
-function larismanis_inject_analytics_head() {
+function larisdari_web_inject_analytics_head() {
     if (is_admin()) {
         return;
     }
 
-    $opt = get_option(LARISMANIS_ANALYTICS_OPTION, array());
+    $opt = get_option(LARISDARI_WEB_ANALYTICS_OPTION, array());
     if (!is_array($opt)) {
         return;
     }
@@ -758,12 +758,12 @@ function larismanis_inject_analytics_head() {
 <script>
 window.dataLayer = window.dataLayer || [];
 <?php if ($lead_success) : ?>
-window.dataLayer.push({ event: 'larismanis_lead_submitted', currency: 'IDR', value: 3000000 });
+window.dataLayer.push({ event: 'larisdari_web_lead_submitted', currency: 'IDR', value: 3000000 });
 <?php endif; ?>
 (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','<?php echo esc_js($gtm_id); ?>');
 </script>
     <?php elseif ($lead_success) : ?>
-<script>window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: 'larismanis_lead_submitted', currency: 'IDR', value: 3000000 });</script>
+<script>window.dataLayer = window.dataLayer || []; window.dataLayer.push({ event: 'larisdari_web_lead_submitted', currency: 'IDR', value: 3000000 });</script>
     <?php endif;
 
     // Google Analytics 4 + Google Ads (gtag.js)
@@ -819,19 +819,19 @@ fbq('track', 'Lead', { content_name: 'Lisensi Website LarisDari.web.id', currenc
         echo $custom_script . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
     }
 }
-add_action('wp_head', 'larismanis_inject_analytics_head', 20);
+add_action('wp_head', 'larisdari_web_inject_analytics_head', 20);
 
 /**
  * Outputs GTM <noscript> fallback directly after <body> opens.
  */
-function larismanis_inject_gtm_noscript() {
+function larisdari_web_inject_gtm_noscript() {
     if (is_admin()) {
         return;
     }
-    $opt = get_option(LARISMANIS_ANALYTICS_OPTION, array());
+    $opt = get_option(LARISDARI_WEB_ANALYTICS_OPTION, array());
     $gtm_id = (is_array($opt) && !empty($opt['gtm_id'])) ? trim((string) $opt['gtm_id']) : '';
     if ($gtm_id !== '') {
         echo '<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=' . esc_attr($gtm_id) . '" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>' . "\n";
     }
 }
-add_action('wp_body_open', 'larismanis_inject_gtm_noscript');
+add_action('wp_body_open', 'larisdari_web_inject_gtm_noscript');
