@@ -39,9 +39,9 @@ RUN adduser --system --uid 1001 nextjs
 # Copy public folder & static assets
 COPY --from=builder /app/public ./public
 
-# Set permissions for cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+# Set permissions for cache and persistent proof storage
+RUN mkdir -p .next /app/storage/proofs
+RUN chown nextjs:nodejs .next && chown -R nextjs:nodejs /app/storage
 
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
