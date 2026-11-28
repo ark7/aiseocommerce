@@ -28,11 +28,20 @@ if ! ${DOCKER_CMD} ps --format '{{.Names}}' | grep -qx "${CONTAINER_NAME}"; then
   exit 1
 fi
 
-echo "[1/3] Syncing theme files into ${CONTAINER_NAME}..."
-tar -C "${THEME_SRC}" -cf - . | ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" bash -c \
-  "mkdir -p /var/www/html/wp-content/themes/${TARGET_THEME} && tar -xf - -C /var/www/html/wp-content/themes/${TARGET_THEME} && chown -R www-data:www-data /var/www/html/wp-content/themes/${TARGET_THEME}"
+echo "[1/4] Syncing theme files into ${CONTAINER_NAME}..."
+THEME_MOUNT_TYPE="$(${DOCKER_CMD} inspect "${CONTAINER_NAME}" --format "{{range .Mounts}}{{if eq .Destination \"/var/www/html/wp-content/themes/${TARGET_THEME}\"}}{{.Type}}{{end}}{{end}}" || true)"
+if [ "${THEME_MOUNT_TYPE}" = "bind" ]; then
+  chmod -R a+rX "${THEME_SRC}"
+  echo "[INFO] Bind mount active at /var/www/html/wp-content/themes/${TARGET_THEME}; permissions synced without self-untar."
+else
+  TMP_THEME_TAR="$(mktemp /tmp/wp-theme-XXXXXX.tar)"
+  tar -C "${THEME_SRC}" -cf "${TMP_THEME_TAR}" .
+  ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" bash -c \
+    "mkdir -p /var/www/html/wp-content/themes/${TARGET_THEME} && tar -xf - -C /var/www/html/wp-content/themes/${TARGET_THEME} && chown -R www-data:www-data /var/www/html/wp-content/themes/${TARGET_THEME}" < "${TMP_THEME_TAR}"
+  rm -f "${TMP_THEME_TAR}"
+fi
 
-echo "[2/3] Ensuring WordPress core is initialized and activating theme '${TARGET_THEME}'..."
+echo "[2/4] Ensuring WordPress core is initialized and activating theme '${TARGET_THEME}'..."
 ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" php <<'PHP'
 <?php
 $_SERVER['HTTP_HOST'] = 'larisdari.web.id';
