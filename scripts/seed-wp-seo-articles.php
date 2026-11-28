@@ -171,11 +171,11 @@ foreach ($articles as $item) {
     }
     $cat_id = is_array($term) && isset($term['term_id']) ? (int) $term['term_id'] : (int) get_option('default_category', 1);
 
-    // Find existing post by slug
+    // Find existing post by slug (including scheduled 'future' posts from clock skew)
     $existing_posts = get_posts(array(
         'name'        => $slug,
         'post_type'   => 'post',
-        'post_status' => array('publish', 'draft', 'pending', 'private'),
+        'post_status' => array('publish', 'future', 'draft', 'pending', 'private'),
         'numberposts' => 1,
     ));
 
@@ -186,6 +186,7 @@ foreach ($articles as $item) {
         'post_excerpt'  => $seo_desc,
         'post_content'  => $content,
         'post_status'   => 'publish',
+        'edit_date'     => true,
         'post_author'   => 1,
         'post_date'     => $pub_date,
         'post_date_gmt' => get_gmt_from_date($pub_date),
