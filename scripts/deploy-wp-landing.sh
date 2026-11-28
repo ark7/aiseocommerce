@@ -125,7 +125,14 @@ echo wp_json_encode(array(
 ), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
 PHP
 
-echo "[3/3] Verifying local WordPress response on http://127.0.0.1:8080/..."
+echo "[3/4] Seeding 10 StoryBrand SEO articles & cleaning boilerplate sitemap items..."
+if [ -f "${REPO_ROOT}/wordpress/content/seo-articles.json" ] && [ -f "${REPO_ROOT}/scripts/seed-wp-seo-articles.php" ]; then
+  ${DOCKER_CMD} cp "${REPO_ROOT}/wordpress/content/seo-articles.json" "${CONTAINER_NAME}:/tmp/seo-articles.json"
+  ${DOCKER_CMD} exec -i "${CONTAINER_NAME}" php < "${REPO_ROOT}/scripts/seed-wp-seo-articles.php"
+  ${DOCKER_CMD} exec "${CONTAINER_NAME}" rm -f /tmp/seo-articles.json
+fi
+
+echo "[4/4] Verifying local WordPress response on http://127.0.0.1:8080/..."
 if command -v curl >/dev/null 2>&1; then
   TMP_HTML="$(mktemp)"
   curl -fsS -H "Host: larisdari.web.id" -H "X-Forwarded-Proto: https" http://127.0.0.1:8080/ -o "${TMP_HTML}"

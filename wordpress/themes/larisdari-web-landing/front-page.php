@@ -484,6 +484,66 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
     </div>
   </section>
 
+  <!-- 7B. SEO BLOG & PLAYBOOK CLUSTER -->
+  <?php
+  $latest_articles = new WP_Query(array(
+      'post_type'           => 'post',
+      'post_status'         => 'publish',
+      'posts_per_page'      => 3,
+      'ignore_sticky_posts' => true,
+  ));
+  if ($latest_articles->have_posts()) : ?>
+    <section id="panduan" class="lm-section" style="padding-top:24px;">
+      <div class="lm-container">
+        <div class="lm-section-header" style="margin-bottom:36px;">
+          <span class="lm-eyebrow">Playbook Penjualan &amp; Web Commerce</span>
+          <h2>Strategi Terbaru Meningkatkan Penjualan Brand Anda</h2>
+          <p>Pelajari cara mengelola omnichannel marketplace, iklan sosial media, harga grosir B2B, dan SEO toko online langsung dari ahlinya.</p>
+        </div>
+
+        <div class="lm-article-grid">
+          <?php while ($latest_articles->have_posts()) : $latest_articles->the_post(); ?>
+            <?php
+            $art_id    = get_the_ID();
+            $art_cats  = get_the_category($art_id);
+            $art_cat   = !empty($art_cats) ? $art_cats[0] : null;
+            $art_thumb = get_the_post_thumbnail_url($art_id, 'medium_large');
+            $art_alt   = (string) get_post_meta(get_post_thumbnail_id($art_id), '_wp_attachment_image_alt', true);
+            if (trim($art_alt) === '') {
+                $art_alt = get_the_title();
+            }
+            $art_mins  = larisdari_web_reading_time(get_post_field('post_content', $art_id));
+            ?>
+            <article class="lm-article-card">
+              <a href="<?php the_permalink(); ?>" class="lm-article-thumb-wrap" tabindex="-1" aria-hidden="true">
+                <?php if ($art_thumb) : ?>
+                  <img src="<?php echo esc_url($art_thumb); ?>" alt="<?php echo esc_attr($art_alt); ?>" width="1200" height="675" class="lm-article-thumb" loading="lazy" decoding="async">
+                <?php endif; ?>
+              </a>
+              <div class="lm-article-card-body">
+                <?php if ($art_cat) : ?>
+                  <span class="lm-cat-badge is-small"><?php echo esc_html($art_cat->name); ?></span>
+                <?php endif; ?>
+                <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+                <p><?php echo esc_html(wp_trim_words(wp_strip_all_tags(get_the_excerpt()), 20, '...')); ?></p>
+                <div class="lm-article-card-foot">
+                  <span><?php echo esc_html((string) $art_mins); ?> menit baca</span>
+                  <a href="<?php the_permalink(); ?>" class="lm-read-more">Baca Panduan &rarr;</a>
+                </div>
+              </div>
+            </article>
+          <?php endwhile; wp_reset_postdata(); ?>
+        </div>
+
+        <div style="text-align:center; margin-top:32px;">
+          <a href="<?php echo esc_url(home_url('/artikel/')); ?>" class="lm-btn lm-btn-outline lm-btn-lg">
+            Lihat Seluruh 10 Panduan Strategi &rarr;
+          </a>
+        </div>
+      </div>
+    </section>
+  <?php endif; ?>
+
   <!-- 8. FAQ & FINAL CTA -->
   <section id="faq" class="lm-section lm-section-alt">
     <div class="lm-container">
