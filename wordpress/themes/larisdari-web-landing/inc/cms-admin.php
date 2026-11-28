@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('LARISDARI_WEB_ANALYTICS_OPTION', 'larisdari_web_analytics_options');
+define('LARISDARI_WEB_WEBHOOK_OPTION', 'larisdari_web_webhook_options');
 
 /**
  * Registers internal Custom Post Type `lm_lead` to store landing page orders cleanly.
@@ -107,10 +108,20 @@ function larisdari_web_handle_submit_lead() {
     $email             = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
     $custom_domain     = isset($_POST['custom_domain']) ? sanitize_text_field(wp_unslash($_POST['custom_domain'])) : '';
     $business_category = isset($_POST['business_category']) ? sanitize_text_field(wp_unslash($_POST['business_category'])) : '';
+    $license_plan_raw  = isset($_POST['license_plan']) ? strtoupper(sanitize_text_field(wp_unslash($_POST['license_plan']))) : 'OWNED';
+    $license_plan      = ($license_plan_raw === 'DEFERRED_6M') ? 'DEFERRED_6M' : 'OWNED';
+    $infra_tier_raw    = isset($_POST['infra_tier']) ? strtoupper(sanitize_text_field(wp_unslash($_POST['infra_tier']))) : 'SHARED';
+    $infra_tier        = ($infra_tier_raw === 'DEDICATED') ? 'DEDICATED' : 'SHARED';
     $notes             = isset($_POST['notes']) ? sanitize_textarea_field(wp_unslash($_POST['notes'])) : '';
     $utm_source        = isset($_POST['utm_source']) ? sanitize_text_field(wp_unslash($_POST['utm_source'])) : '';
     $utm_medium        = isset($_POST['utm_medium']) ? sanitize_text_field(wp_unslash($_POST['utm_medium'])) : '';
     $utm_campaign      = isset($_POST['utm_campaign']) ? sanitize_text_field(wp_unslash($_POST['utm_campaign'])) : '';
+
+    if ($license_plan === 'OWNED') {
+        $initial_amount = ($infra_tier === 'DEDICATED') ? 3350000 : 3150000;
+    } else {
+        $initial_amount = ($infra_tier === 'DEDICATED') ? 450000 : 200000;
+    }
 
     if ($full_name === '' || $whatsapp === '' || $brand_name === '') {
         wp_safe_redirect(add_query_arg('lead_error', 'required', home_url('/')) . '#pesan');
@@ -134,13 +145,68 @@ function larisdari_web_handle_submit_lead() {
     update_post_meta($post_id, '_lm_email', $email);
     update_post_meta($post_id, '_lm_custom_domain', $custom_domain);
     update_post_meta($post_id, '_lm_business_category', $business_category);
+    update_post_meta($post_id, '_lm_license_plan', $license_plan);
+    update_post_meta($post_id, '_lm_infra_tier', $infra_tier);
+    update_post_meta($post_id, '_lm_initial_amount', (string) $initial_amount);
     update_post_meta($post_id, '_lm_notes', $notes);
     update_post_meta($post_id, '_lm_utm_source', $utm_source);
     update_post_meta($post_id, '_lm_utm_medium', $utm_medium);
     update_post_meta($post_id, '_lm_utm_campaign', $utm_campaign);
     update_post_meta($post_id, '_lm_status', 'BARU');
 
-    wp_safe_redirect(add_query_arg('lead_submitted', '1', home_url('/')) . '#pesan');
+    // Sync to Next.js Control Plane Webhook when configured (graceful fallback if unreachable)
+    $order_code  = '';
+    $billing_url = '';
+    $webhook_opt = get_option(LARISDARI_WEB_WEBHOOK_OPTION, array());
+    $webhook_url = (is_array($webhook_opt) && !empty($webhook_opt['webhook_url'])) ? trim((string) $webhook_opt['webhook_url']) : '';
+    $webhook_sec = (is_array($webhook_opt) && !empty($webhook_opt['webhook_secret'])) ? trim((string) $webhook_opt['webhook_secret']) : '';
+
+    if ($webhook_url !== '') {
+        $resp = wp_remote_post($webhook_url, array(
+            'timeout' => 5,
+            'headers' => array(
+                'Content-Type'             => 'application/json',
+                'x-license-webhook-secret' => $webhook_sec,
+            ),
+            'body'    => wp_json_encode(array(
+                'customerName'     => $full_name,
+                'whatsapp'         => $whatsapp,
+                'brandName'        => $brand_name,
+                'email'            => $email,
+                'customDomain'     => $custom_domain,
+                'businessCategory' => $business_category,
+                'licensePlan'      => $license_plan,
+                'infraTier'        => $infra_tier,
+                'notes'            => $notes,
+                'utmSource'        => $utm_source,
+                'utmMedium'        => $utm_medium,
+                'utmCampaign'      => $utm_campaign,
+            )),
+        ));
+        if (!is_wp_error($resp) && wp_remote_retrieve_response_code($resp) >= 200 && wp_remote_retrieve_response_code($resp) < 300) {
+            $decoded = json_decode((string) wp_remote_retrieve_body($resp), true);
+            if (is_array($decoded)) {
+                $order_code  = isset($decoded['orderCode']) ? sanitize_text_field((string) $decoded['orderCode']) : '';
+                $billing_url = isset($decoded['billingUrl']) ? esc_url_raw((string) $decoded['billingUrl']) : '';
+                if ($order_code !== '') {
+                    update_post_meta($post_id, '_lm_order_code', $order_code);
+                }
+                if ($billing_url !== '') {
+                    update_post_meta($post_id, '_lm_billing_url', $billing_url);
+                }
+            }
+        }
+    }
+
+    $redirect_args = array('lead_submitted' => '1');
+    if ($order_code !== '') {
+        $redirect_args['order_code'] = $order_code;
+    }
+    if ($billing_url !== '') {
+        $redirect_args['billing_url'] = $billing_url;
+    }
+
+    wp_safe_redirect(add_query_arg($redirect_args, home_url('/')) . '#pesan');
     exit;
 }
 add_action('admin_post_nopriv_larisdari_web_submit_lead', 'larisdari_web_handle_submit_lead');
@@ -231,7 +297,7 @@ function larisdari_web_handle_export_leads_csv() {
     header('Content-Disposition: attachment; filename="larisdari-pemesanan-' . gmdate('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, array('Tanggal', 'Nama Lengkap', 'Nama Brand', 'Nomor WhatsApp', 'Email', 'Rencana Domain', 'Kategori Bisnis', 'Catatan', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Status', 'Link Chat WA'));
+    fputcsv($out, array('Tanggal', 'Kode Order', 'Nama Lengkap', 'Nama Brand', 'Skema Lisensi', 'Tier Server', 'Tagihan Awal', 'Nomor WhatsApp', 'Email', 'Rencana Domain', 'Kategori Bisnis', 'Catatan', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'Status', 'Portal Billing', 'Link Chat WA'));
 
     foreach ($leads as $lead) {
         $name   = get_post_meta($lead->ID, '_lm_full_name', true);
@@ -241,8 +307,12 @@ function larisdari_web_handle_export_leads_csv() {
 
         fputcsv($out, array(
             larisdari_web_csv_safe_cell(get_the_date('Y-m-d H:i', $lead)),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_order_code', true)),
             larisdari_web_csv_safe_cell($name),
             larisdari_web_csv_safe_cell($brand),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_license_plan', true) ?: 'OWNED'),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_infra_tier', true) ?: 'SHARED'),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_initial_amount', true)),
             larisdari_web_csv_safe_cell($wa),
             larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_email', true)),
             larisdari_web_csv_safe_cell($domain),
@@ -252,6 +322,7 @@ function larisdari_web_handle_export_leads_csv() {
             larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_medium', true)),
             larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_utm_campaign', true)),
             larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_status', true) ?: 'BARU'),
+            larisdari_web_csv_safe_cell(get_post_meta($lead->ID, '_lm_billing_url', true)),
             larisdari_web_csv_safe_cell(larisdari_web_format_wa_click_url($wa, $name, $brand, $domain)),
         ));
     }
@@ -465,6 +536,9 @@ function larisdari_web_render_leads_page() {
                 $email       = get_post_meta($lead->ID, '_lm_email', true);
                 $domain      = get_post_meta($lead->ID, '_lm_custom_domain', true);
                 $category    = get_post_meta($lead->ID, '_lm_business_category', true);
+                $l_plan      = get_post_meta($lead->ID, '_lm_license_plan', true) ?: 'OWNED';
+                $l_tier      = get_post_meta($lead->ID, '_lm_infra_tier', true) ?: 'SHARED';
+                $l_code      = get_post_meta($lead->ID, '_lm_order_code', true);
                 $notes       = get_post_meta($lead->ID, '_lm_notes', true);
                 $utm_source  = get_post_meta($lead->ID, '_lm_utm_source', true);
                 $utm_camp    = get_post_meta($lead->ID, '_lm_utm_campaign', true);
@@ -477,10 +551,16 @@ function larisdari_web_render_leads_page() {
                   <td>
                     <strong><?php echo esc_html(get_the_date('d M Y', $lead)); ?></strong><br>
                     <span style="color:#64748b; font-size:12px;"><?php echo esc_html(get_the_date('H:i', $lead)); ?> WIB</span>
+                    <?php if ($l_code) : ?>
+                      <br><code style="font-size:11px;"><?php echo esc_html($l_code); ?></code>
+                    <?php endif; ?>
                   </td>
                   <td>
                     <strong style="font-size:14px; color:#0f172a;"><?php echo esc_html($full_name); ?></strong><br>
-                    <span style="color:#4f46e5; font-weight:600;"><?php echo esc_html($brand_name); ?></span>
+                    <span style="color:#4f46e5; font-weight:600;"><?php echo esc_html($brand_name); ?></span><br>
+                    <span style="font-size:11px; color:#334155; font-weight:600;">
+                      <?php echo esc_html(($l_plan === 'DEFERRED_6M' ? 'Tanpa Lisensi 6Bln' : 'Beli Lisensi') . ' • ' . $l_tier); ?>
+                    </span>
                   </td>
                   <td>
                     <code><?php echo esc_html($whatsapp); ?></code>
@@ -582,6 +662,12 @@ function larisdari_web_handle_save_analytics() {
 
     update_option(LARISDARI_WEB_ANALYTICS_OPTION, $options);
 
+    $webhook_options = array(
+        'webhook_url'    => isset($_POST['webhook_url']) ? esc_url_raw(wp_unslash($_POST['webhook_url'])) : '',
+        'webhook_secret' => isset($_POST['webhook_secret']) ? sanitize_text_field(wp_unslash($_POST['webhook_secret'])) : '',
+    );
+    update_option(LARISDARI_WEB_WEBHOOK_OPTION, $webhook_options);
+
     wp_safe_redirect(add_query_arg(array('page' => 'larisdari-web-analytics', 'saved' => '1'), admin_url('admin.php')));
     exit;
 }
@@ -598,6 +684,10 @@ function larisdari_web_render_analytics_page() {
     $opt = get_option(LARISDARI_WEB_ANALYTICS_OPTION, array());
     if (!is_array($opt)) {
         $opt = array();
+    }
+    $wh_opt = get_option(LARISDARI_WEB_WEBHOOK_OPTION, array());
+    if (!is_array($wh_opt)) {
+        $wh_opt = array();
     }
 
     $val = function ($key) use ($opt) {
@@ -709,6 +799,23 @@ function larisdari_web_render_analytics_page() {
             <th scope="row"><label for="custom_head_script">Script Tambahan <code>&lt;head&gt;</code></label></th>
             <td>
               <textarea name="custom_head_script" id="custom_head_script" rows="5" class="large-text code" placeholder="<!-- Tempel tag script tambahan di sini bila diperlukan -->"><?php echo esc_textarea($val('custom_head_script')); ?></textarea>
+            </td>
+          </tr>
+        </table>
+
+        <h2 style="margin-top:24px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">4. Sinkronisasi Webhook Order ke Control Plane Next.js</h2>
+        <table class="form-table" role="presentation">
+          <tr>
+            <th scope="row"><label for="webhook_url">Control Plane Webhook URL</label></th>
+            <td>
+              <input name="webhook_url" id="webhook_url" type="url" value="<?php echo esc_attr(isset($wh_opt['webhook_url']) ? (string) $wh_opt['webhook_url'] : ''); ?>" class="regular-text" placeholder="https://demo.larisdari.web.id/api/webhook/license-order">
+              <p class="description">Saat terisi, setiap pesanan baru dari form <code>#pesan</code> otomatis dikirim ke tab Pesanan Lisensi Super-Admin dan menghasilkan link Portal Billing untuk calon pelanggan.</p>
+            </td>
+          </tr>
+          <tr>
+            <th scope="row"><label for="webhook_secret">Webhook Secret (<code>LICENSE_WEBHOOK_SECRET</code>)</label></th>
+            <td>
+              <input name="webhook_secret" id="webhook_secret" type="password" value="<?php echo esc_attr(isset($wh_opt['webhook_secret']) ? (string) $wh_opt['webhook_secret'] : ''); ?>" class="regular-text" placeholder="Secret bersama antara WordPress &amp; Next.js">
             </td>
           </tr>
         </table>

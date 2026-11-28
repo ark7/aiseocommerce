@@ -15,6 +15,8 @@ import {
 } from '@/lib/turnstile';
 import GlobalPublicTurnstileGuard from '@/components/security/GlobalPublicTurnstileGuard';
 import GlobalClickDebounceGuard from '@/components/GlobalClickDebounceGuard';
+import StoreSuspendedNotice from '@/components/StoreSuspendedNotice';
+import { evaluateStoreSuspensionState } from '@/lib/licenseBilling';
 
 export async function generateMetadata(): Promise<Metadata> {
   const store = await getActiveStore();
@@ -97,6 +99,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     }
   }
 
+  let requestPathname = '/';
+  try {
+    requestPathname = headers().get('x-pathname') || '/';
+  } catch {
+    requestPathname = '/';
+  }
+
+  const bypassSuspensionGate =
+    requestPathname.startsWith('/super-admin') ||
+    requestPathname.startsWith('/billing') ||
+    requestPathname.startsWith('/api') ||
+    requestPathname.startsWith('/_next');
+
+  const suspensionState = !bypassSuspensionGate
+    ? evaluateStoreSuspensionState(store as any)
+    : { isSuspended: false, effectiveStatus: 'ACTIVE', reason: null };
+
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
@@ -149,19 +168,31 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
           )}
-          {children}
-          <GlobalClickDebounceGuard />
-          <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
-          <GlobalPublicTurnstileGuard
-            siteKey={turnstileConfig.siteKey}
-            initiallyVerified={isTurnstileVerified}
-            storeDomain={store?.domain}
-          />
-          <CookieConsentBanner
-            enabled={store?.settings?.cookieConsentEnabled ?? true}
-            title={store?.settings?.cookieConsentTitle}
-            text={store?.settings?.cookieConsentText}
-          />
+          {suspensionState.isSuspended ? (
+            <StoreSuspendedNotice
+              storeName={store?.name}
+              domain={store?.domain}
+              effectiveStatus={suspensionState.effectiveStatus}
+              reason={suspensionState.reason}
+              billingPortalToken={(store as any)?.billingPortalToken}
+            />
+          ) : (
+            <>
+              {children}
+              <GlobalClickDebounceGuard />
+              <MasterThirdPartyTracker storeDomain={store?.domain} storeName={store?.name} />
+              <GlobalPublicTurnstileGuard
+                siteKey={turnstileConfig.siteKey}
+                initiallyVerified={isTurnstileVerified}
+                storeDomain={store?.domain}
+              />
+              <CookieConsentBanner
+                enabled={store?.settings?.cookieConsentEnabled ?? true}
+                title={store?.settings?.cookieConsentTitle}
+                text={store?.settings?.cookieConsentText}
+              />
+            </>
+          )}
         </ThemeProvider>
       </body>
     </html>

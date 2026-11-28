@@ -85,12 +85,14 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(functionsPhp).not.toContain('6281288997711');
     expect(functionsPhp).not.toContain('wa.me/');
 
-    // CMS Admin Leads + Click-to-Chat WA
+    // CMS Admin Leads + Click-to-Chat WA + Next.js Webhook Sync
     expect(cmsAdminPhp).toContain('larisdari_web_submit_lead');
     expect(cmsAdminPhp).toContain('larisdari-web-leads');
     expect(cmsAdminPhp).toContain('Klik to Chat WA');
     expect(cmsAdminPhp).toContain('https://wa.me/');
     expect(cmsAdminPhp).toContain('larisdari_web_export_leads_csv');
+    expect(cmsAdminPhp).toContain('larisdari_web_webhook_options');
+    expect(cmsAdminPhp).toContain('x-license-webhook-secret');
 
     // Indonesian Pixel & Analytics support (GTM, Google Ads, GA4, Meta Pixel, TikTok Pixel)
     expect(cmsAdminPhp).toContain('larisdari-web-analytics');
@@ -136,11 +138,18 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(frontPagePhp).toContain('Website komersial pemersatu jalur penjualan online Anda');
     expect(frontPagePhp).toContain('https://demo.larisdari.web.id');
     expect(frontPagePhp).toContain('Lisensi 1 Website');
-    expect(frontPagePhp).toContain('Biaya Operasional Bulanan');
     expect(frontPagePhp).toContain('Rp 150.000');
+    expect(frontPagePhp).toContain('Rp 350.000');
+    expect(frontPagePhp).toContain('Rp 200.000');
+    expect(frontPagePhp).toContain('Rp 450.000');
     expect(frontPagePhp).toContain('Rp 3.000.000');
+    expect(frontPagePhp).toContain('DEFERRED_6M');
+    expect(frontPagePhp).toContain('OWNED');
+    expect(frontPagePhp).toContain('DEDICATED');
+    expect(frontPagePhp).toContain('SHARED');
+    expect(frontPagePhp).toContain('Gratis Support Setting');
     expect(frontPagePhp).toContain('selama LarisDari.web.id beroperasi');
-    expect(frontPagePhp).toContain('Domain &amp; Email Custom');
+    expect(frontPagePhp).toContain('Custom Domain');
     expect(frontPagePhp).not.toContain('Starter UMKM');
 
     expect(frontPagePhp).toContain('id="pesan"');

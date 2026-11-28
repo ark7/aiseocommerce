@@ -19,27 +19,41 @@ model Store {
   address   String?
   phone     String?
   email     String?
-  isDemo    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isDemo                      Boolean   @default(false)
+  infraTier                   String    @default("SHARED") // SHARED | DEDICATED
+  licenseStatus               String    @default("OWNED")  // OWNED | DEFERRED_6M | OVERDUE
+  licensePriceAmount          Float     @default(3000000)
+  licenseRedeemedAt           DateTime?
+  licenseRedemptionDeadlineAt DateTime?
+  monthlyFeeAmount            Float     @default(150000)
+  serviceStatus               String    @default("ACTIVE") // ACTIVE | GRACE_PERIOD | SUSPENDED | LICENSE_OVERDUE
+  subscriptionExpiresAt       DateTime?
+  suspendedAt                 DateTime?
+  suspendedReason             String?
+  billingPortalToken          String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
-  users            User[]
-  products         Product[]
-  orders           Order[]
-  ledgers          Ledger[]
-  settings         StoreSettings?
-  categories       Category[]
-  pettyCashes      PettyCash[]
-  productEvents    ProductEvent[]
-  ledgerCategories LedgerCategory[]
-  vouchers         Voucher[]
-  voucherClaims    VoucherClaim[]
-  articles         Article[]
-  landingPages     LandingPage[]
-  systemErrorLogs  SystemErrorLog[]
-  pageViewLogs     PageViewLog[]
-  dailyMetrics     DailyStoreMetric[]
+  users                User[]
+  products             Product[]
+  orders               Order[]
+  ledgers              Ledger[]
+  settings             StoreSettings?
+  categories           Category[]
+  pettyCashes          PettyCash[]
+  productEvents        ProductEvent[]
+  ledgerCategories     LedgerCategory[]
+  vouchers             Voucher[]
+  voucherClaims        VoucherClaim[]
+  articles             Article[]
+  landingPages         LandingPage[]
+  systemErrorLogs      SystemErrorLog[]
+  pageViewLogs         PageViewLog[]
+  dailyMetrics         DailyStoreMetric[]
+  licenseOrders        LicenseOrder[]
+  subscriptionPayments SubscriptionPayment[]
 
+  @@index([billingPortalToken])
   @@map("stores")
 }
 
@@ -755,4 +769,67 @@ model DailyStoreMetric {
 
   @@unique([storeId, date])
   @@map("daily_store_metrics")
+}
+
+model LicenseOrder {
+  id                   String    @id @default(cuid())
+  orderCode            String    @unique @default("")
+  source               String    @default("WORDPRESS") // WORDPRESS | MANUAL_ADMIN
+  customerName         String    @default("")
+  whatsapp             String    @default("")
+  email                String?
+  brandName            String    @default("")
+  customDomain         String    @default("")
+  businessCategory     String?
+  notes                String?   @db.Text
+  licensePlan          String    @default("OWNED") // OWNED | DEFERRED_6M
+  infraTier            String    @default("SHARED") // SHARED | DEDICATED
+  licenseFeeAmount     Float     @default(3000000)
+  monthlyFeeAmount     Float     @default(150000)
+  initialPaymentAmount Float     @default(3150000)
+  status               String    @default("NEW") // NEW | WAITING_PAYMENT | PAYMENT_SUBMITTED | PAID_READY_SETUP | IN_SETUP | LIVE | CANCELLED
+  portalToken          String    @unique @default(cuid())
+  storeId              String?
+  store                Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  liveNotifiedAt       DateTime?
+  adminNotes           String?   @db.Text
+  utmSource            String?
+  utmMedium            String?
+  utmCampaign          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  payments SubscriptionPayment[]
+
+  @@index([status])
+  @@index([storeId])
+  @@map("license_orders")
+}
+
+model SubscriptionPayment {
+  id                 String        @id @default(cuid())
+  storeId            String?
+  store              Store?        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  licenseOrderId     String?
+  licenseOrder     LicenseOrder? @relation(fields: [licenseOrderId], references: [id], onDelete: SetNull)
+  paymentType        String        @default("MONTHLY_RENEWAL") // INITIAL_ORDER | MONTHLY_RENEWAL | LICENSE_REDEMPTION
+  billingMonths      Int           @default(1)
+  amount             Float         @default(0)
+  status             String        @default("PENDING_REVIEW") // PENDING_REVIEW | APPROVED | REJECTED
+  proofRelativePath  String?
+  proofMimeType      String?
+  transferSenderName String?
+  transferBank       String?
+  clientNotes        String?       @db.Text
+  periodStartAt      DateTime?
+  periodEndAt        DateTime?
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  rejectionReason    String?       @db.Text
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([storeId, status])
+  @@index([licenseOrderId])
+  @@map("subscription_payments")
 }

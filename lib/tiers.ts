@@ -24,12 +24,18 @@ export function meetsTier(role: Tier, required: Tier): boolean {
  * Determines the minimum required tier for a given pathname.
  */
 export function requiredTierFor(pathname: string): Tier {
-  // Root, login, register, and auth APIs are open to all (including unauthenticated/guest)
+  // Root, login, register, auth APIs, super-admin control plane, client billing portal, and webhooks
+  // handle their own specialized guards and must not be caught by shopper '/orders' checks.
   if (
     pathname === '/' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
-    pathname.startsWith('/api/auth')
+    pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/super-admin') ||
+    pathname.startsWith('/api/super-admin') ||
+    pathname.startsWith('/billing') ||
+    pathname.startsWith('/api/billing') ||
+    pathname.startsWith('/api/webhook')
   ) {
     return 'GUEST';
   }

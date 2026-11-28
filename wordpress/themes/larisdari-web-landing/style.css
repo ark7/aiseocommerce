@@ -4,7 +4,7 @@ Theme URI: https://larisdari.web.id
 Author: LarisDari.web.id Team
 Author URI: https://larisdari.web.id
 Description: Tema landing page pemasaran resmi untuk LarisDari.web.id — Website komersial pemersatu jalur penjualan online Anda. Ringan, cepat, responsif, dan ramah SEO.
-Version: 1.7.0
+Version: 1.8.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -1593,4 +1593,87 @@ img {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ========================
+   2x2 PRICING MATRIX (v1.8.0)
+   ======================== */
+.lm-price-matrix-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 8px;
+}
+
+@media (min-width: 880px) {
+  .lm-price-matrix-grid {
+    grid-template-columns: repeat(2, 1fr);
+    align-items: stretch;
+  }
+}
+
+.lm-tier-options-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 520px) {
+  .lm-tier-options-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.lm-tier-box {
+  background: var(--lm-slate-50);
+  border: 1px solid var(--lm-slate-200);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lm-tier-box.is-dedicated {
+  background: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+  border-color: rgba(79, 70, 229, 0.35);
+}
+
+.lm-tier-kicker {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lm-primary-dark);
+}
+
+.lm-tier-price {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--lm-slate-900);
+}
+
+.lm-tier-note {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--lm-slate-600);
+  margin: 0;
+}
+
+.lm-included-banner {
+  margin-top: 22px;
+  background: var(--lm-white);
+  border: 1px solid var(--lm-slate-200);
+  border-radius: 16px;
+  padding: 20px 24px;
+}
+
+.lm-calc-summary {
+  margin-top: 16px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  padding: 16px 18px;
 }

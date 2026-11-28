@@ -9,7 +9,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('LARISDARI_WEB_THEME_VERSION', '1.7.0');
+define('LARISDARI_WEB_THEME_VERSION', '1.8.0');
 
 require_once get_template_directory() . '/inc/cms-admin.php';
 
@@ -364,17 +364,38 @@ function larisdari_web_output_seo_head() {
             'offers'              => array(
                 array(
                     '@type'         => 'Offer',
-                    'name'          => 'Lisensi 1 Website (Berlaku selama LarisDari.web.id beroperasi)',
+                    'name'          => 'Lisensi 1 Website (Beli Awal)',
                     'price'         => '3000000',
                     'priceCurrency' => 'IDR',
                     'url'           => home_url('/#pesan'),
                 ),
                 array(
                     '@type'         => 'Offer',
-                    'name'          => 'Biaya Operasional Bulanan Website',
+                    'name'          => 'Operasional Shared Infrastructure (Sudah Lisensi)',
                     'price'         => '150000',
                     'priceCurrency' => 'IDR',
-                    'url'           => $demo_url,
+                    'url'           => home_url('/#harga'),
+                ),
+                array(
+                    '@type'         => 'Offer',
+                    'name'          => 'Operasional Dedicated Infrastructure (Sudah Lisensi)',
+                    'price'         => '350000',
+                    'priceCurrency' => 'IDR',
+                    'url'           => home_url('/#harga'),
+                ),
+                array(
+                    '@type'         => 'Offer',
+                    'name'          => 'Mulai Tanpa Lisensi Awal Shared (Tebus Maks. 6 Bulan)',
+                    'price'         => '200000',
+                    'priceCurrency' => 'IDR',
+                    'url'           => home_url('/#harga'),
+                ),
+                array(
+                    '@type'         => 'Offer',
+                    'name'          => 'Mulai Tanpa Lisensi Awal Dedicated (Tebus Maks. 6 Bulan)',
+                    'price'         => '450000',
+                    'priceCurrency' => 'IDR',
+                    'url'           => home_url('/#harga'),
                 ),
             ),
         );
@@ -383,10 +404,10 @@ function larisdari_web_output_seo_head() {
             'mainEntity' => array(
                 array(
                     '@type' => 'Question',
-                    'name'  => 'Bagaimana cara kerja biaya lisensi Rp 3.000.000, operasional Rp 150.000/bulan, serta domain & email custom?',
+                    'name'  => 'Bagaimana skema harga lisensi Rp 3.000.000, opsi Shared/Dedicated, dan opsi Mulai Tanpa Lisensi Awal?',
                     'acceptedAnswer' => array(
                         '@type' => 'Answer',
-                        'text'  => 'Kami hanya memakai 1 skema harga yang transparan: Anda membeli Lisensi 1 Website sebesar Rp 3.000.000 (berlaku selama LarisDari.web.id beroperasi) untuk memiliki dan mengoperasikan 1 toko online penuh, ditambah Biaya Operasional Bulanan Rp 150.000/bulan agar server dan sistem berjalan optimal setiap bulannya. Untuk domain dan email custom disiapkan dan dibawa oleh masing-masing pengguna.',
+                        'text'  => 'Semua paket sudah memakai custom domain pilihan Anda dan gratis support setting oleh tim kami hingga live. Jika beli lisensi Rp 3.000.000 di awal: biaya operasional Shared Infrastructure Rp 150.000/bulan dan Dedicated Infrastructure Rp 350.000/bulan. Jika belum siap membeli lisensi di awal, Anda dapat mulai dengan Rp 200.000/bulan (Shared) atau Rp 450.000/bulan (Dedicated), lalu wajib menebus lisensi Rp 3.000.000 maksimal di bulan ke-6 (setelah ditebus tarif turun ke Rp 150rb/Rp 350rb; bila lewat bulan ke-6 belum ditebus, layanan otomatis dinonaktifkan).',
                     ),
                 ),
                 array(
@@ -475,12 +496,27 @@ function larisdari_web_customize_register($wp_customize) {
             'type'    => 'email',
         ),
         'larisdari_web_price_monthly' => array(
-            'label'   => 'Biaya Operasional Bulanan Website',
+            'label'   => 'Bulanan Shared (Sudah Lisensi)',
             'default' => 'Rp 150.000',
             'type'    => 'text',
         ),
+        'larisdari_web_price_dedicated_owned' => array(
+            'label'   => 'Bulanan Dedicated (Sudah Lisensi)',
+            'default' => 'Rp 350.000',
+            'type'    => 'text',
+        ),
+        'larisdari_web_price_shared_deferred' => array(
+            'label'   => 'Bulanan Shared (Tanpa Lisensi Awal - Tebus <= 6 Bln)',
+            'default' => 'Rp 200.000',
+            'type'    => 'text',
+        ),
+        'larisdari_web_price_dedicated_deferred' => array(
+            'label'   => 'Bulanan Dedicated (Tanpa Lisensi Awal - Tebus <= 6 Bln)',
+            'default' => 'Rp 450.000',
+            'type'    => 'text',
+        ),
         'larisdari_web_price_lifetime' => array(
-            'label'   => 'Biaya Lisensi 1 Website (Selama LarisDari.web.id Beroperasi)',
+            'label'   => 'Harga Lisensi 1 Website (Beli Awal / Tebus Maks. Bln ke-6)',
             'default' => 'Rp 3.000.000',
             'type'    => 'text',
         ),

@@ -17,10 +17,15 @@ $hero_subtitle  = larisdari_web_get_option('larisdari_web_hero_subtitle', 'Satuk
 $demo_url       = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
 $demo_admin_url = larisdari_web_get_option('larisdari_web_demo_admin_url', 'https://demo.larisdari.web.id/login');
 
-$price_monthly  = larisdari_web_get_option('larisdari_web_price_monthly', 'Rp 150.000');
-$price_lifetime = larisdari_web_get_option('larisdari_web_price_lifetime', 'Rp 3.000.000');
+$price_monthly            = larisdari_web_get_option('larisdari_web_price_monthly', 'Rp 150.000');
+$price_dedicated_owned    = larisdari_web_get_option('larisdari_web_price_dedicated_owned', 'Rp 350.000');
+$price_shared_deferred    = larisdari_web_get_option('larisdari_web_price_shared_deferred', 'Rp 200.000');
+$price_dedicated_deferred = larisdari_web_get_option('larisdari_web_price_dedicated_deferred', 'Rp 450.000');
+$price_lifetime           = larisdari_web_get_option('larisdari_web_price_lifetime', 'Rp 3.000.000');
 
 $lead_submitted = isset($_GET['lead_submitted']) && $_GET['lead_submitted'] === '1';
+$lead_order_code = isset($_GET['order_code']) ? sanitize_text_field(wp_unslash($_GET['order_code'])) : '';
+$lead_billing_url = isset($_GET['billing_url']) ? esc_url_raw(wp_unslash($_GET['billing_url'])) : '';
 $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_GET['lead_error'])) : '';
 ?>
 
@@ -308,82 +313,121 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
     </div>
   </section>
 
-  <!-- 6. PRICING (SINGLE UNIFIED PACKAGE) -->
+  <!-- 6. PRICING MATRIX (2x2: OWNED vs DEFERRED_6M x SHARED vs DEDICATED) -->
   <section id="harga" class="lm-section lm-section-alt">
     <div class="lm-container">
       <div class="lm-section-header">
-        <span class="lm-eyebrow">Satu Skema Harga Jelas</span>
-        <h2>1 Paket Lengkap Website Komersial + Biaya Operasional Transparan</h2>
-        <p>Tidak ada paket bertingkat yang membingungkan. Semua pengguna mendapatkan 100% fitur lengkap yang sama dengan membeli lisensi 1 website dan membayar biaya operasional bulanan.</p>
+        <span class="lm-eyebrow">Skema Harga Transparan &amp; Fleksibel</span>
+        <h2>Pilih Beli Lisensi di Awal atau Mulai Ringan Tanpa Lisensi</h2>
+        <p>Semua paket mendapatkan 100% fitur lengkap yang sama, wajib menggunakan <strong>Custom Domain brand Anda</strong>, serta <strong>GRATIS Support Setting penuh oleh tim kami</strong> sampai website siap jualan.</p>
       </div>
 
-      <div class="lm-price-card is-featured lm-single-price-card">
-        <span class="lm-popular-pill">1 Harga • Semua Fitur Terbuka</span>
-
-        <div>
-          <h3 class="lm-price-title" style="font-size:1.35rem; text-align:center;">
-            Paket Resmi Website Komersial LarisDari.web.id
-          </h3>
-          <p class="lm-price-desc" style="text-align:center; margin-bottom:0;">
-            Beli lisensi 1 website di awal, lalu cukup bayar biaya operasional setiap bulan untuk menjaga website tetap online optimal.
-          </p>
-
-          <div class="lm-price-breakdown-grid">
-            <div class="lm-price-component-box is-primary">
-              <div class="lm-price-component-kicker">1. Lisensi 1 Website</div>
-              <div>
-                <span class="lm-price-amount"><?php echo esc_html($price_lifetime); ?></span>
-              </div>
-              <p class="lm-price-period" style="margin:6px 0 0;">
-                Dibayar 1x di awal • Berlaku <strong>selama LarisDari.web.id beroperasi</strong>
-              </p>
-            </div>
-
-            <div class="lm-price-plus-badge" aria-hidden="true">+</div>
-
-            <div class="lm-price-component-box">
-              <div class="lm-price-component-kicker">2. Biaya Operasional Bulanan</div>
-              <div>
-                <span class="lm-price-amount"><?php echo esc_html($price_monthly); ?></span>
-                <span class="lm-price-period"> / bulan</span>
-              </div>
-              <p class="lm-price-period" style="margin:6px 0 0;">
-                Untuk memastikan server, database cloud, &amp; website berjalan lancar dalam 1 bulan
-              </p>
-            </div>
-          </div>
-
-          <div style="margin-top:20px; padding-top:20px; border-top:1px solid #e2e8f0;">
-            <p style="margin:0 0 14px; font-size:0.85rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.05em;">
-              Seluruh Fitur yang Sudah Termasuk Tanpa Tambahan Biaya Paket:
+      <div class="lm-price-matrix-grid">
+        <!-- SKEMA 1: BELI LISENSI DI AWAL -->
+        <div class="lm-price-card is-featured">
+          <span class="lm-popular-pill">Paling Hemat Jangka Panjang</span>
+          <div>
+            <h3 class="lm-price-title" style="font-size:1.3rem;">
+              1. Beli Lisensi di Awal (<?php echo esc_html($price_lifetime); ?>)
+            </h3>
+            <p class="lm-price-desc">
+              Bayar lisensi 1 website 1× di awal (berlaku selama LarisDari.web.id beroperasi) + biaya operasional bulanan paling rendah sesuai infrastruktur pilihan Anda.
             </p>
-            <ul class="lm-feature-checklist-2col">
-              <li><span aria-hidden="true">✅</span> <span>1 Website toko komersial mandiri lengkap &amp; terisolasi</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Integrasi link Shopee, Tokopedia, dan TikTok Shop</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Katalog multi-varian, kategori, &amp; mode Pre-Order</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Matriks Harga Grosir Bertingkat (Batch Pricing)</span></li>
-              <li><span aria-hidden="true">✅</span> <span>AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Cek Ongkir Biteship otomatis &amp; tarif flat dalam/luar kota</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Midtrans/Flip + verifikasi bukti transfer &amp; notifikasi WA/Telegram</span></li>
-              <li><span aria-hidden="true">✅</span> <span>Pembukuan Kas, HPP, Laba Rugi, &amp; Proteksi Cloudflare Turnstile</span></li>
-              <li><span aria-hidden="true">🌐</span> <span><strong>Domain &amp; Email Custom:</strong> dibawa sendiri oleh pengguna</span></li>
-              <li><span aria-hidden="true">🤝</span> <span>Pendampingan koneksi DNS domain &amp; SMTP saat onboarding</span></li>
-            </ul>
+
+            <div class="lm-price-component-box is-primary" style="padding:14px 16px;">
+              <div class="lm-price-component-kicker">Harga Lisensi 1 Website • 1× di Awal</div>
+              <div>
+                <span class="lm-price-amount" style="font-size:1.65rem;"><?php echo esc_html($price_lifetime); ?></span>
+                <span class="lm-price-period"> • Gratis Setting Custom Domain</span>
+              </div>
+            </div>
+
+            <div class="lm-tier-options-grid">
+              <div class="lm-tier-box">
+                <div>
+                  <div class="lm-tier-kicker">Shared Infrastructure</div>
+                  <div class="lm-tier-price"><?php echo esc_html($price_monthly); ?><span class="lm-price-period"> / bln</span></div>
+                  <p class="lm-tier-note">Ideal untuk brand &amp; UMKM berkembang di server cloud bersama terisolasi.</p>
+                </div>
+                <a href="#pesan" class="lm-btn lm-btn-outline" data-select-plan="OWNED" data-select-tier="SHARED" style="width:100%;">
+                  Pilih Owned Shared
+                </a>
+              </div>
+
+              <div class="lm-tier-box is-dedicated">
+                <div>
+                  <div class="lm-tier-kicker">Dedicated Infrastructure</div>
+                  <div class="lm-tier-price"><?php echo esc_html($price_dedicated_owned); ?><span class="lm-price-period"> / bln</span></div>
+                  <p class="lm-tier-note">Resource VPS &amp; database tersendiri untuk trafik iklan &amp; transaksi tinggi.</p>
+                </div>
+                <a href="#pesan" class="lm-btn lm-btn-primary" data-select-plan="OWNED" data-select-tier="DEDICATED" style="width:100%;">
+                  Pilih Owned Dedicated
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="lm-single-price-actions">
-          <a href="#pesan" class="lm-btn lm-btn-primary lm-btn-lg" style="flex:1; min-width:240px;">
-            Isi Form Pemesanan Lisensi &rarr;
-          </a>
-          <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline lm-btn-lg">
-            Coba Demo Live Dulu
-          </a>
+        <!-- SKEMA 2: MULAI TANPA LISENSI AWAL -->
+        <div class="lm-price-card">
+          <div>
+            <h3 class="lm-price-title" style="font-size:1.3rem;">
+              2. Mulai Tanpa Lisensi Awal (Tebus &le; 6 Bulan)
+            </h3>
+            <p class="lm-price-desc">
+              Solusi ringan agar toko langsung online tanpa keluar biaya lisensi di hari pertama. Lisensi <strong><?php echo esc_html($price_lifetime); ?> wajib dibayar maksimal di bulan ke-6</strong> — jika melewati bulan ke-6 belum ditebus, layanan otomatis dinonaktifkan (OFF).
+            </p>
+
+            <div class="lm-price-component-box" style="padding:14px 16px; background:#fffbeb; border-color:#fde68a;">
+              <div class="lm-price-component-kicker" style="color:#b45309;">Mulai Ringan Hari Pertama • Gratis Setting Custom Domain</div>
+              <p style="margin:2px 0 0; font-size:0.86rem; color:#78350f; font-weight:600;">
+                Setelah menebus lisensi <?php echo esc_html($price_lifetime); ?> (&le; bulan ke-6), tarif bulanan otomatis turun ke <?php echo esc_html($price_monthly); ?> / <?php echo esc_html($price_dedicated_owned); ?>.
+              </p>
+            </div>
+
+            <div class="lm-tier-options-grid">
+              <div class="lm-tier-box">
+                <div>
+                  <div class="lm-tier-kicker">Shared (Tanpa Lisensi)</div>
+                  <div class="lm-tier-price"><?php echo esc_html($price_shared_deferred); ?><span class="lm-price-period"> / bln</span></div>
+                  <p class="lm-tier-note">Turun ke <?php echo esc_html($price_monthly); ?>/bln setelah tebus lisensi maks. bulan ke-6.</p>
+                </div>
+                <a href="#pesan" class="lm-btn lm-btn-outline" data-select-plan="DEFERRED_6M" data-select-tier="SHARED" style="width:100%;">
+                  Pilih Shared 6 Bln
+                </a>
+              </div>
+
+              <div class="lm-tier-box is-dedicated">
+                <div>
+                  <div class="lm-tier-kicker">Dedicated (Tanpa Lisensi)</div>
+                  <div class="lm-tier-price"><?php echo esc_html($price_dedicated_deferred); ?><span class="lm-price-period"> / bln</span></div>
+                  <p class="lm-tier-note">Turun ke <?php echo esc_html($price_dedicated_owned); ?>/bln setelah tebus lisensi maks. bulan ke-6.</p>
+                </div>
+                <a href="#pesan" class="lm-btn lm-btn-primary" data-select-plan="DEFERRED_6M" data-select-tier="DEDICATED" style="width:100%;">
+                  Pilih Dedicated 6 Bln
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <div class="lm-included-banner">
+        <p style="margin:0 0 14px; font-size:0.85rem; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.05em;">
+          Seluruh Fitur &amp; Dukungan yang Sudah Termasuk di Semua Skenario:
+        </p>
+        <ul class="lm-feature-checklist-2col">
+          <li><span aria-hidden="true">✅</span> <span><strong>Gratis Support Setting Penuh:</strong> DNS Custom Domain, SSL, SMTP, kurir &amp; payment disiapkan tim kami</span></li>
+          <li><span aria-hidden="true">✅</span> <span>Integrasi link Shopee, Tokopedia, dan TikTok Shop + keranjang mandiri</span></li>
+          <li><span aria-hidden="true">✅</span> <span>Katalog multi-varian, kategori, Pre-Order, &amp; Harga Grosir Bertingkat</span></li>
+          <li><span aria-hidden="true">✅</span> <span>AI SEO Copilot, Artikel SEO, &amp; AI Foto Studio (BYOK)</span></li>
+          <li><span aria-hidden="true">✅</span> <span>Cek Ongkir Biteship otomatis + Midtrans/Flip + notifikasi WA/Telegram</span></li>
+          <li><span aria-hidden="true">✅</span> <span>Pembukuan Kas, HPP, Laba Rugi, &amp; Proteksi Cloudflare Turnstile SEO-Safe</span></li>
+        </ul>
       </div>
 
       <div class="lm-pricing-note">
-        <strong><span aria-hidden="true">📌</span> Ketentuan Domain &amp; Email Custom:</strong> Domain brand sendiri (misal <code>namatoko.com</code> atau <code>.id</code>) serta akun <strong>Email Custom / SMTP</strong> dibawa dan disiapkan oleh masing-masing pengguna agar aset digital bisnis 100% atas nama Anda. Tim kami membantu menyambungkan DNS &amp; SMTP agar website Anda langsung siap operasional.
+        <strong><span aria-hidden="true">📌</span> Ketentuan Custom Domain &amp; Email Brand:</strong> Seluruh paket menggunakan <strong>domain brand milik sendiri</strong> (misal <code>namatoko.com</code> atau <code>.id</code>) dan akun <strong>Email Custom / SMTP</strong> agar 100% aset digital atas nama Anda. Biaya pembelian domain dibayarkan ke registrar oleh pemilik usaha, sedangkan seluruh setting DNS, SSL HTTPS, dan integrasi sistem dibantu oleh tim LarisDari.web.id hingga live.
       </div>
     </div>
   </section>
@@ -394,16 +438,26 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
       <div class="lm-section-header">
         <span class="lm-eyebrow">Pendaftaran &amp; Pemesanan Lisensi</span>
         <h2>Mulai Miliki Website Komersial Anda Sekarang</h2>
-        <p>Isi form pemesanan di bawah ini untuk memiliki Lisensi 1 Website (<strong><?php echo esc_html($price_lifetime); ?></strong> + operasional <strong><?php echo esc_html($price_monthly); ?>/bulan</strong>). Data pemesanan Anda langsung tercatat di sistem CMS kami untuk segera ditindaklanjuti.</p>
+        <p>Pilih skema kepemilikan dan tier infrastruktur Anda (semua termasuk Custom Domain &amp; Gratis Support Setting). Pesanan Anda langsung tercatat di sistem untuk diproses dan diaktifkan.</p>
       </div>
 
       <div class="lm-order-form-card">
         <?php if ($lead_submitted) : ?>
           <div class="lm-alert-success" role="status">
             <strong>✅ Form Pemesanan Berhasil Dikirim!</strong>
+            <?php if ($lead_order_code !== '') : ?>
+              <span> Kode Pesanan: <strong><?php echo esc_html($lead_order_code); ?></strong>.</span>
+            <?php endif; ?>
             <p style="margin:6px 0 0;">
-              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem CMS kami dan tim LarisDari.web.id akan segera menindaklanjuti pesanan Anda.
+              Terima kasih telah mendaftar. Data pemesanan Anda sudah tercatat di sistem dan tim LarisDari.web.id akan segera menindaklanjuti setup website Anda.
             </p>
+            <?php if ($lead_billing_url !== '') : ?>
+              <p style="margin:10px 0 0;">
+                <a href="<?php echo esc_url($lead_billing_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-primary">
+                  Buka Portal Billing &amp; Upload Bukti Bayar &rarr;
+                </a>
+              </p>
+            <?php endif; ?>
           </div>
         <?php elseif ($lead_error !== '') : ?>
           <div class="lm-alert-error" role="alert">
@@ -428,6 +482,22 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
           <div class="lm-form-grid">
             <div class="lm-field">
+              <label for="lm_license_plan">Skema Kepemilikan Lisensi <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <select id="lm_license_plan" name="license_plan" class="lm-select">
+                <option value="OWNED">1. Beli Lisensi di Awal (<?php echo esc_html($price_lifetime); ?>)</option>
+                <option value="DEFERRED_6M">2. Mulai Tanpa Lisensi Awal (Wajib tebus maks. Bln ke-6)</option>
+              </select>
+            </div>
+
+            <div class="lm-field">
+              <label for="lm_infra_tier">Infrastruktur Server <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <select id="lm_infra_tier" name="infra_tier" class="lm-select">
+                <option value="SHARED">Shared Infrastructure (<?php echo esc_html($price_monthly); ?> / <?php echo esc_html($price_shared_deferred); ?> bln)</option>
+                <option value="DEDICATED">Dedicated Infrastructure (<?php echo esc_html($price_dedicated_owned); ?> / <?php echo esc_html($price_dedicated_deferred); ?> bln)</option>
+              </select>
+            </div>
+
+            <div class="lm-field">
               <label for="lm_full_name">Nama Lengkap <span style="color:#dc2626;" aria-hidden="true">*</span></label>
               <input type="text" id="lm_full_name" name="full_name" required autocomplete="name" class="lm-input" placeholder="Contoh: Budi Santoso">
             </div>
@@ -448,8 +518,8 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
             </div>
 
             <div class="lm-field">
-              <label for="lm_custom_domain">Rencana Nama Domain (Opsional)</label>
-              <input type="text" id="lm_custom_domain" name="custom_domain" autocomplete="url" class="lm-input" placeholder="Contoh: namatoko.com (dibawa oleh user)">
+              <label for="lm_custom_domain">Custom Domain Brand Anda <span style="color:#dc2626;" aria-hidden="true">*</span></label>
+              <input type="text" id="lm_custom_domain" name="custom_domain" required autocomplete="url" class="lm-input" placeholder="Contoh: namatoko.com (dibantu setting tim kami)">
             </div>
 
             <div class="lm-field">
@@ -464,6 +534,19 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
                 <option value="Lainnya">Lainnya</option>
               </select>
             </div>
+          </div>
+
+          <div class="lm-calc-summary" aria-live="polite">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px;">
+              <div>
+                <div style="font-size:0.78rem; font-weight:700; color:#4338ca; text-transform:uppercase;">Estimasi Pembayaran Awal</div>
+                <div id="lm-calc-monthly" style="font-size:0.88rem; font-weight:700; color:#1e293b;">Rp 150.000 / bulan (Shared)</div>
+              </div>
+              <div id="lm-calc-initial" style="font-size:1.4rem; font-weight:800; color:#312e81;">Rp 3.150.000</div>
+            </div>
+            <p id="lm-calc-note" style="margin:6px 0 0; font-size:0.82rem; color:#475569;">
+              Lisensi Rp 3.000.000 + operasional bulan ke-1 Rp 150.000. Gratis setting Custom Domain &amp; integrasi penuh.
+            </p>
           </div>
 
           <div class="lm-field" style="margin-top:16px;">
@@ -554,9 +637,9 @@ $lead_error     = isset($_GET['lead_error']) ? sanitize_text_field(wp_unslash($_
 
       <div class="lm-faq-list">
         <details class="lm-faq-item" open>
-          <summary>Bagaimana cara kerja biaya lisensi Rp 3.000.000, operasional Rp 150.000/bulan, serta domain &amp; email custom?</summary>
+          <summary>Bagaimana skema harga lisensi <?php echo esc_html($price_lifetime); ?>, opsi Shared vs Dedicated, dan Mulai Tanpa Lisensi Awal?</summary>
           <p class="lm-faq-answer">
-            Kami hanya memakai 1 skema harga yang transparan: Anda membeli <strong>Lisensi 1 Website sebesar Rp 3.000.000</strong> (berlaku selama LarisDari.web.id beroperasi) untuk memiliki dan mengoperasikan 1 toko online penuh, ditambah <strong>Biaya Operasional Bulanan Rp 150.000/bulan</strong> agar server dan sistem berjalan optimal setiap bulannya. Untuk <strong>domain dan email custom</strong> disiapkan dan dibawa oleh masing-masing pengguna.
+            Semua paket sudah memakai <strong>Custom Domain brand Anda</strong> dan <strong>GRATIS Support Setting</strong> oleh tim kami. Bila memilih <strong>Beli Lisensi di Awal (<?php echo esc_html($price_lifetime); ?>)</strong>, biaya bulanannya adalah <strong><?php echo esc_html($price_monthly); ?>/bln (Shared)</strong> atau <strong><?php echo esc_html($price_dedicated_owned); ?>/bln (Dedicated)</strong>. Jika memilih <strong>Tanpa Lisensi Awal</strong>, Anda mulai dari <strong><?php echo esc_html($price_shared_deferred); ?>/bln (Shared)</strong> atau <strong><?php echo esc_html($price_dedicated_deferred); ?>/bln (Dedicated)</strong> dan wajib menebus lisensi <?php echo esc_html($price_lifetime); ?> maksimal di bulan ke-6 (setelah ditebus tarif turun ke harga normal; jika melewati bulan ke-6 belum ditebus, layanan otomatis dinonaktifkan).
           </p>
         </details>
 

@@ -16,6 +16,10 @@ describe('Tiers & GatedLink Auth System', () => {
       expect(requiredTierFor('/login')).toBe('GUEST');
       expect(requiredTierFor('/register')).toBe('GUEST');
       expect(requiredTierFor('/demo-store/product/item-1')).toBe('GUEST');
+      expect(requiredTierFor('/api/super-admin/license-orders')).toBe('GUEST');
+      expect(requiredTierFor('/billing/abc123token')).toBe('GUEST');
+      expect(requiredTierFor('/api/billing/abc123token')).toBe('GUEST');
+      expect(requiredTierFor('/api/webhook/license-order')).toBe('GUEST');
     });
 
     it('returns CUSTOMER for cart, orders, checkout', () => {

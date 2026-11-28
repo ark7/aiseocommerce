@@ -2,6 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import ImageUploader from '@/components/ImageUploader';
+import LicenseOrdersTab, { LicenseOrderRecord } from '@/components/super-admin/LicenseOrdersTab';
+import SubscriptionPaymentsTab from '@/components/super-admin/SubscriptionPaymentsTab';
+import TenantSubscriptionModal, { TenantSubscriptionEditable } from '@/components/super-admin/TenantSubscriptionModal';
+import { formatRupiah } from '@/lib/licenseBilling';
 
 interface TenantItem {
   id: string;
@@ -10,6 +14,18 @@ interface TenantItem {
   email: string | null;
   phone: string | null;
   address: string | null;
+  isDemo?: boolean;
+  infraTier?: string;
+  licenseStatus?: string;
+  licensePriceAmount?: number;
+  licenseRedeemedAt?: string | null;
+  licenseRedemptionDeadlineAt?: string | null;
+  monthlyFeeAmount?: number;
+  serviceStatus?: string;
+  subscriptionExpiresAt?: string | null;
+  suspendedAt?: string | null;
+  suspendedReason?: string | null;
+  billingPortalToken?: string | null;
   createdAt: string;
   primaryColor: string;
   fontFamily: string;
@@ -103,7 +119,9 @@ export default function SuperAdminControlPlanePage() {
   const [loginLoading, setLoginLoading] = useState(false);
 
   // Navigation Tab
-  const [activeTab, setActiveTab] = useState<'list' | 'duplicate'>('list');
+  const [activeTab, setActiveTab] = useState<'orders' | 'payments' | 'list' | 'duplicate'>('list');
+  const [pendingPaymentsCount, setPendingPaymentsCount] = useState(0);
+  const [subscriptionModalTenant, setSubscriptionModalTenant] = useState<TenantSubscriptionEditable | null>(null);
 
   // Tenant List State
   const [tenants, setTenants] = useState<TenantItem[]>([]);
@@ -239,10 +257,17 @@ export default function SuperAdminControlPlanePage() {
       setLoadingTenants(true);
       const headers: Record<string, string> = {};
       if (activeToken) headers.Authorization = `Bearer ${activeToken}`;
-      const res = await fetch('/api/super-admin/tenants', { headers });
-      if (res.ok) {
-        const data = await res.json();
+      const [tenantsRes, paymentsRes] = await Promise.all([
+        fetch('/api/super-admin/tenants', { headers }),
+        fetch('/api/super-admin/subscription-payments?status=PENDING_REVIEW', { headers }),
+      ]);
+      if (tenantsRes.ok) {
+        const data = await tenantsRes.json();
         setTenants(data.tenants || []);
+      }
+      if (paymentsRes.ok) {
+        const pData = await paymentsRes.json();
+        setPendingPaymentsCount(Number(pData.pendingCount || 0));
       }
     } catch {
       // ignore
@@ -250,6 +275,46 @@ export default function SuperAdminControlPlanePage() {
       setLoadingTenants(false);
     }
   }, []);
+
+  const handleQuickToggleSuspend = async (tenant: TenantItem) => {
+    const currentlySuspended =
+      tenant.serviceStatus === 'SUSPENDED' || tenant.serviceStatus === 'LICENSE_OVERDUE';
+    const nextStatus = currentlySuspended ? 'ACTIVE' : 'SUSPENDED';
+    const confirmMsg = currentlySuspended
+      ? `Aktifkan kembali layanan untuk "${tenant.name}" (${tenant.domain})?`
+      : `Nonaktifkan layanan sementara untuk "${tenant.name}" (${tenant.domain})? Pengunjung storefront akan melihat layar nonaktif sampai diaktifkan kembali.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`/api/super-admin/tenants/${tenant.id}/subscription`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ serviceStatus: nextStatus }),
+    });
+    if (res.ok) {
+      fetchTenants(token);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || 'Gagal mengubah status layanan toko');
+    }
+  };
+
+  const handlePrefillFromOrder = (order: LicenseOrderRecord) => {
+    const slug = toSlug(order.brandName || order.customerName || 'toko');
+    setStoreName(order.brandName || '');
+    setTenantSlug(slug);
+    setDomain(order.customDomain || `${slug}.larisdari.web.id`);
+    setTagline(`Toko Resmi ${order.brandName}`);
+    setStoreEmail(order.email || `halo@${order.customDomain || `${slug}.larisdari.web.id`}`);
+    setStorePhone(order.whatsapp || '');
+    setAdminName(order.customerName || '');
+    setAdminEmail(order.email || `admin@${order.customDomain || `${slug}.larisdari.web.id`}`);
+    setSubscriptionPlan(order.infraTier === 'DEDICATED' ? 'ENTERPRISE' : 'BUSINESS');
+    setInternalNotes(`Order Code: ${order.orderCode} | Skema: ${order.licensePlan} | Tier: ${order.infraTier}`);
+    setDuplicationResult(null);
+    setActiveTab('duplicate');
+  };
 
   useEffect(() => {
     const savedToken = localStorage.getItem('super_admin_token');
@@ -697,17 +762,44 @@ export default function SuperAdminControlPlanePage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('orders')}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
+                activeTab === 'orders'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              🛒 Pesanan Lisensi
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('payments')}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition flex items-center gap-1.5 ${
+                activeTab === 'payments'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <span>💳 Approval Pembayaran</span>
+              {pendingPaymentsCount > 0 && (
+                <span className="bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold">
+                  {pendingPaymentsCount}
+                </span>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('list')}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
                 activeTab === 'list'
                   ? 'bg-indigo-600 text-white'
                   : 'text-slate-300 hover:bg-slate-800'
               }`}
             >
-              📋 Daftar Pelanggan ({tenants.length})
+              📋 Website &amp; Langganan ({tenants.length})
             </button>
             <button
               type="button"
@@ -715,13 +807,13 @@ export default function SuperAdminControlPlanePage() {
                 setDuplicationResult(null);
                 setActiveTab('duplicate');
               }}
-              className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
                 activeTab === 'duplicate'
                   ? 'bg-indigo-600 text-white'
                   : 'bg-slate-800 text-indigo-300 hover:bg-slate-700'
               }`}
             >
-              + Duplikasi Website Pelanggan
+              + Duplikasi Website
             </button>
             <button
               type="button"
@@ -748,7 +840,23 @@ export default function SuperAdminControlPlanePage() {
       </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'list' ? (
+        {activeTab === 'orders' ? (
+          <div className="bg-slate-950 rounded-2xl p-6 text-slate-100 shadow-sm">
+            <LicenseOrdersTab
+              token={token || ''}
+              onPrefillDuplicate={handlePrefillFromOrder}
+              onProvisioned={() => fetchTenants(token)}
+            />
+          </div>
+        ) : activeTab === 'payments' ? (
+          <div className="bg-slate-950 rounded-2xl p-6 text-slate-100 shadow-sm">
+            <SubscriptionPaymentsTab
+              token={token || ''}
+              onPendingCountChange={setPendingPaymentsCount}
+              onPaymentReviewed={() => fetchTenants(token)}
+            />
+          </div>
+        ) : activeTab === 'list' ? (
           <div className="space-y-6">
             {/* Summary KPI */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -824,10 +932,62 @@ export default function SuperAdminControlPlanePage() {
                       {filteredTenants.map((tenant) => (
                         <tr key={tenant.id} className="hover:bg-gray-50">
                           <td className="px-4 py-4">
-                            <div className="font-bold text-gray-900">{tenant.name}</div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-bold text-gray-900">{tenant.name}</span>
+                              {tenant.isDemo && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-slate-100 text-slate-700 border border-slate-300">
+                                  DEMO
+                                </span>
+                              )}
+                              <span
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                  tenant.serviceStatus === 'SUSPENDED' ||
+                                  tenant.serviceStatus === 'LICENSE_OVERDUE'
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : tenant.serviceStatus === 'GRACE_PERIOD'
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-emerald-100 text-emerald-700'
+                                }`}
+                              >
+                                {tenant.serviceStatus || 'ACTIVE'}
+                              </span>
+                            </div>
                             <div className="text-xs text-indigo-600 font-medium">
                               🌐 {tenant.domain}
                             </div>
+                            <div className="text-[11px] text-gray-600 mt-1 flex flex-wrap gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded bg-gray-100 font-semibold">
+                                {tenant.licenseStatus === 'DEFERRED_6M'
+                                  ? 'Tanpa Lisensi (Tebus ≤6 Bln)'
+                                  : tenant.licenseStatus === 'OVERDUE'
+                                    ? 'Lisensi Overdue'
+                                    : 'Lisensi OWNED'}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">
+                                {tenant.infraTier || 'SHARED'} • {formatRupiah(Number(tenant.monthlyFeeAmount ?? 150000))}/bln
+                              </span>
+                            </div>
+                            {tenant.subscriptionExpiresAt && (
+                              <div className="text-[11px] text-gray-500 mt-0.5">
+                                Aktif s/d:{' '}
+                                {new Date(tenant.subscriptionExpiresAt).toLocaleDateString('id-ID', {
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </div>
+                            )}
+                            {tenant.licenseStatus === 'DEFERRED_6M' &&
+                              tenant.licenseRedemptionDeadlineAt && (
+                                <div className="text-[11px] text-amber-700 font-semibold mt-0.5">
+                                  ⏳ Deadline tebus:{' '}
+                                  {new Date(tenant.licenseRedemptionDeadlineAt).toLocaleDateString('id-ID', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </div>
+                              )}
                             {tenant.tagline && (
                               <div className="text-xs text-gray-500 mt-0.5">{tenant.tagline}</div>
                             )}
@@ -887,7 +1047,7 @@ export default function SuperAdminControlPlanePage() {
                             })}
                           </td>
                           <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                            <div className="flex flex-wrap items-center justify-center gap-1.5">
                               <a
                                 href={`/api/super-admin/preview?domain=${encodeURIComponent(tenant.domain)}&redirect=/`}
                                 target="_blank"
@@ -898,6 +1058,52 @@ export default function SuperAdminControlPlanePage() {
                                 <span>👁️</span>
                                 <span>Preview</span>
                               </a>
+                              <button
+                                type="button"
+                                onClick={() => setSubscriptionModalTenant(tenant)}
+                                title="Kelola Langganan Bulanan, Tier, & Status Lisensi"
+                                className="px-2.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 text-xs font-semibold flex items-center gap-1 transition"
+                              >
+                                <span>💳</span>
+                                <span>Langganan</span>
+                              </button>
+                              {!tenant.isDemo && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickToggleSuspend(tenant)}
+                                  title={
+                                    tenant.serviceStatus === 'SUSPENDED' ||
+                                    tenant.serviceStatus === 'LICENSE_OVERDUE'
+                                      ? 'Aktifkan Kembali Layanan'
+                                      : 'Nonaktifkan Layanan Sementara'
+                                  }
+                                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                                    tenant.serviceStatus === 'SUSPENDED' ||
+                                    tenant.serviceStatus === 'LICENSE_OVERDUE'
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                                      : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300'
+                                  }`}
+                                >
+                                  {tenant.serviceStatus === 'SUSPENDED' ||
+                                  tenant.serviceStatus === 'LICENSE_OVERDUE'
+                                    ? 'Aktifkan'
+                                    : 'Nonaktifkan'}
+                                </button>
+                              )}
+                              {tenant.billingPortalToken && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const url = `${window.location.origin}/billing/${tenant.billingPortalToken}`;
+                                    navigator.clipboard.writeText(url);
+                                    alert(`Link Portal Billing disalin:\n${url}`);
+                                  }}
+                                  title="Salin Link Portal Billing Klien"
+                                  className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold transition"
+                                >
+                                  Link Billing
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => openResetPasswordModal(tenant)}
@@ -2651,6 +2857,15 @@ export default function SuperAdminControlPlanePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {subscriptionModalTenant && (
+        <TenantSubscriptionModal
+          tenant={subscriptionModalTenant}
+          token={token || ''}
+          onClose={() => setSubscriptionModalTenant(null)}
+          onSaved={() => fetchTenants(token)}
+        />
       )}
     </div>
   );
