@@ -5,7 +5,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
   const repoRoot = process.cwd();
   const themeDir = path.join(repoRoot, 'wordpress', 'themes', 'larisdari-web-landing');
 
-  it('contains all required WordPress theme files, brand assets, CMS module, and deployment script', () => {
+  it('contains all required WordPress theme files, blog templates, brand assets, CMS module, seeder, and deploy script', () => {
     const requiredFiles = [
       'style.css',
       'functions.php',
@@ -13,6 +13,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       'front-page.php',
       'index.php',
       'footer.php',
+      'single.php',
+      'page-artikel.php',
+      'archive.php',
       path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
       path.join('assets', 'images', 'logo.svg'),
@@ -26,13 +29,17 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       expect(fs.existsSync(path.join(themeDir, file))).toBe(true);
     }
 
+    expect(fs.existsSync(path.join(repoRoot, 'wordpress', 'content', 'seo-articles.json'))).toBe(true);
+    expect(fs.existsSync(path.join(repoRoot, 'scripts', 'seed-wp-seo-articles.php'))).toBe(true);
+
     const deployScript = fs.readFileSync(path.join(repoRoot, 'scripts', 'deploy-wp-landing.sh'), 'utf8');
     expect(deployScript).toContain('https://larisdari.web.id');
     expect(deployScript).toContain('https://demo.larisdari.web.id');
     expect(deployScript).toContain('larisdari-web-landing');
+    expect(deployScript).toContain('seed-wp-seo-articles.php');
   });
 
-  it('defines valid WordPress theme metadata, focus-visible accessibility, tap targets, and contrast in style.css', () => {
+  it('defines valid WordPress theme metadata, focus-visible accessibility, tap targets, and blog styles in style.css', () => {
     const styleCss = fs.readFileSync(path.join(themeDir, 'style.css'), 'utf8');
     expect(styleCss).toContain('Theme Name: LarisDari.web.id Official Landing');
     expect(styleCss).toContain('Text Domain: larisdari-web-landing');
@@ -48,9 +55,12 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(styleCss).toContain(':focus-visible');
     expect(styleCss).toContain('prefers-reduced-motion');
     expect(styleCss).toContain('width: 48px;');
+    expect(styleCss).toContain('.lm-article-grid');
+    expect(styleCss).toContain('.lm-article-body');
+    expect(styleCss).toContain('.lm-breadcrumb');
   });
 
-  it('registers WP Customizer, rich SEO metadata, WP security hardening, CMS Leads, and Analytics in functions & cms-admin', () => {
+  it('registers WP Customizer, rich SEO metadata (SoftwareApplication, BlogPosting, BreadcrumbList), sitemap headers, WP security, and Analytics', () => {
     const functionsPhp = fs.readFileSync(path.join(themeDir, 'functions.php'), 'utf8');
     const cmsAdminPhp = fs.readFileSync(path.join(themeDir, 'inc', 'cms-admin.php'), 'utf8');
 
@@ -60,6 +70,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(functionsPhp).toContain('application/ld+json');
     expect(functionsPhp).toContain('SoftwareApplication');
     expect(functionsPhp).toContain('FAQPage');
+    expect(functionsPhp).toContain('BlogPosting');
+    expect(functionsPhp).toContain('BreadcrumbList');
+    expect(functionsPhp).toContain('larisdari_web_is_sitemap_request');
     expect(functionsPhp).toContain('rel="canonical"');
     expect(functionsPhp).toContain('property="og:image"');
     expect(functionsPhp).toContain('wp_sitemaps_add_provider');
@@ -93,16 +106,20 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     const frontPagePhp = fs.readFileSync(path.join(themeDir, 'front-page.php'), 'utf8');
     const footerPhp = fs.readFileSync(path.join(themeDir, 'footer.php'), 'utf8');
     const indexPhp = fs.readFileSync(path.join(themeDir, 'index.php'), 'utf8');
+    const singlePhp = fs.readFileSync(path.join(themeDir, 'single.php'), 'utf8');
 
     expect(headerPhp).toContain('#pesan');
+    expect(headerPhp).toContain('/artikel/');
     expect(headerPhp).toContain('lm-skip-link');
     expect(headerPhp).toContain('assets/images/logo.svg');
     expect(footerPhp).toContain('#pesan');
+    expect(footerPhp).toContain('/artikel/');
     expect(footerPhp).toContain('assets/images/logo-dark.svg');
     expect(footerPhp).not.toContain('<h4');
     expect(footerPhp).toContain('lm-footer-heading');
+    expect(singlePhp).toContain('lm-article-cta-box');
 
-    for (const content of [headerPhp, frontPagePhp, footerPhp, indexPhp]) {
+    for (const content of [headerPhp, frontPagePhp, footerPhp, indexPhp, singlePhp]) {
       expect(content).not.toContain('wa.me');
       expect(content).not.toMatch(/0812|628[0-9]{4,}/);
       expect(content).not.toMatch(/konsultasi|konsul/i);
@@ -127,6 +144,7 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(frontPagePhp).not.toContain('Starter UMKM');
 
     expect(frontPagePhp).toContain('id="pesan"');
+    expect(frontPagePhp).toContain('id="panduan"');
     expect(frontPagePhp).toContain('larisdari_web_submit_lead');
     expect(frontPagePhp).toContain('name="whatsapp"');
     expect(frontPagePhp).toContain('name="brand_name"');
@@ -142,6 +160,51 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
     expect(indexPhp).toContain('front-page.php');
   });
 
+  it('provides 10 complete evergreen StoryBrand SEO articles with realistic 1200x675 illustrations and internal links', () => {
+    const articlesPath = path.join(repoRoot, 'wordpress', 'content', 'seo-articles.json');
+    const rawJson = fs.readFileSync(articlesPath, 'utf8');
+    expect(rawJson).not.toMatch(/laris\s*manis/i);
+
+    const articles = JSON.parse(rawJson) as Array<{
+      slug: string;
+      title: string;
+      seoTitle: string;
+      seoDescription: string;
+      category: string;
+      imageFile: string;
+      imageAlt: string;
+      contentHtml: string;
+    }>;
+
+    expect(articles).toHaveLength(10);
+    const seenSlugs = new Set<string>();
+
+    for (const article of articles) {
+      expect(article.slug.length).toBeGreaterThan(10);
+      expect(seenSlugs.has(article.slug)).toBe(false);
+      seenSlugs.add(article.slug);
+
+      expect(article.seoDescription.length).toBeGreaterThanOrEqual(110);
+      expect(article.seoDescription.length).toBeLessThanOrEqual(165);
+
+      // Evergreen rule (Opsi A): no hardcoded price numbers in article bodies
+      expect(article.contentHtml).not.toMatch(/Rp\s*3\.000\.000|Rp\s*150\.000/i);
+      expect(article.contentHtml).not.toMatch(/wa\.me|0812|628[0-9]{4,}/i);
+      expect(article.contentHtml).not.toMatch(/konsultasi|konsul/i);
+
+      // Word count >= 600 words & internal links present
+      const plainWords = article.contentHtml.replace(/<[^>]+>/g, ' ').trim().split(/\s+/);
+      expect(plainWords.length).toBeGreaterThanOrEqual(600);
+      expect(article.contentHtml).toContain('https://larisdari.web.id/');
+
+      // Realistic illustration file exists and is non-trivial (> 10 KB)
+      const imgPath = path.join(themeDir, 'assets', 'images', 'articles', article.imageFile);
+      expect(fs.existsSync(imgPath)).toBe(true);
+      expect(fs.statSync(imgPath).size).toBeGreaterThan(10_000);
+      expect(article.imageAlt.length).toBeGreaterThan(15);
+    }
+  });
+
   it('contains zero legacy larismanis identifiers across theme files and deploy script', () => {
     const themeFiles = [
       'style.css',
@@ -150,6 +213,9 @@ describe('WordPress Landing Page Theme (wordpress/themes/larisdari-web-landing)'
       'front-page.php',
       'footer.php',
       'index.php',
+      'single.php',
+      'page-artikel.php',
+      'archive.php',
       path.join('inc', 'cms-admin.php'),
       path.join('assets', 'js', 'landing.js'),
       path.join('assets', 'images', 'logo.svg'),

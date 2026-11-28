@@ -9,7 +9,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-$demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+$demo_url    = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
+$anchor_base = (is_front_page() || is_home()) ? '' : trailingslashit(home_url('/'));
+$artikel_url = home_url('/artikel/');
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -32,20 +34,21 @@ $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.lar
     </a>
 
     <nav class="lm-nav-desktop" aria-label="Navigasi Utama">
-      <a href="#masalah" class="lm-nav-link">Keunggulan</a>
-      <a href="#omnichannel" class="lm-nav-link">Integrasi</a>
-      <a href="#fitur" class="lm-nav-link">Fitur</a>
-      <a href="#demo" class="lm-nav-link">Demo Live</a>
-      <a href="#harga" class="lm-nav-link">Harga</a>
-      <a href="#pesan" class="lm-nav-link">Pesan Lisensi</a>
-      <a href="#faq" class="lm-nav-link">FAQ</a>
+      <a href="<?php echo esc_url($anchor_base . '#masalah'); ?>" class="lm-nav-link">Keunggulan</a>
+      <a href="<?php echo esc_url($anchor_base . '#omnichannel'); ?>" class="lm-nav-link">Integrasi</a>
+      <a href="<?php echo esc_url($anchor_base . '#fitur'); ?>" class="lm-nav-link">Fitur</a>
+      <a href="<?php echo esc_url($anchor_base . '#demo'); ?>" class="lm-nav-link">Demo Live</a>
+      <a href="<?php echo esc_url($anchor_base . '#harga'); ?>" class="lm-nav-link">Harga</a>
+      <a href="<?php echo esc_url($artikel_url); ?>" class="lm-nav-link">Artikel</a>
+      <a href="<?php echo esc_url($anchor_base . '#pesan'); ?>" class="lm-nav-link">Pesan Lisensi</a>
+      <a href="<?php echo esc_url($anchor_base . '#faq'); ?>" class="lm-nav-link">FAQ</a>
     </nav>
 
     <div class="lm-nav-actions">
       <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline">
         Lihat Demo Toko
       </a>
-      <a href="#pesan" class="lm-btn lm-btn-primary">
+      <a href="<?php echo esc_url($anchor_base . '#pesan'); ?>" class="lm-btn lm-btn-primary">
         Pesan Lisensi &rarr;
       </a>
     </div>
@@ -64,19 +67,20 @@ $demo_url = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.lar
 
   <div id="lm-mobile-drawer" class="lm-mobile-drawer" hidden>
     <nav class="lm-mobile-nav-list" aria-label="Menu Mobile">
-      <a href="#masalah" class="lm-mobile-nav-link">Keunggulan</a>
-      <a href="#omnichannel" class="lm-mobile-nav-link">Integrasi Omnichannel</a>
-      <a href="#fitur" class="lm-mobile-nav-link">6 Pilar Fitur</a>
-      <a href="#demo" class="lm-mobile-nav-link">Coba Demo Live</a>
-      <a href="#harga" class="lm-mobile-nav-link">Skema Harga</a>
-      <a href="#pesan" class="lm-mobile-nav-link">Form Pemesanan Lisensi</a>
-      <a href="#faq" class="lm-mobile-nav-link">Tanya Jawab (FAQ)</a>
+      <a href="<?php echo esc_url($anchor_base . '#masalah'); ?>" class="lm-mobile-nav-link">Keunggulan</a>
+      <a href="<?php echo esc_url($anchor_base . '#omnichannel'); ?>" class="lm-mobile-nav-link">Integrasi Omnichannel</a>
+      <a href="<?php echo esc_url($anchor_base . '#fitur'); ?>" class="lm-mobile-nav-link">6 Pilar Fitur</a>
+      <a href="<?php echo esc_url($anchor_base . '#demo'); ?>" class="lm-mobile-nav-link">Coba Demo Live</a>
+      <a href="<?php echo esc_url($anchor_base . '#harga'); ?>" class="lm-mobile-nav-link">Skema Harga</a>
+      <a href="<?php echo esc_url($artikel_url); ?>" class="lm-mobile-nav-link">Artikel &amp; Strategi SEO</a>
+      <a href="<?php echo esc_url($anchor_base . '#pesan'); ?>" class="lm-mobile-nav-link">Form Pemesanan Lisensi</a>
+      <a href="<?php echo esc_url($anchor_base . '#faq'); ?>" class="lm-mobile-nav-link">Tanya Jawab (FAQ)</a>
     </nav>
     <div class="lm-mobile-actions">
       <a href="<?php echo esc_url($demo_url); ?>" target="_blank" rel="noopener" class="lm-btn lm-btn-outline">
         Lihat Demo Toko
       </a>
-      <a href="#pesan" class="lm-btn lm-btn-primary">
+      <a href="<?php echo esc_url($anchor_base . '#pesan'); ?>" class="lm-btn lm-btn-primary">
         Isi Form Pemesanan &rarr;
       </a>
     </div>

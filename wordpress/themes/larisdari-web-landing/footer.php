@@ -12,6 +12,7 @@ if (!defined('ABSPATH')) {
 $demo_url       = larisdari_web_get_option('larisdari_web_demo_url', 'https://demo.larisdari.web.id');
 $demo_admin_url = larisdari_web_get_option('larisdari_web_demo_admin_url', 'https://demo.larisdari.web.id/login');
 $contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@larisdari.web.id');
+$anchor_base    = (is_front_page() || is_home()) ? '' : trailingslashit(home_url('/'));
 ?>
 
 <footer class="lm-footer" role="contentinfo">
@@ -40,10 +41,11 @@ $contact_email  = larisdari_web_get_option('larisdari_web_contact_email', 'halo@
       <div>
         <h2 class="lm-footer-heading">Navigasi &amp; Pendaftaran</h2>
         <ul>
-          <li><a href="#fitur">Fitur Unggulan</a></li>
-          <li><a href="#harga">Skema Harga</a></li>
-          <li><a href="#pesan">Form Pemesanan Lisensi</a></li>
-          <li><a href="#faq">FAQ</a></li>
+          <li><a href="<?php echo esc_url($anchor_base . '#fitur'); ?>">Fitur Unggulan</a></li>
+          <li><a href="<?php echo esc_url($anchor_base . '#harga'); ?>">Skema Harga</a></li>
+          <li><a href="<?php echo esc_url(home_url('/artikel/')); ?>">Artikel &amp; Strategi SEO</a></li>
+          <li><a href="<?php echo esc_url($anchor_base . '#pesan'); ?>">Form Pemesanan Lisensi</a></li>
+          <li><a href="<?php echo esc_url($anchor_base . '#faq'); ?>">FAQ</a></li>
           <li><a href="mailto:<?php echo esc_attr($contact_email); ?>"><?php echo esc_html($contact_email); ?></a></li>
         </ul>
       </div>
