@@ -38,7 +38,11 @@ export function getOwnerCredentials(): {
   passwordHash?: string;
 } {
   const email = (process.env.SUPER_ADMIN_EMAIL || 'owner@master-control.local').trim().toLowerCase();
-  const passwordHash = process.env.SUPER_ADMIN_PASSWORD_HASH || undefined;
+  const b64Hash = process.env.SUPER_ADMIN_PASSWORD_HASH_B64?.trim();
+  const decodedB64Hash = b64Hash
+    ? Buffer.from(b64Hash, 'base64').toString('utf8').trim()
+    : undefined;
+  const passwordHash = decodedB64Hash || process.env.SUPER_ADMIN_PASSWORD_HASH || undefined;
   const password = process.env.SUPER_ADMIN_PASSWORD || 'MasterOwner#2026!';
 
   return { email, password, passwordHash };

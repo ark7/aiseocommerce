@@ -79,6 +79,21 @@ describe('Super-Admin Owner Control Plane & Website Duplication', () => {
       ).resolves.toBe(false);
     });
 
+    it('supports base64-encoded bcrypt hash via SUPER_ADMIN_PASSWORD_HASH_B64', async () => {
+      const bcrypt = require('bcryptjs');
+      const rawHash = bcrypt.hashSync('Base64Secret#2026', 6);
+      process.env.SUPER_ADMIN_PASSWORD_HASH_B64 = Buffer.from(rawHash, 'utf8').toString('base64');
+      delete process.env.SUPER_ADMIN_PASSWORD_HASH;
+      delete process.env.SUPER_ADMIN_PASSWORD;
+
+      await expect(
+        verifyOwnerCredentials('myowner@aiseo.id', 'Base64Secret#2026')
+      ).resolves.toBe(true);
+      await expect(
+        verifyOwnerCredentials('myowner@aiseo.id', 'WrongPass')
+      ).resolves.toBe(false);
+    });
+
     it('rejects regular store ADMIN JWT tokens from accessing duplication endpoints', async () => {
       // A valid JWT for a Store ADMIN (not the Super-Admin Owner)
       const regularStoreAdminToken = jwt.sign(
